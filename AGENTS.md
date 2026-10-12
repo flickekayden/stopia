@@ -25,3 +25,4 @@
 - Device haptics and installation prompts run only in effects or user handlers with capability checks so SSR and unsupported browsers stay safe.
 - UI hierarchy uses unframed game-section bands, shared segmented Button variants and global semantic surface/focus tokens; keep presentation changes separate from multiplayer state and developer overrides.
 - Built-in keyboard keys use the keyboard-key exception to the global minimum-width rule so standard QWERTY rows fit the smartphone shell without horizontal overflow.
+- SettingsRuntime mounts useDockLayout to measure the active action bar and share scroll/chat clearance; short viewports keep bars in document flow so content remains reachable without changing game state.

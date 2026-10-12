@@ -219,7 +219,7 @@ export function RoundBoard({
   const evaluating = round.status !== "answering" || stopCountdown === 0;
 
   return (
-    <div className={`space-y-4 ${appKeyboard ? "pb-[28rem]" : "pb-48"}`}>
+    <div className="dock-clearance space-y-4">
       <div className={`sticky top-0 z-20 flex items-center border border-border bg-background/95 pt-[calc(0.75rem+env(safe-area-inset-top))] backdrop-blur ${compactHeader ? "gap-3 rounded-b-lg border-t-0 px-3 pb-2" : "gap-4 rounded-b-3xl border-t-0 px-4 pb-4"}`}>
         <div className={`flex shrink-0 items-center justify-center bg-primary ${compactHeader ? "size-10 rounded-md" : "size-20 rounded-2xl"}`}>
           <span className={`font-display text-primary-foreground ${compactHeader ? "text-2xl" : "text-5xl"}`}>{round.letter}</span>
@@ -324,9 +324,9 @@ export function RoundBoard({
           );
           return (
             <div className="flex w-full flex-col gap-1.5">
-              <div className="flex gap-1">{[..."QWERTYUIOP"].map(key)}</div>
-              <div className="flex gap-1">{[..."ASDFGHJKLÇ"].map(key)}</div>
-              <div className="flex gap-1">
+              <div className="keyboard-row flex gap-1">{[..."QWERTYUIOP"].map(key)}</div>
+              <div className="keyboard-row flex gap-1">{[..."ASDFGHJKLÇ"].map(key)}</div>
+              <div className="keyboard-row flex gap-1">
                 <div className="flex-[0.5]" />
                 {[..."ZXCVBNM"].map(key)}
                 <Button variant="secondary" type="button" aria-label="Apagar" onMouseDown={(e) => e.preventDefault()} onClick={back} className="keyboard-key h-12 min-h-12 min-w-0 flex-[1.5] rounded-md px-0 text-base">⌫</Button>

@@ -104,7 +104,7 @@ export function RoundResults({
   const visibleCategories = mode === "list" ? categories : [category];
 
   return (
-    <div className="space-y-4 pb-80">
+    <div className="dock-clearance space-y-4">
       <div ref={categoryHeading} className="scroll-mt-4 space-y-3 text-center">
         <p className="text-sm text-muted-foreground">Rodada {round.number} · letra {round.letter}</p>
         <h2 className="font-display text-3xl">Resultado da rodada</h2>
@@ -153,12 +153,12 @@ export function RoundResults({
               </Button>
             )}
             {!everyoneReady && (
-              <div className="flex flex-wrap items-center justify-center gap-2">
+              <div className="game-scroll flex max-h-20 flex-wrap items-center justify-center gap-2 overflow-y-auto">
                 <span className="text-sm text-muted-foreground">Ainda vendo:</span>
                 {pending.map((p) => (
                   <span
                     key={p.id}
-                    className="rounded-full bg-secondary px-3 py-1 text-sm text-muted-foreground"
+                    className="text-balance-safe max-w-full rounded-full bg-secondary px-3 py-1 text-sm text-muted-foreground"
                   >
                     {p.nickname} <PlayerPresence player={p} />
                   </span>

@@ -50,11 +50,11 @@ export function FinalRanking({
   }
 
   return (
-    <div className="space-y-4 pb-64">
+    <div className="dock-clearance space-y-4">
       <div className="py-6 text-center">
         <Trophy className="mx-auto size-12 text-gold" />
         <h2 className="mt-3 font-display text-4xl">Fim de jogo!</h2>
-        <p className="text-muted-foreground">
+        <p className="text-balance-safe text-muted-foreground">
           {ranking[0] ? `${ranking[0].nickname} levou a melhor` : "Sem vencedores"}
         </p>
       </div>
@@ -94,7 +94,7 @@ export function FinalRanking({
               key={p.id}
               className={`rounded-lg border p-4 ${i === 0 ? "border-gold bg-card" : "border-border bg-card"}`}
             >
-              <div className="flex items-center justify-between gap-3">
+              <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
                 <p className="text-balance-safe min-w-0 font-bold text-lg">
                   {i + 1}º {p.nickname}
                 </p>

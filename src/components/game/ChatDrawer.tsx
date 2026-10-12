@@ -239,7 +239,7 @@ export function ChatDrawer({
           } else onOpenChange(true);
         }}
         style={bubblePos ? { left: bubblePos.x, top: bubblePos.y, right: "auto", bottom: "auto", touchAction: "none" } : { touchAction: "none" }}
-        className={`fixed ${locked && devCfg.keyboard.mode === "app" ? "bottom-[calc(21rem+env(safe-area-inset-bottom))]" : voiceControls ? "bottom-[calc(19rem+env(safe-area-inset-bottom))]" : "bottom-[calc(7rem+env(safe-area-inset-bottom))]"} right-[max(1rem,calc((100vw-28rem)/2+1rem))] z-40 size-14 rounded-full shadow-lg touch-none`}
+        className="chat-launcher fixed right-[max(1rem,calc((100vw-28rem)/2+1rem))] z-40 size-14 rounded-full shadow-lg touch-none"
       >
         <MessageCircle className="size-6" />
         {unread > 0 && !open && (
