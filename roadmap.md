@@ -1,7 +1,7 @@
 # Roadmap
 
-- [ ] Add supplied built-in category presets and lobby replace/merge controls
-- [ ] Verify eight-category rotation and real lobby persistence
+- [x] Add supplied built-in category presets and lobby replace/merge controls
+- [x] Verify eight-category rotation and real lobby persistence
 
 - [x] Mostrar salas criadas para todos na tela inicial
 - [x] Proteger exclusão com senha de desenvolvedor no servidor
