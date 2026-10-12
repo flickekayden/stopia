@@ -105,7 +105,7 @@ export const updateCategoryPreset = createServerFn({ method: "POST" })
     z
       .object({
         presetId: z.string().uuid(),
-        categories: z.array(z.string().trim().min(1).max(60)).min(1).max(100),
+        categories: z.array(z.string().trim().min(1).max(160)).min(1).max(100),
       })
       .parse(input),
   )

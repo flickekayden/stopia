@@ -197,7 +197,7 @@ export function CategoryPresets({
                     <div key={i} className="flex items-center gap-2">
                       <Input
                         value={c}
-                        maxLength={60}
+                        maxLength={160}
                         onChange={(e) => {
                           const next = [...draft];
                           next[i] = e.target.value;
@@ -218,7 +218,7 @@ export function CategoryPresets({
                   <div className="flex items-center gap-2">
                     <Input
                       value={newItem}
-                      maxLength={60}
+                      maxLength={160}
                       placeholder="Adicionar categoria"
                       onChange={(e) => setNewItem(e.target.value)}
                       onKeyDown={(e) => { if (e.key === "Enter") addItem(); }}
