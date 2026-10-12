@@ -78,7 +78,7 @@ export function FinalRanking({
           return <div key={p.id} className="min-w-0 flex-1 text-center">
             <p className="text-balance-safe mb-2 text-sm font-bold">{p.nickname}</p>
             <div className={`flex flex-col items-center justify-center rounded-t-lg border border-current ${place === 0 ? "h-36 bg-gold/15 text-gold" : place === 1 ? "h-28 bg-silver/15 text-silver" : "h-20 bg-bronze/15 text-bronze"}`}>
-              <span className="text-xl">{["🥇", "🥈", "🥉"][place]}</span>
+              <Trophy className="size-5" aria-hidden="true" />
               <strong className="font-display text-2xl">{p.score}</strong>
               <span className="text-xs">{place + 1}º lugar</span>
             </div>
