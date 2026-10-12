@@ -184,6 +184,61 @@ export type Database = {
           },
         ]
       }
+      room_voice_notes: {
+        Row: {
+          created_at: string
+          duration_ms: number
+          id: string
+          nickname: string
+          player_id: string
+          room_id: string
+          round_id: string
+          storage_path: string
+        }
+        Insert: {
+          created_at?: string
+          duration_ms: number
+          id?: string
+          nickname: string
+          player_id: string
+          room_id: string
+          round_id: string
+          storage_path: string
+        }
+        Update: {
+          created_at?: string
+          duration_ms?: number
+          id?: string
+          nickname?: string
+          player_id?: string
+          room_id?: string
+          round_id?: string
+          storage_path?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "room_voice_notes_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "room_voice_notes_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "room_voice_notes_round_id_fkey"
+            columns: ["round_id"]
+            isOneToOne: false
+            referencedRelation: "rounds"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       rooms: {
         Row: {
           categories: string[]

@@ -1,5 +1,9 @@
 # Roadmap
 
+- [x] Add secure voice uploads and realtime distribution during results
+- [x] Add seven-second push-to-talk, cancellation, playback queue and saved mute
+- [x] Verify voice reactions with two players and mobile-sized results
+
 - [x] Add supplied built-in category presets and lobby replace/merge controls
 - [x] Verify eight-category rotation and real lobby persistence
 

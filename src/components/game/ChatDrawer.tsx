@@ -55,6 +55,7 @@ export function ChatDrawer({
   playerId,
   players,
   locked,
+  voiceControls = false,
   open,
   quote,
   onOpenChange,
@@ -65,6 +66,7 @@ export function ChatDrawer({
   playerId: string;
   players: Player[];
   locked: boolean;
+  voiceControls?: boolean;
   open: boolean;
   quote: AnswerCardData | null;
   onOpenChange: (open: boolean) => void;
@@ -219,7 +221,7 @@ export function ChatDrawer({
           } else onOpenChange(true);
         }}
         style={bubblePos ? { left: bubblePos.x, top: bubblePos.y, right: "auto", bottom: "auto", touchAction: "none" } : { touchAction: "none" }}
-        className="fixed bottom-[calc(4rem+env(safe-area-inset-bottom))] right-4 z-40 size-14 rounded-full shadow-lg md:hidden"
+        className={`fixed ${voiceControls ? "bottom-[calc(11rem+env(safe-area-inset-bottom))]" : "bottom-[calc(4rem+env(safe-area-inset-bottom))]"} right-4 z-40 size-14 rounded-full shadow-lg md:hidden`}
       >
         <MessageCircle className="size-6" />
         {unread > 0 && !open && (
