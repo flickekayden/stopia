@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { getGlobalSettings } from "@/lib/game.functions";
-import { setGlobalSettings, useDevSettings, useEffectiveDevSettings } from "@/lib/dev-settings";
+import { setGlobalSettings, useDevSettings, useEffectiveDevSettings, type GlobalSettings } from "@/lib/dev-settings";
 
 const DevPanel = lazy(() => import("@/components/DevPanel").then((module) => ({ default: module.DevPanel })));
 
@@ -25,7 +25,7 @@ export function SettingsRuntime() {
       inFlight = true;
       try {
         const settings = await fetchGlobal();
-        if (active) setGlobalSettings(settings);
+        if (active) setGlobalSettings(settings as GlobalSettings);
       } catch { /* Keep the last confirmed settings during transient failures. */ }
       finally { inFlight = false; }
     };
