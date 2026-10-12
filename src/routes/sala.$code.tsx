@@ -432,6 +432,7 @@ function RoomPage() {
         playerId={me.id}
         players={players}
         locked={chatLocked}
+        voiceControls={currentRound?.status === "results" && room.status === "playing"}
         open={chatOpen}
         quote={chatQuote}
         onOpenChange={setChatOpen}
