@@ -352,7 +352,7 @@ function RoomPage() {
   return (
     <main className="mx-auto w-full max-w-md px-4 pt-[calc(0.75rem+env(safe-area-inset-top))]">
       <header className="mb-4 space-y-3">
-        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 pr-14">
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 pr-28">
           <h1 className="font-display text-2xl text-primary">STOP!</h1>
           <Button
             variant="ghost"

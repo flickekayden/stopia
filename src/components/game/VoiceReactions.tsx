@@ -12,7 +12,7 @@ export function VoiceReactions(props: { roomId: string; roundId: string; playerI
   return (
     <>
       {voice.speaker && createPortal(
-        <div role="status" className="pointer-events-none fixed inset-x-4 top-4 z-50 mx-auto flex max-w-sm items-center gap-3 rounded-xl border border-border bg-popover px-4 py-3 text-popover-foreground shadow-sm">
+        <div role="status" className="pointer-events-none fixed inset-x-4 top-[calc(0.75rem+env(safe-area-inset-top))] z-50 mx-auto flex max-w-sm items-center gap-3 rounded-xl border border-border bg-popover px-4 py-3 text-popover-foreground shadow-sm">
           <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary font-bold text-primary-foreground">{voice.speaker.slice(0, 1).toUpperCase()}</span>
           <span className="min-w-0 flex-1 break-words text-sm">@{voice.speaker} reagindo...</span>
           <AudioLines aria-hidden className="size-5 shrink-0 animate-pulse text-primary motion-reduce:animate-none" />

@@ -199,7 +199,7 @@ export function DevPanel() {
               <AiTab s={s} patch={patch} />
             </TabsContent>
           </Tabs>
-          <div className="space-y-2 px-4 pb-8">
+          <div className="sticky bottom-0 space-y-2 border-t border-border bg-background px-4 pt-3 pb-[calc(1rem+env(safe-area-inset-bottom))]">
             <Button
               className="w-full"
               disabled={saving}
