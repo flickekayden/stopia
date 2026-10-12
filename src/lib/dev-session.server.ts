@@ -27,8 +27,6 @@ export async function developerIsUnlocked() {
   return session.data.unlocked === true;
 }
 
-import { createHmac, timingSafeEqual } from "node:crypto";
-
 function sign(payload: string) {
   return createHmac("sha256", process.env["DEVELOPER_SESSION_SECRET"] ?? "").update(payload).digest("hex");
 }
