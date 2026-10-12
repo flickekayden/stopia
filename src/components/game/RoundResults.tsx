@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { List, Layers, FastForward } from "lucide-react";
 import { toast } from "sonner";
 
@@ -44,6 +44,13 @@ export function RoundResults({
   const [markingSeen, setMarkingSeen] = useState(false);
   const categoryHeading = useRef<HTMLDivElement | null>(null);
   const evaluation = round.evaluation as unknown as Evaluation | null;
+  const cards = useMemo(() => round.categories.map((category) => ({
+    category,
+    answers: players.map((player): AnswerCardData => {
+      const row = evaluation?.resultados.find((result) => result.categoria === category && result.jogador_id === player.id);
+      return { roundId: round.id, category, playerId: player.id, playerName: player.nickname, response: row?.resposta ?? "", points: row?.pontos ?? 0, comment: row?.comentario ?? "" };
+    }),
+  })), [round.id, round.categories, evaluation, players]);
   const categories = round.categories;
   const category = categories[index] ?? "";
   const isLastCategory = index >= categories.length - 1;
@@ -58,7 +65,7 @@ export function RoundResults({
   const previousPending = useRef(pending.length);
 
   useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), 500);
+    const timer = window.setInterval(() => setNow(Date.now()), 1_000);
     return () => window.clearInterval(timer);
   }, []);
 
@@ -111,14 +118,10 @@ export function RoundResults({
         </div>
       </div>
       {visibleCategories.map((c) => {
-        const rows = (evaluation?.resultados ?? []).filter((r) => r.categoria === c);
+        const categoryCards = cards.find((item) => item.category === c)?.answers ?? [];
         return <section key={c} id={`result-category-${categories.indexOf(c)}`} className="scroll-mt-4 space-y-3">
           <h2 className="text-balance-safe font-display text-3xl text-primary">{c}</h2>
-          {players.map((p) => {
-            const row = rows.find((r) => r.jogador_id === p.id);
-            const data: AnswerCardData = { roundId: round.id, category: c, playerId: p.id, playerName: p.nickname, response: row?.resposta ?? "", points: row?.pontos ?? 0, comment: row?.comentario ?? "" };
-            return <AnswerCard key={p.id} data={data} highlighted={highlightedAnswer === answerCardId(data)} onQuote={onQuote} />;
-          })}
+          {categoryCards.map((data) => <AnswerCard key={data.playerId} data={data} highlighted={highlightedAnswer === answerCardId(data)} onQuote={onQuote} />)}
         </section>;
       })}
 

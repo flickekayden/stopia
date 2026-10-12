@@ -10,8 +10,10 @@ async function verifyVoicePlayer(data: z.infer<typeof identity>) {
   const hash = `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
   const { data: player } = await supabaseAdmin.from("players").select("id,nickname").eq("id", data.playerId).eq("room_id", data.roomId).eq("session_id", hash).maybeSingle();
   if (!player) throw new Error("Sua sessão na sala expirou");
-  const { data: round } = await supabaseAdmin.from("rounds").select("id,status,number").eq("id", data.roundId).eq("room_id", data.roomId).maybeSingle();
-  const { data: room } = await supabaseAdmin.from("rooms").select("status,current_round").eq("id", data.roomId).maybeSingle();
+  const [{ data: round }, { data: room }] = await Promise.all([
+    supabaseAdmin.from("rounds").select("id,status,number").eq("id", data.roundId).eq("room_id", data.roomId).maybeSingle(),
+    supabaseAdmin.from("rooms").select("status,current_round").eq("id", data.roomId).maybeSingle(),
+  ]);
   if (!round || round.status !== "results" || !room || room.status !== "playing" || room.current_round !== round.number) throw new Error("Reações de voz estão disponíveis apenas nos resultados da rodada atual");
   return { player, db: supabaseAdmin };
 }

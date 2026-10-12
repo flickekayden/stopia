@@ -68,26 +68,26 @@ const SERVER_SNAPSHOT = { isDev: false, settings: DEFAULT_DEV_SETTINGS };
 
 export function useDevSettings() {
   return useSyncExternalStore(
-    (l) => {
-      load();
-      listeners.add(l);
-      queueMicrotask(l);
-      return () => listeners.delete(l);
-    },
-    () => {
-      load();
-      return snapshot;
-    },
-    () => SERVER_SNAPSHOT,
+    subscribeDev,
+    getDevSnapshot,
+    getServerDevSnapshot,
   );
 }
+
+function subscribeDev(listener: () => void) {
+  load();
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+}
+function getDevSnapshot() { return snapshot; }
+function getServerDevSnapshot() { return SERVER_SNAPSHOT; }
 
 /* Configurações globais salvas pelo desenvolvedor (valem para todos os aparelhos). */
 export type GlobalSettings = Partial<Pick<DevSettings, "buttonLayout" | "colors" | "texts" | "scoringMode" | "keyboard" | "quickMessages">>;
 let globalSettings: DevSettings = DEFAULT_DEV_SETTINGS;
 const globalListeners = new Set<() => void>();
 export function setGlobalSettings(g: GlobalSettings) {
-  globalSettings = {
+  const next = {
     ...DEFAULT_DEV_SETTINGS,
     ...g,
     colors: { ...DEFAULT_DEV_SETTINGS.colors, ...g.colors },
@@ -95,18 +95,23 @@ export function setGlobalSettings(g: GlobalSettings) {
     keyboard: { ...DEFAULT_DEV_SETTINGS.keyboard, ...g.keyboard },
     ai: DEFAULT_DEV_SETTINGS.ai,
   };
+  if (JSON.stringify(next) === JSON.stringify(globalSettings)) return;
+  globalSettings = next;
   globalListeners.forEach((l) => l());
 }
 export function useGlobalSettings() {
   return useSyncExternalStore(
-    (l) => {
-      globalListeners.add(l);
-      return () => globalListeners.delete(l);
-    },
-    () => globalSettings,
-    () => DEFAULT_DEV_SETTINGS,
+    subscribeGlobal,
+    getGlobalSnapshot,
+    getServerGlobalSnapshot,
   );
 }
+function subscribeGlobal(listener: () => void) {
+  globalListeners.add(listener);
+  return () => globalListeners.delete(listener);
+}
+function getGlobalSnapshot() { return globalSettings; }
+function getServerGlobalSnapshot() { return DEFAULT_DEV_SETTINGS; }
 
 /** Configurações efetivas: as locais do desenvolvedor, ou as globais salvas para todos. */
 export function useEffectiveDevSettings() {

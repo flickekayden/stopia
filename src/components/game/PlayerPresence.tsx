@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { memo, useEffect, useState } from "react";
 
 import type { Player } from "@/hooks/use-room";
 
@@ -8,13 +8,17 @@ export function isPlayerOnline(player: Player, now = Date.now()) {
   return player.is_online && now - new Date(player.last_seen).getTime() <= OFFLINE_AFTER_MS;
 }
 
-export function PlayerPresence({ player, showOnlineText = false }: { player: Player; showOnlineText?: boolean }) {
+export const PlayerPresence = memo(function PlayerPresence({ player, showOnlineText = false }: { player: Player; showOnlineText?: boolean }) {
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), 1_000);
-    return () => window.clearInterval(timer);
-  }, []);
+    setNow(Date.now());
+    if (!player.is_online) return;
+    const remaining = new Date(player.last_seen).getTime() + OFFLINE_AFTER_MS - Date.now();
+    if (remaining < 0) return;
+    const timer = window.setTimeout(() => setNow(Date.now()), remaining + 1);
+    return () => window.clearTimeout(timer);
+  }, [player.is_online, player.last_seen]);
 
   const online = isPlayerOnline(player, now);
 
@@ -25,4 +29,4 @@ export function PlayerPresence({ player, showOnlineText = false }: { player: Pla
       <span className="sr-only">{online ? "Online" : "Ausente"}</span>
     </span>
   );
-}
+});

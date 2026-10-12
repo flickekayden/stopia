@@ -83,8 +83,13 @@ export function RoundBoard({
   }, [mine, hydrated, round.categories]);
 
   useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 500);
+    if (round.status !== "answering" || (!round.ends_at && !round.stop_requested_at)) return;
+    const id = setInterval(() => setNow(Date.now()), 1_000);
     return () => clearInterval(id);
+  }, [round.status, round.ends_at, round.stop_requested_at]);
+
+  useEffect(() => () => {
+    if (saveTimer.current) clearTimeout(saveTimer.current);
   }, []);
 
   const secondsLeft = useMemo(() => {
@@ -173,7 +178,7 @@ export function RoundBoard({
   }
 
   const canStop = room.stop_policy === "anyone" || isHost;
-  const finishedIds = answers.filter((a) => a.finished).map((a) => a.player_id);
+  const finishedIds = useMemo(() => answers.filter((a) => a.finished).map((a) => a.player_id), [answers]);
   const previousFinishedIds = useRef<Set<string> | null>(null);
   useEffect(() => {
     const current = new Set(finishedIds);

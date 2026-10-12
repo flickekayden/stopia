@@ -34,10 +34,10 @@ export const listChatMessages = createServerFn({ method: "POST" })
       .from("chat_messages")
       .select("id, room_id, player_id, content, quote, created_at")
       .eq("room_id", data.roomId)
-      .order("created_at", { ascending: true })
+      .order("created_at", { ascending: false })
       .limit(100);
     if (error) throw new Error("Não foi possível carregar o chat");
-    return messages ?? [];
+    return (messages ?? []).reverse();
   });
 
 export const sendChatMessage = createServerFn({ method: "POST" })
