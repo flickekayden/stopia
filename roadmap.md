@@ -1,5 +1,11 @@
 # Roadmap
 
+- [x] Audit application performance before making changes
+- [ ] Reduce room refreshes and preserve multiplayer synchronization
+- [ ] Split optional screens and streamline chat loading
+- [ ] Optimize audio, subscriptions, timers and result rendering
+- [ ] Verify real multiplayer flows and record performance evidence
+
 - [x] Add timed results readiness, host override and inactive-player bypass
 - [x] Add continuous results with category shortcuts
 - [x] Compact home entry, lobby tags/presence, and focused round header
