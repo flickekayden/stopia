@@ -290,7 +290,7 @@ export function RoundBoard({
               placeholder={`Com ${round.letter}...`}
               autoComplete="off"
               autoCorrect="off"
-              autoCapitalize="words"
+              autoCapitalize="sentences"
               spellCheck={false}
               enterKeyHint={index < round.categories.length - 1 ? "next" : "done"}
               onKeyDown={(event) => {
@@ -314,15 +314,30 @@ export function RoundBoard({
       </div>
 
       <div className={`mobile-bottom-bar fixed inset-x-0 bottom-[var(--keyboard-inset,0px)] mx-auto flex flex-wrap w-full max-w-md gap-3 ${dev.buttonLayout === "reversed" ? "flex-row-reverse" : dev.buttonLayout === "stacked" ? "flex-col" : ""} border-t border-border bg-background/95 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] backdrop-blur`}>
-        {appKeyboard && !evaluating && (
-          <div className="grid w-full grid-cols-7 gap-1">
-            {[..."QWERTYUIOPASDFGHJKLÇZXCVBNM"].map((k) => (
-              <Button variant="secondary" key={k} type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => { const c = focusedCat ?? round.categories[0] ?? ""; setValue(c, (values[c] ?? "") + k); }} className="h-12 rounded-md bg-secondary text-sm font-bold">{k}</Button>
-            ))}
-            <Button variant="secondary" type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => { const c = focusedCat ?? round.categories[0] ?? ""; setValue(c, (values[c] ?? "") + " "); }} className="col-span-2 h-12 rounded-md bg-secondary text-xs">Espaço</Button>
-            <Button variant="secondary" type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => { const c = focusedCat ?? round.categories[0] ?? ""; setValue(c, (values[c] ?? "").slice(0, -1)); }} className="h-12 rounded-md bg-secondary text-sm">⌫</Button>
-          </div>
-        )}
+        {appKeyboard && !evaluating && (() => {
+          const target = () => focusedCat ?? round.categories[0] ?? "";
+          const type = (k: string) => { const c = target(); setValue(c, (values[c] ?? "") + k); };
+          const back = () => { const c = target(); setValue(c, (values[c] ?? "").slice(0, -1)); };
+          const key = (k: string) => (
+            <Button variant="secondary" key={k} type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => type(k)} className="h-12 min-h-12 min-w-0 flex-1 rounded-md px-0 text-base font-bold">{k}</Button>
+          );
+          return (
+            <div className="flex w-full flex-col gap-1.5">
+              <div className="flex gap-1">{[..."QWERTYUIOP"].map(key)}</div>
+              <div className="flex gap-1">{[..."ASDFGHJKLÇ"].map(key)}</div>
+              <div className="flex gap-1">
+                <div className="flex-[0.5]" />
+                {[..."ZXCVBNM"].map(key)}
+                <Button variant="secondary" type="button" aria-label="Apagar" onMouseDown={(e) => e.preventDefault()} onClick={back} className="h-12 min-h-12 min-w-0 flex-[1.5] rounded-md px-0 text-base">⌫</Button>
+              </div>
+              <div className="flex gap-1">
+                <div className="flex-[2]" />
+                <Button variant="secondary" type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => type(" ")} className="h-12 min-h-12 flex-[6] rounded-md text-sm">Espaço</Button>
+                <div className="flex-[2]" />
+              </div>
+            </div>
+          );
+        })()}
         {evaluating ? (
           <div className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-secondary font-bold">
             <Loader2 className="size-5 animate-spin" /> Avaliando respostas...
