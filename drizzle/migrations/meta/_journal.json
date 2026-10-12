@@ -8,6 +8,13 @@
       "when": 1791843181321,
       "tag": "0000_room_voice_notes",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1791845136445,
+      "tag": "0001_enable_game_realtime",
+      "breakpoints": true
     }
   ]
 }
