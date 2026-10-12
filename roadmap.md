@@ -1,8 +1,8 @@
 # Roadmap
 
-- [ ] Audit every route, shared control and game phase across narrow, short and wide viewports
-- [ ] Adapt fixed actions, forms, dialogs, game keyboard and long content without changing rules
-- [ ] Verify real multiplayer, chat and final rankings across device sizes
+- [x] Audit every route, shared control and game phase across narrow, short and wide viewports
+- [x] Adapt fixed actions, forms, dialogs, game keyboard and long content without changing rules
+- [x] Verify real multiplayer, chat and final rankings across device sizes
 
 - [x] Review all screens before visual changes
 - [x] Polish shared controls, typography, contrast and sheets
