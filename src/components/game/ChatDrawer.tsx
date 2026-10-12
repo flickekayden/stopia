@@ -285,7 +285,7 @@ export function ChatDrawer({
                   <ChatBubble key={message.id} mine={mine}>
                     <ChatBubbleContent>
                       <span className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
-                        <span className="text-balance-safe min-w-0">{author?.nickname ?? "Jogador"}</span>
+                        <span className="truncate min-w-0">{author?.nickname ?? "Jogador"}</span>
                         {author && <PlayerPresence player={author} />}
                       </span>
                       {messageQuote && (

@@ -75,7 +75,7 @@ export const AnswerCard = memo(function AnswerCard({
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <p className="text-balance-safe text-xs font-semibold text-muted-foreground">
+          <p className="truncate text-xs font-semibold text-muted-foreground">
             {data.playerName} · {data.category}
           </p>
           <p className={cn("text-balance-safe break-words font-bold", compact ? "text-sm" : "text-lg")}>
