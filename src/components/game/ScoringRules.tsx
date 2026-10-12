@@ -26,14 +26,14 @@ export function ScoringRules() {
   const rules = free ? FREE_RULES : RULES;
 
   return (
-    <section className="rounded-3xl border border-border bg-card p-5">
+    <section className="game-section">
       <Button variant="ghost"
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center justify-between gap-2"
+        className="flex w-full items-center justify-between gap-2 px-0"
         aria-expanded={open}
       >
-        <span className="flex items-center gap-2 font-display text-xl">
+        <span className="flex items-center gap-2 text-base font-semibold">
           <Scale className="size-5 text-primary" />
           Como a IA pontua
         </span>
@@ -50,7 +50,7 @@ export function ScoringRules() {
             </li>
           )}
           {rules.map((rule) => (
-            <li key={rule.points} className="flex items-start gap-3 rounded-2xl bg-secondary px-4 py-3">
+            <li key={rule.points} className="flex items-start gap-3 border-b border-border/50 py-3 last:border-0">
               <span className="mt-0.5 flex h-8 w-12 shrink-0 items-center justify-center rounded-xl bg-primary font-display text-sm text-primary-foreground">
                 {rule.points}
               </span>

@@ -132,32 +132,33 @@ export function CategoryPresets({
 
   return (
     <div className="space-y-6">
-      <section className="space-y-3" aria-labelledby="preset-title">
-        <h2 id="preset-title" className="font-display text-xl">Presets de categorias</h2>
-        <div className="grid grid-cols-2 gap-2" role="group" aria-label="Como carregar a lista">
-          <Button variant={merging ? "secondary" : "default"} aria-pressed={!merging} onClick={() => setMerging(false)}>Substituir</Button>
-          <Button variant={merging ? "default" : "secondary"} aria-pressed={merging} onClick={() => setMerging(true)}>Mesclar</Button>
+      <section className="game-section space-y-3" aria-labelledby="preset-title">
+        <h2 id="preset-title" className="text-lg font-bold">Listas prontas</h2>
+        <div className="grid grid-cols-2 gap-1 rounded-2xl border border-border p-1" role="group" aria-label="Como carregar a lista">
+          <Button variant={merging ? "segment" : "selected"} aria-pressed={!merging} onClick={() => setMerging(false)}>Substituir</Button>
+          <Button variant={merging ? "selected" : "segment"} aria-pressed={merging} onClick={() => setMerging(true)}>Mesclar</Button>
         </div>
         <div className="space-y-2">
           {[{ id: "builtin-default", name: "Padrão base", categories: DEFAULT_CATEGORIES }, ...BUILTIN_CATEGORY_PRESETS].map((preset) => (
             <Button key={preset.id} variant="secondary" disabled={applying} onClick={() => void apply(preset)} className="h-auto min-h-14 w-full justify-between gap-3 whitespace-normal px-4 py-3 text-left">
               <span className="min-w-0 break-words">{preset.name}</span>
-              <span className="shrink-0 text-xs text-muted-foreground">{preset.categories.length}</span>
+              <span className="shrink-0 rounded-md bg-background/50 px-2 py-1 text-xs tabular-nums text-muted-foreground" aria-label={`${preset.categories.length} categorias`}>{preset.categories.length}</span>
             </Button>
           ))}
         </div>
       </section>
-    <section className="rounded-3xl border border-border bg-card p-5">
-      <h2 className="font-display text-xl">Listas salvas</h2>
+    <section className="game-section">
+      <h2 className="text-lg font-bold">Listas salvas</h2>
       <div className="mt-3 flex items-center gap-2">
         <Input
           value={name}
           maxLength={40}
           placeholder="Nome da lista atual"
+          aria-label="Nome da lista atual"
           onChange={(e) => setName(e.target.value)}
           className="h-12 rounded-2xl"
         />
-        <Button className="size-12 shrink-0 rounded-2xl" size="icon" disabled={saving} onClick={save}>
+        <Button className="size-12 shrink-0 rounded-2xl" size="icon" aria-label="Salvar lista atual" title="Salvar lista atual" disabled={saving} onClick={save}>
           <Save className="size-5" />
         </Button>
       </div>
@@ -191,6 +192,8 @@ export function CategoryPresets({
                   size="icon"
                   className="size-12 shrink-0 rounded-2xl text-destructive"
                   onClick={() => { setDeleteTarget(p); setNeedsPassword(false); setDeletePassword(""); }}
+                  aria-label={`Apagar lista ${p.name}`}
+                  title="Apagar lista"
                 >
                   <Trash2 className="size-5" />
                 </Button>

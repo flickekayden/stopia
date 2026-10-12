@@ -63,7 +63,7 @@ export const AnswerCard = memo(function AnswerCard({
       id={compact ? undefined : answerCardId(data)}
       className={cn(
         "border border-border bg-card transition-shadow",
-        compact ? "rounded-lg p-3" : "rounded-2xl p-4",
+        compact ? "rounded-lg p-3" : "rounded-lg p-4",
         highlighted && "ring-2 ring-primary ring-offset-2 ring-offset-background",
         superCreative && "super-creative-answer border-gold",
         onClick && "cursor-pointer",
@@ -71,23 +71,23 @@ export const AnswerCard = memo(function AnswerCard({
       onClick={onClick}
       role={onClick ? "button" : undefined}
       tabIndex={onClick ? 0 : undefined}
-      onKeyDown={onClick ? (event) => event.key === "Enter" && onClick() : undefined}
+      onKeyDown={onClick ? (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onClick(); } } : undefined}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-semibold text-muted-foreground">
+          <p className="text-balance-safe text-xs font-semibold text-muted-foreground">
             {data.playerName} · {data.category}
           </p>
           <p className={cn("text-balance-safe break-words font-bold", compact ? "text-sm" : "text-lg")}>
             {data.response.trim() ? data.response : "— em branco —"}
           </p>
         </div>
-        <span className={cn("shrink-0 rounded-lg px-2 py-1 font-display", compact ? "text-base" : "text-xl", pointsStyle(data.points))}>
+        <span aria-label={`${data.points} pontos`} className={cn("flex min-w-10 shrink-0 items-center justify-center rounded-lg px-2 py-1 font-display tabular-nums", compact ? "text-base" : "text-xl", pointsStyle(data.points))}>
           {data.points}
         </span>
       </div>
       {data.comment && (
-        <p className="text-balance-safe mt-2 break-words text-xs text-muted-foreground italic">“{data.comment}”</p>
+        <p className="text-balance-safe mt-3 break-words text-sm leading-relaxed text-muted-foreground italic">“{data.comment}”</p>
       )}
       {superCreative && (
         <div className="mt-2 flex items-center gap-1 text-xs font-bold text-gold">
@@ -100,7 +100,7 @@ export const AnswerCard = memo(function AnswerCard({
             type="button"
             variant="ghost"
             size="sm"
-            className="mt-2 w-full justify-center"
+            className="mt-3 w-full justify-start border-t border-border rounded-none px-0 text-muted-foreground"
             disabled={loading}
             onClick={(event) => {
               event.stopPropagation();
@@ -119,7 +119,7 @@ export const AnswerCard = memo(function AnswerCard({
           type="button"
           variant="ghost"
           size="sm"
-          className="mt-2 w-full justify-center text-primary"
+          className="mt-1 w-full justify-start px-0 text-primary"
           onClick={(event) => {
             event.stopPropagation();
             onQuote(data);

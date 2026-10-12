@@ -241,7 +241,7 @@ export function RoundBoard({
       </div>
 
       <div className="space-y-1">
-        <div className="text-right text-xs tabular-nums text-muted-foreground">{filledCount}/{round.categories.length} preenchidas</div>
+        <div className="text-right text-sm font-medium tabular-nums text-muted-foreground">{filledCount}/{round.categories.length} preenchidas</div>
         <progress aria-label="Respostas preenchidas" className="answer-progress h-1 w-full" value={filledCount} max={round.categories.length || 1} />
       </div>
 
@@ -264,7 +264,7 @@ export function RoundBoard({
         {players.map((p) => (
           <span
             key={p.id}
-            className={`flex items-center gap-1 rounded-full px-3 py-1 text-sm ${
+            className={`game-chip flex items-center gap-1 rounded-lg px-3 py-1 text-sm ${
               finishedIds.includes(p.id)
                 ? "bg-success/20 text-success"
                 : "bg-secondary text-muted-foreground"
@@ -279,9 +279,10 @@ export function RoundBoard({
 
       <div className="space-y-3">
         {round.categories.map((category, index) => (
-          <div key={category} className="rounded-2xl border border-border bg-card p-3">
-            <label className="text-sm font-semibold text-muted-foreground">{category}</label>
+          <div key={category} className="game-field rounded-lg border border-border bg-card p-3">
+            <label htmlFor={`answer-field-${index}`} className="flex items-start gap-2 text-sm font-semibold text-foreground"><span className="shrink-0 text-xs tabular-nums text-muted-foreground">{String(index + 1).padStart(2, "0")}</span><span className="text-balance-safe">{category}</span></label>
             <Input
+              id={`answer-field-${index}`}
               ref={(input) => { answerInputs.current[index] = input; if (index === 0) firstAnswerInput.current = input; }}
               aria-label={category}
               value={values[category] ?? ""}
@@ -307,7 +308,7 @@ export function RoundBoard({
               data-form-type="other"
               data-lpignore="true"
               data-1p-ignore="true"
-              className="mt-1 h-12 rounded-xl border-2 text-base"
+              className="mt-2 h-12 rounded-lg text-base"
             />
           </div>
         ))}
@@ -319,7 +320,7 @@ export function RoundBoard({
           const type = (k: string) => { const c = target(); setValue(c, (values[c] ?? "") + k); };
           const back = () => { const c = target(); setValue(c, (values[c] ?? "").slice(0, -1)); };
           const key = (k: string) => (
-            <Button variant="secondary" key={k} type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => type(k)} className="h-12 min-h-12 min-w-0 flex-1 rounded-md px-0 text-base font-bold">{k}</Button>
+            <Button variant="secondary" key={k} type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => type(k)} className="keyboard-key h-12 min-h-12 min-w-0 flex-1 rounded-md px-0 text-base font-bold">{k}</Button>
           );
           return (
             <div className="flex w-full flex-col gap-1.5">
@@ -328,7 +329,7 @@ export function RoundBoard({
               <div className="flex gap-1">
                 <div className="flex-[0.5]" />
                 {[..."ZXCVBNM"].map(key)}
-                <Button variant="secondary" type="button" aria-label="Apagar" onMouseDown={(e) => e.preventDefault()} onClick={back} className="h-12 min-h-12 min-w-0 flex-[1.5] rounded-md px-0 text-base">⌫</Button>
+                <Button variant="secondary" type="button" aria-label="Apagar" onMouseDown={(e) => e.preventDefault()} onClick={back} className="keyboard-key h-12 min-h-12 min-w-0 flex-[1.5] rounded-md px-0 text-base">⌫</Button>
               </div>
               <div className="flex gap-1">
                 <div className="flex-[2]" />
@@ -339,7 +340,7 @@ export function RoundBoard({
           );
         })()}
         {evaluating ? (
-          <div className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-secondary font-bold">
+          <div role="status" className="flex h-14 w-full items-center justify-center gap-2 rounded-xl bg-secondary font-bold">
             <Loader2 className="size-5 animate-spin" /> Avaliando respostas...
           </div>
         ) : (
@@ -350,7 +351,7 @@ export function RoundBoard({
               onClick={() => void markFinished()}
               className="h-14 flex-1 rounded-2xl text-base font-bold"
             >
-              {devText(dev.texts.finishButton, "Terminei")}{mine?.finished ? " ✓" : ""}
+              {sending ? <Loader2 className="animate-spin" /> : mine?.finished ? <Check /> : null}{devText(dev.texts.finishButton, "Terminei")}
             </Button>
             <Button
               onClick={() => void handleStopClick()}

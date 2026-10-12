@@ -39,7 +39,7 @@ export function InstallApp() {
   }
   if (installed) return null;
   return <>
-    <Button variant="outline" className="w-full" onClick={() => void install()}><Download /> Instalar app</Button>
+    <Button variant="ghost" className="w-full text-muted-foreground" onClick={() => void install()}><Download /> Instalar app</Button>
     <Dialog open={helpOpen} onOpenChange={setHelpOpen}>
       <DialogContent>
         <DialogHeader><DialogTitle>Instalar STOP!</DialogTitle><DialogDescription>{ios ? "Abra no Safari para adicionar o STOP à Tela de Início." : "Abra o menu do navegador e escolha Instalar app ou Adicionar à tela inicial."}</DialogDescription></DialogHeader>

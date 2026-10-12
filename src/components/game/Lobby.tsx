@@ -104,33 +104,33 @@ export function Lobby({
 
   return (
     <div className="space-y-6 pb-44">
-      <section className="rounded-3xl border border-border bg-card p-5 text-center">
+      <section className="py-4 text-center">
         <p className="text-sm text-muted-foreground">Código da sala</p>
-        <p className="font-display text-5xl tracking-[0.3em] text-primary">{room.code}</p>
+        <p className="mt-1 font-display text-5xl text-primary">{room.code}</p>
         <Button onClick={share} variant="secondary" className="mt-4 h-12 w-full rounded-2xl font-bold">
           {copied ? <Check className="mr-2 size-5" /> : <Copy className="mr-2 size-5" />}
           Compartilhar sala
         </Button>
       </section>
 
-      <section className="rounded-3xl border border-border bg-card p-5">
-        <h2 className="font-display text-xl">Jogadores ({players.length})</h2>
+      <section className="game-section">
+        <h2 className="text-lg font-bold">Jogadores <span className="text-muted-foreground">· {players.length}</span></h2>
         <ul className="mt-3 space-y-2">
           {players.map((p) => (
-            <li key={p.id} className="animate-in fade-in slide-in-from-bottom-1 motion-reduce:animate-none flex items-center gap-2 rounded-2xl bg-secondary px-4 py-3">
+            <li key={p.id} className="animate-in fade-in slide-in-from-bottom-1 motion-reduce:animate-none flex items-center gap-3 border-b border-border/50 px-1 py-3 last:border-0">
               <span className={`size-2 shrink-0 rounded-full ${p.is_online ? "bg-success motion-safe:animate-pulse" : "bg-muted-foreground"}`} aria-hidden="true" />
               {p.is_host && <Crown className="size-4 text-primary" />}
-              <span className="font-semibold">{p.nickname}</span>
+              <span className="text-balance-safe min-w-0 flex-1 font-semibold">{p.nickname}</span>
               <PlayerPresence player={p} />
             </li>
           ))}
         </ul>
       </section>
 
-      <section className="space-y-3">
-        <h2 className="font-display text-xl">Categorias ({room.categories.length})</h2>
+      <section className="game-section space-y-3">
+        <h2 className="text-lg font-bold">Categorias <span className="text-muted-foreground">· {room.categories.length}</span></h2>
         <div className="flex flex-wrap gap-2">
-          {room.categories.map((c) => <span key={c} className="max-w-full rounded-full bg-secondary px-3 py-1.5 text-sm text-balance-safe">{c}</span>)}
+          {room.categories.map((c) => <span key={c} className="game-chip rounded-lg bg-secondary px-3 py-1.5 text-sm text-balance-safe">{c}</span>)}
         </div>
       </section>
 
@@ -138,8 +138,8 @@ export function Lobby({
 
       {isHost ? (
         <>
-          <section className="space-y-5 rounded-3xl border border-border bg-card p-5">
-            <h2 className="font-display text-xl">Configuração</h2>
+          <section className="game-section space-y-6">
+            <h2 className="text-lg font-bold">Configuração</h2>
 
             <div>
               <p className="mb-2 text-sm font-semibold text-muted-foreground">Rodadas</p>
@@ -148,6 +148,7 @@ export function Lobby({
                   <Button variant="secondary"
                     key={n}
                     onClick={() => void update({ total_rounds: n })}
+                    aria-pressed={room.total_rounds === n}
                     className={`h-12 rounded-2xl font-display text-xl transition ${
                       room.total_rounds === n
                         ? "bg-primary text-primary-foreground"
@@ -166,6 +167,7 @@ export function Lobby({
                 <p className="text-sm text-muted-foreground">Encerra a rodada no tempo</p>
               </div>
               <Switch
+                aria-label="Cronômetro"
                 checked={room.timer_enabled}
                 onCheckedChange={(v) => void update({ timer_enabled: v })}
               />
@@ -177,6 +179,7 @@ export function Lobby({
                   <Button variant="secondary"
                     key={s}
                     onClick={() => void update({ timer_seconds: s })}
+                    aria-pressed={room.timer_seconds === s}
                     className={`h-11 rounded-2xl text-sm font-bold transition ${
                       room.timer_seconds === s
                         ? "bg-primary text-primary-foreground"
@@ -199,6 +202,7 @@ export function Lobby({
                   <Button variant="secondary"
                     key={opt.value}
                     onClick={() => void update({ stop_policy: opt.value })}
+                    aria-pressed={room.stop_policy === opt.value}
                     className={`h-12 rounded-2xl font-bold transition ${
                       room.stop_policy === opt.value
                         ? "bg-primary text-primary-foreground"
@@ -222,6 +226,8 @@ export function Lobby({
                     <Button variant="secondary"
                       key={l}
                       onClick={() => toggleLetter(l)}
+                      aria-label={`${off ? "Incluir" : "Excluir"} letra ${l}`}
+                      aria-pressed={off}
                       className={`size-12 rounded-xl font-display text-lg transition ${
                         off ? "bg-muted text-muted-foreground line-through" : "bg-secondary text-foreground"
                       }`}
@@ -239,8 +245,8 @@ export function Lobby({
             onApply={(list) => update({ categories: list })}
           />
 
-          <section className="rounded-3xl border border-border bg-card p-5">
-            <Button variant="ghost" className="w-full justify-between" aria-expanded={editingCategories} onClick={() => setEditingCategories((v) => !v)}><span className="font-display text-xl">Editar categorias</span><Pencil className="size-4" /></Button>
+          <section className="game-section">
+            <Button variant="ghost" className="w-full justify-between px-0" aria-expanded={editingCategories} onClick={() => setEditingCategories((v) => !v)}><span className="text-lg font-bold">Editar categorias</span><Pencil className="size-4" /></Button>
             <p className="mt-1 text-sm text-muted-foreground">
               Cadastre quantas quiser. Cada rodada usa 8, em rodízio.
             </p>
@@ -249,6 +255,7 @@ export function Lobby({
                 <li key={`${c}-${i}`} className="flex items-center gap-2">
                   <Input
                     defaultValue={c}
+                    aria-label={`Editar categoria ${c}`}
                     onBlur={(e) => {
                       const v = e.target.value.trim();
                       if (v && v !== c) editCategory(i, v);
@@ -260,6 +267,8 @@ export function Lobby({
                     size="icon"
                     className="size-12 shrink-0 rounded-2xl text-destructive"
                     onClick={() => removeCategory(i)}
+                    aria-label={`Remover categoria ${c}`}
+                    title={`Remover ${c}`}
                   >
                     <Trash2 className="size-5" />
                   </Button>
@@ -270,13 +279,14 @@ export function Lobby({
               <Input
                 value={newCategory}
                 placeholder="Nova categoria"
+                aria-label="Nova categoria"
                 onChange={(e) => setNewCategory(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") addCategory();
                 }}
                 className="h-12 rounded-2xl"
               />
-              <Button className="size-12 shrink-0 rounded-2xl" size="icon" onClick={addCategory}>
+              <Button className="size-12 shrink-0 rounded-2xl" size="icon" aria-label="Adicionar categoria" title="Adicionar categoria" onClick={addCategory}>
                 <Plus className="size-5" />
               </Button>
             </div>
@@ -285,7 +295,7 @@ export function Lobby({
           <div className="mobile-bottom-bar fixed inset-x-0 bottom-0 mx-auto w-full max-w-md border-t border-border bg-background/95 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] backdrop-blur"><Button
             onClick={onStart}
             disabled={starting || players.length === 0}
-            className="h-16 w-full rounded-3xl font-display text-2xl"
+            className="h-14 w-full rounded-xl font-display text-2xl"
           >
             {starting ? "Começando..." : devText(devSettings.texts.startButton, "Começar partida")}
           </Button></div>
