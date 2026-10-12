@@ -35,6 +35,8 @@
   --color-ring-offset-background: var(--background);
   --color-success: var(--success);
   --color-gold: var(--gold);
+  --color-silver: var(--silver);
+  --color-bronze: var(--bronze);
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
   --color-chart-3: var(--chart-3);
@@ -70,6 +72,8 @@
   --destructive-foreground: oklch(0.98 0.01 90);
   --success: oklch(0.75 0.19 150);
   --gold: oklch(0.85 0.17 85);
+  --silver: oklch(0.8 0.025 240);
+  --bronze: oklch(0.72 0.13 55);
   --border: oklch(0.34 0.045 285);
   --input: oklch(0.32 0.045 285);
   --ring: oklch(0.88 0.19 96);
@@ -137,6 +141,12 @@
 .voice-progress::-webkit-progress-value { background: var(--destructive); }
 .voice-progress::-moz-progress-bar { background: var(--destructive); }
 
+.answer-progress { appearance: none; border: none; overflow: hidden; border-radius: 4px; background: var(--secondary); }
+.answer-progress::-webkit-progress-bar { background: var(--secondary); }
+.answer-progress::-webkit-progress-value { background: var(--success); transition: width 200ms ease; }
+.answer-progress::-moz-progress-bar { background: var(--success); }
+
 @media (prefers-reduced-motion: reduce) {
+  .answer-progress::-webkit-progress-value { transition: none; }
   .super-creative-answer { animation: none; box-shadow: var(--shadow-super-creative); }
 }
