@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate, useRouter } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
-import { DoorOpen, LockKeyhole, Trash2, Users } from "lucide-react";
+import { ChevronDown, DoorOpen, LockKeyhole, Trash2, Users } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -62,6 +62,8 @@ function Home() {
   const unlock = useServerFn(unlockDeveloper);
   const removeRoom = useServerFn(deleteRoom);
   const [nickname, setNickname] = useState(() => getLastNickname());
+  const [entryMode, setEntryMode] = useState<"create" | "join">("create");
+  const [roomsOpen, setRoomsOpen] = useState(false);
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState<"create" | "join" | null>(null);
   const [passwordOpen, setPasswordOpen] = useState(false);
@@ -165,12 +167,13 @@ function Home() {
   }
 
   function chooseRoom(roomCode: string) {
+    setEntryMode("join");
     setCode(roomCode);
-    document.getElementById("codigo")?.scrollIntoView({ behavior: "smooth", block: "center" });
+    window.requestAnimationFrame(() => document.getElementById("codigo")?.focus());
   }
 
   return (
-    <main className="mx-auto flex min-h-[100dvh] w-full max-w-md flex-col gap-8 px-5 py-10">
+    <main className="mx-auto flex min-h-[100dvh] w-full max-w-md flex-col gap-5 px-5 py-6">
       <header className="text-center">
         <div className="inline-block -rotate-2 rounded-2xl bg-primary px-5 py-2 shadow-[0_8px_0_0_var(--color-accent)]">
           <h1 className="font-display text-5xl text-primary-foreground">{devText(devSettings.texts.appTitle, "STOP!")}</h1>
@@ -180,7 +183,7 @@ function Home() {
         </p>
       </header>
 
-      <section className="space-y-3 rounded-3xl border border-border bg-card p-5">
+      <section className="space-y-3">
         <label className="text-sm font-semibold text-muted-foreground" htmlFor="apelido">
           Seu apelido
         </label>
@@ -192,16 +195,20 @@ function Home() {
           onChange={(e) => setNickname(e.target.value)}
           className="h-14 rounded-2xl border-2 text-lg"
         />
-        <Button
+        <div className="grid grid-cols-2 gap-2" role="group" aria-label="Entrada na sala">
+          <Button variant={entryMode === "create" ? "default" : "secondary"} onClick={() => setEntryMode("create")}>Criar nova sala</Button>
+          <Button variant={entryMode === "join" ? "default" : "secondary"} onClick={() => setEntryMode("join")}>Entrar com código</Button>
+        </div>
+        {entryMode === "create" && <Button
           onClick={handleCreate}
           disabled={loading !== null}
           className="h-14 w-full rounded-2xl text-lg font-bold"
         >
           {loading === "create" ? "Criando..." : "Criar sala"}
-        </Button>
+        </Button>}
       </section>
 
-      <section className="space-y-3 rounded-3xl border border-border bg-card p-5">
+      {entryMode === "join" && <section className="space-y-3">
         <label className="text-sm font-semibold text-muted-foreground" htmlFor="codigo">
           Entrar com código
         </label>
@@ -222,12 +229,12 @@ function Home() {
         >
           {loading === "join" ? "Entrando..." : "Entrar na sala"}
         </Button>
-      </section>
+      </section>}
 
       <section className="space-y-3 pb-4" aria-labelledby="salas-title">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <h2 id="salas-title" className="font-display text-2xl">Salas criadas</h2>
+            <Button variant="ghost" onClick={() => setRoomsOpen((v) => !v)} aria-expanded={roomsOpen} className="px-0"><h2 id="salas-title" className="font-display text-2xl">Salas criadas</h2><ChevronDown className={roomsOpen ? "rotate-180" : ""} /></Button>
             <p className="text-sm text-muted-foreground">
               {rooms.length === 0 ? "Nenhuma sala por aqui." : `${rooms.length} sala${rooms.length === 1 ? "" : "s"}`}
             </p>
@@ -246,7 +253,7 @@ function Home() {
           )}
         </div>
 
-        <div className="space-y-2">
+        {roomsOpen && <div className="space-y-2">
           {rooms.map((room) => {
             const waiting = room.status === "lobby";
             const finished = room.status === "ended" || room.status === "finished";
@@ -291,7 +298,7 @@ function Home() {
               </article>
             );
           })}
-        </div>
+        </div>}
       </section>
 
       <Dialog open={passwordOpen} onOpenChange={setPasswordOpen}>

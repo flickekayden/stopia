@@ -218,15 +218,11 @@ function RoomPage() {
     }
   }
 
-  async function handleNext() {
-    if (!room || !currentRound || !playerId) return;
+  async function handleNext(force = false) {
+    if (!room || !currentRound || !playerId || !sessionId) return;
     setBusy(true);
     try {
-      if (currentRound.number >= room.total_rounds) {
-        await supabase.from("rooms").update({ status: "ended" }).eq("id", room.id);
-      } else {
-        await start({ data: { roomId: room.id, playerId } });
-      }
+      await start({ data: { roomId: room.id, playerId, sessionId, force, expectedRound: currentRound.number } });
       await refresh();
     } catch (e) {
       play("error");
@@ -404,6 +400,7 @@ function RoomPage() {
         <Lobby room={room} players={players} isHost={isHost} starting={busy} onStart={handleStart} />
       ) : currentRound.status === "results" && currentRound.evaluation ? (
         <RoundResults
+          key={currentRound.id}
           room={room}
           round={currentRound}
           players={players}
