@@ -533,12 +533,10 @@ export const evaluateRound = createServerFn({ method: "POST" })
     if (round.evaluation && !force) return { evaluation: round.evaluation as unknown as Evaluation, latencyMs: 0 };
     const previous = (round.evaluation as unknown as Evaluation | null) ?? null;
 
-    const { data: players } = await supabase
-      .from("players")
-      .select("*")
-      .eq("room_id", round.room_id)
-      .order("created_at");
-    const { data: answers } = await supabase.from("answers").select("*").eq("round_id", round.id);
+    const [{ data: players }, { data: answers }] = await Promise.all([
+      supabase.from("players").select("id, nickname, score").eq("room_id", round.room_id).order("created_at"),
+      supabase.from("answers").select("player_id, values").eq("round_id", round.id),
+    ]);
 
     const list = (players ?? []).map((p) => {
       const row = (answers ?? []).find((a) => a.player_id === p.id);
@@ -591,7 +589,10 @@ export const evaluateRound = createServerFn({ method: "POST" })
       .update(force ? { evaluation } : { evaluation, status: "results", ends_at: new Date(Date.now() + RESULTS_VIEW_MS).toISOString() })
       .eq("id", round.id);
 
-    for (const p of players ?? []) {
+    const participants = players ?? [];
+    // Respect the edge runtime's six-connection budget while updating scores.
+    for (let offset = 0; offset < participants.length; offset += 6) {
+      await Promise.all(participants.slice(offset, offset + 6).map(async (p) => {
       const gained = resultados
         .filter((r) => r.jogador_id === p.id)
         .reduce((sum, r) => sum + r.pontos, 0);
@@ -602,6 +603,7 @@ export const evaluateRound = createServerFn({ method: "POST" })
         .from("players")
         .update({ score: Math.max(0, p.score - lost + gained) })
         .eq("id", p.id);
+      }));
     }
 
     return { evaluation, latencyMs };
@@ -673,12 +675,10 @@ export const finalAnalysis = createServerFn({ method: "POST" })
     if (!room) throw new Error("Sala não encontrada");
     if (room.final_analysis) return { analysis: room.final_analysis as unknown as FinalAnalysis };
 
-    const { data: players } = await supabase.from("players").select("*").eq("room_id", room.id);
-    const { data: rounds } = await supabase
-      .from("rounds")
-      .select("number, letter, evaluation")
-      .eq("room_id", room.id)
-      .order("number");
+    const [{ data: players }, { data: rounds }] = await Promise.all([
+      supabase.from("players").select("id, nickname, score").eq("room_id", room.id),
+      supabase.from("rounds").select("number, letter, evaluation").eq("room_id", room.id).order("number"),
+    ]);
 
     const resumo = (players ?? []).map((p) => ({
       jogador_id: p.id,

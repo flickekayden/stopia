@@ -43,5 +43,5 @@ export function removePlayer(code: string) {
 
 export function getLastNickname() {
   const all = Object.values(read());
-  return all.length > 0 ? all[all.length - 1]!.nickname : "";
+  return all.at(-1)?.nickname ?? "";
 }

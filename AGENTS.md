@@ -15,3 +15,8 @@
 - Voice reactions use private Storage uploads through session-hash-validated server functions and room-scoped realtime metadata; signed playback links are issued only to current-round players because the workspace blocks public buckets.
 - Push-to-talk recording, playback queues and device mute are owned by the reusable voice hook mounted only in round results, so microphones and audio are released when leaving results.
 - Results reuse round ends_at as a server-issued viewing deadline and shared pacing constants; startNextRound validates the host session, expected round and readiness/override before advancing or ending to keep multiplayer transitions authoritative without changing the schema.
+- Global settings synchronization and theme application live in SettingsRuntime; the developer editor is lazy-loaded only for unlocked devices to keep its UI dependencies out of initial loading.
+- Room snapshots read only the latest round; player updates and answer changes apply room-scoped realtime rows directly, with coalesced snapshot refreshes and a trailing refresh for in-flight events to avoid request storms without losing transitions.
+- Room chat uses lightweight plain-text bubbles and design-system input controls rather than AI Markdown/attachment engines; append realtime messages and cap history at the newest 100 entries to bound work and memory.
+- Results and final rankings are lazy-loaded game phases; unchanged answer cards retain memoized renders so countdown ticks do not repaint every answer.
+- Independent server reads and score writes run in parallel with at most six outbound requests per batch to respect the deployed runtime budget.

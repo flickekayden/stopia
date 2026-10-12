@@ -1,5 +1,5 @@
 import { useServerFn } from "@tanstack/react-start";
-import { MessageCircle, X } from "lucide-react";
+import { CornerDownLeft, Loader2, MessageCircle, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -9,13 +9,8 @@ import {
   ConversationEmptyState,
   ConversationScrollButton,
 } from "@/components/ai-elements/conversation";
-import { Message, MessageContent } from "@/components/ai-elements/message";
-import {
-  PromptInput,
-  PromptInputFooter,
-  PromptInputSubmit,
-  PromptInputTextarea,
-} from "@/components/ai-elements/prompt-input";
+import { ChatBubble, ChatBubbleContent } from "@/components/game/ChatBubble";
+import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupTextarea } from "@/components/ui/input-group";
 import { AnswerCard, type AnswerCardData } from "@/components/game/AnswerCard";
 import { PlayerPresence } from "@/components/game/PlayerPresence";
 import { useSound } from "@/components/SoundProvider";
@@ -96,25 +91,36 @@ export function ChatDrawer({
   const [keyboardInset, setKeyboardInset] = useState(0);
   const openRef = useRef(open);
   const playersRef = useRef(players);
+  const messageIds = useRef(new Set<string>());
+  const messagesReady = useRef(false);
+  const pendingMessages = useRef<ChatMessage[]>([]);
+  const latestMessages = useRef<ChatMessage[]>([]);
+  useEffect(() => { latestMessages.current = messages; }, [messages]);
 
   useEffect(() => { openRef.current = open; }, [open]);
   useEffect(() => { playersRef.current = players; }, [players]);
 
-  const refresh = useCallback(async (countUnread = false) => {
+  const refresh = useCallback(async () => {
     try {
       const next = await listMessages({ data: { roomId, playerId } });
-      setMessages((previous) => {
-        if (countUnread && !openRef.current && next.length > previous.length) {
-          setUnread((value) => value + next.length - previous.length);
-        }
-        return next;
-      });
+      const combined = [...next, ...latestMessages.current, ...pendingMessages.current].filter((message, index, all) => all.findIndex((item) => item.id === message.id) === index)
+        .sort((a, b) => a.created_at.localeCompare(b.created_at)).slice(-100);
+      pendingMessages.current = [];
+      messageIds.current = new Set(combined.map((message) => message.id));
+      messagesReady.current = true;
+      setMessages(combined);
     } catch {
       // A transient refresh failure should not interrupt the game.
     }
   }, [listMessages, playerId, roomId]);
 
-  useEffect(() => { void refresh(false); }, [refresh]);
+  useEffect(() => {
+    messagesReady.current = false;
+    messageIds.current.clear();
+    pendingMessages.current = [];
+    latestMessages.current = [];
+    void refresh();
+  }, [refresh]);
 
   useEffect(() => {
     const channel = supabase
@@ -131,9 +137,18 @@ export function ChatDrawer({
           const emoji = Array.from(incoming.content)[0] ?? "💬";
           toast(`${emoji} @${author?.nickname ?? "Jogador"} reagiu à sua resposta!`, { duration: 2_500 });
         }
-        void refresh(incoming.player_id !== playerId);
+        const message = payload.new as ChatMessage;
+        if (messageIds.current.has(message.id)) return;
+        messageIds.current.add(message.id);
+        if (messageIds.current.size > 200) messageIds.current = new Set([...messageIds.current].slice(-100));
+        if (!messagesReady.current) pendingMessages.current.push(message);
+        setMessages((current) => {
+          const next = [...current, message].sort((a, b) => a.created_at.localeCompare(b.created_at)).slice(-100);
+          return next;
+        });
+        if (incoming.player_id !== playerId && !openRef.current) setUnread((value) => value + 1);
       })
-      .subscribe();
+      .subscribe((status) => { if (status === "SUBSCRIBED") void refresh(); });
     return () => { void supabase.removeChannel(channel); };
   }, [playerId, play, refresh, roomId]);
 
@@ -177,7 +192,9 @@ export function ChatDrawer({
     setSending(true);
     try {
       const message = await sendMessage({ data: { roomId, playerId, content: clean, quote } });
-      setMessages((current) => current.some((item) => item.id === message.id) ? current : [...current, message]);
+      messageIds.current.add(message.id);
+      if (!messagesReady.current) pendingMessages.current.push(message);
+      setMessages((current) => current.some((item) => item.id === message.id) ? current : [...current, message].slice(-100));
       setText("");
       onQuoteChange(null);
     } catch (error) {
@@ -264,8 +281,8 @@ export function ChatDrawer({
                 const mine = message.player_id === playerId;
                 const author = playersById.get(message.player_id);
                 return (
-                  <Message key={message.id} from={mine ? "user" : "assistant"}>
-                    <MessageContent>
+                  <ChatBubble key={message.id} mine={mine}>
+                    <ChatBubbleContent>
                       <span className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
                         {author?.nickname ?? "Jogador"}
                         {author && <PlayerPresence player={author} />}
@@ -281,8 +298,8 @@ export function ChatDrawer({
                         />
                       )}
                       {message.content && <p className="whitespace-pre-wrap break-words">{message.content}</p>}
-                    </MessageContent>
-                  </Message>
+                    </ChatBubbleContent>
+                  </ChatBubble>
                 );
               })}
             </ConversationContent>
@@ -310,20 +327,28 @@ export function ChatDrawer({
                 ))}
               </div>
               {!locked && (
-                <PromptInput onSubmit={(message) => submit(message.text)}>
-                  <PromptInputTextarea
+                <form onSubmit={(event) => { event.preventDefault(); void submit(text); }}>
+                <InputGroup>
+                  <InputGroupTextarea
                     value={text}
                     onChange={(event) => setText(event.target.value.slice(0, 100))}
                     maxLength={100}
                     placeholder="Mensagem (até 100 caracteres)"
                     disabled={sending}
-                    className="min-h-12"
+                    className="field-sizing-content max-h-48 min-h-12"
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+                        event.preventDefault();
+                        if (!sending && (text.trim() || quote)) event.currentTarget.form?.requestSubmit();
+                      }
+                    }}
                   />
-                  <PromptInputFooter className="justify-end">
+                  <InputGroupAddon align="block-end" className="justify-end gap-1">
                     <span className="mr-auto text-xs text-muted-foreground">{text.length}/100</span>
-                    <PromptInputSubmit disabled={sending || (!text.trim() && !quote)} status={sending ? "submitted" : "ready"} />
-                  </PromptInputFooter>
-                </PromptInput>
+                    <InputGroupButton type="submit" variant="default" size="icon-sm" aria-label="Enviar mensagem" disabled={sending || (!text.trim() && !quote)}>{sending ? <Loader2 className="size-4 animate-spin" /> : <CornerDownLeft className="size-4" />}</InputGroupButton>
+                  </InputGroupAddon>
+                </InputGroup>
+                </form>
               )}
             </div>
           </div>

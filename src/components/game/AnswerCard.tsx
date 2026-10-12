@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { memo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { HelpCircle, Loader2, MessageCircle, Sparkles } from "lucide-react";
 
@@ -29,7 +29,7 @@ export function answerCardId(data: Pick<AnswerCardData, "roundId" | "category" |
   return `answer-${data.roundId}-${data.playerId}-${encodeURIComponent(data.category)}`;
 }
 
-export function AnswerCard({
+export const AnswerCard = memo(function AnswerCard({
   data,
   compact = false,
   highlighted = false,
@@ -130,4 +130,6 @@ export function AnswerCard({
       )}
     </div>
   );
-}
+}, (previous, next) => previous.compact === next.compact && previous.highlighted === next.highlighted && previous.onQuote === next.onQuote && previous.onClick === next.onClick
+  && previous.data.roundId === next.data.roundId && previous.data.category === next.data.category && previous.data.playerId === next.data.playerId
+  && previous.data.playerName === next.data.playerName && previous.data.response === next.data.response && previous.data.points === next.data.points && previous.data.comment === next.data.comment);

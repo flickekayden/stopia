@@ -33,6 +33,7 @@ export function useVoiceWalkieTalkie(identity: VoiceIdentity) {
   const muteRef = useRef(false);
   const busy = useRef(false);
   const audioContext = useRef<AudioContext | null>(null);
+  const playbackWatchdog = useRef<number | undefined>(undefined);
   const playNextRef = useRef<() => void>(() => undefined);
 
   const playNext = useCallback(() => {
@@ -42,11 +43,14 @@ export function useVoiceWalkieTalkie(identity: VoiceIdentity) {
     const player = new Audio(clip.audioUrl);
     audio.current = player;
     setSpeaker(clip.nickname);
-    let watchdog: number | undefined;
     const done = () => {
-      window.clearTimeout(watchdog);
+      window.clearTimeout(playbackWatchdog.current);
       if (audio.current !== player) return;
       player.pause();
+      player.onended = null;
+      player.onerror = null;
+      player.removeAttribute("src");
+      player.load();
       audio.current = null;
       setSpeaker(null);
       playNextRef.current();
@@ -55,12 +59,14 @@ export function useVoiceWalkieTalkie(identity: VoiceIdentity) {
     player.onerror = done;
     void player.play().then(() => {
       setBlocked(false);
-      watchdog = window.setTimeout(done, clip.duration + 5000);
+      playbackWatchdog.current = window.setTimeout(done, clip.duration + 5000);
     }).catch(() => {
       if (audio.current !== player) return;
       audio.current = null;
       setSpeaker(null);
       queue.current.unshift(clip);
+      player.onended = null;
+      player.onerror = null;
       setBlocked(true);
     });
   }, []);
@@ -152,7 +158,15 @@ export function useVoiceWalkieTalkie(identity: VoiceIdentity) {
     muteRef.current = next;
     setMuted(next);
     try { localStorage.setItem(MUTE_KEY, String(next)); } catch { /* Storage may be unavailable. */ }
-    if (next) { queue.current = []; audio.current?.pause(); audio.current = null; setSpeaker(null); setBlocked(false); }
+    if (next) {
+      queue.current = [];
+      window.clearTimeout(playbackWatchdog.current);
+      if (audio.current) {
+        audio.current.onended = null; audio.current.onerror = null;
+        audio.current.pause(); audio.current.removeAttribute("src"); audio.current.load();
+      }
+      audio.current = null; setSpeaker(null); setBlocked(false);
+    }
     else unlockPlayback();
   }, [unlockPlayback]);
 
@@ -176,13 +190,22 @@ export function useVoiceWalkieTalkie(identity: VoiceIdentity) {
         } catch { /* A reaction may expire when the round advances. */ }
       });
     };
+    let realtimeHealthy = false;
+    let polling = false;
+    let lastPoll = 0;
     const channel = supabase.channel(`voice-${identity.roomId}-${identity.playerId}-${identity.roundId}`)
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "room_voice_notes", filter: `room_id=eq.${identity.roomId}` }, (payload) => {
         if (payload.new['round_id'] === identity.roundId && typeof payload.new['id'] === "string") receive(payload.new['id']);
-      }).subscribe();
+      }).subscribe((status) => { realtimeHealthy = status === "SUBSCRIBED"; });
     const poll = async () => {
-      const { data } = await supabase.from("room_voice_notes").select("id").eq("room_id", identity.roomId).eq("round_id", identity.roundId).gt("created_at", since).order("created_at").limit(50);
-      data?.forEach((note) => receive(note.id));
+      if (!active || polling || document.hidden || (realtimeHealthy && Date.now() - lastPoll < 15_000)) return;
+      polling = true;
+      lastPoll = Date.now();
+      try {
+        const { data } = await supabase.from("room_voice_notes").select("id").eq("room_id", identity.roomId).eq("round_id", identity.roundId).gt("created_at", since).order("created_at").limit(50);
+        data?.forEach((note) => receive(note.id));
+      } catch { /* Realtime continues during transient polling failures. */
+      } finally { polling = false; }
     };
     const fallback = window.setInterval(() => void poll(), 3000);
     const cancelHidden = () => { if (document.hidden) finish(true); };
@@ -190,9 +213,14 @@ export function useVoiceWalkieTalkie(identity: VoiceIdentity) {
     return () => {
       active = false; alive.current = false; discard.current = true; held.current = false;
       window.clearInterval(timer.current); window.clearTimeout(stopTimer.current); window.clearInterval(fallback);
+      window.clearTimeout(playbackWatchdog.current);
       if (recorder.current?.state === "recording") recorder.current.stop();
       stream.current?.getTracks().forEach((track) => track.stop());
-      audio.current?.pause(); audio.current = null; queue.current = []; seen.current.clear();
+      if (audio.current) {
+        audio.current.onended = null; audio.current.onerror = null;
+        audio.current.pause(); audio.current.removeAttribute("src"); audio.current.load();
+      }
+      audio.current = null; queue.current = []; seen.current.clear();
       void audioContext.current?.close(); audioContext.current = null;
       document.removeEventListener("visibilitychange", cancelHidden);
       void supabase.removeChannel(channel);

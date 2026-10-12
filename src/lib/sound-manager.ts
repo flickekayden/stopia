@@ -31,14 +31,6 @@ class SoundManager {
 
   configure(enabled: boolean) {
     this.enabled = enabled;
-    if (typeof Audio === "undefined") return;
-    for (const name of Object.keys(SOURCES) as SoundName[]) {
-      if (this.sounds.has(name)) continue;
-      const audio = new Audio(SOURCES[name]);
-      audio.preload = "auto";
-      audio.volume = VOLUMES[name];
-      this.sounds.set(name, audio);
-    }
   }
 
   unlock() {
@@ -47,9 +39,14 @@ class SoundManager {
 
   play(name: SoundName) {
     if (!this.enabled || !this.unlocked) return;
-    const source = this.sounds.get(name);
-    if (!source) return;
-    const audio = source.cloneNode(true) as HTMLAudioElement;
+    if (typeof Audio === "undefined") return;
+    let audio = this.sounds.get(name);
+    if (!audio) {
+      audio = new Audio(SOURCES[name]);
+      audio.preload = "none";
+      this.sounds.set(name, audio);
+    }
+    audio.currentTime = 0;
     audio.volume = VOLUMES[name];
     void audio.play().catch(() => undefined);
   }
