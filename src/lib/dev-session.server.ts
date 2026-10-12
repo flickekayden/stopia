@@ -3,8 +3,11 @@ import { useSession } from "@tanstack/react-start/server";
 export type DeveloperSession = { unlocked?: boolean };
 
 export function sessionConfig() {
-  const password = process.env["DEVELOPER_SESSION_SECRET"];
-  if (!password) throw new Error("A sessão de desenvolvedor não está configurada");
+  const secret = process.env["DEVELOPER_SESSION_SECRET"];
+  if (!secret) throw new Error("A sessão de desenvolvedor não está configurada");
+  // useSession exige senha com 32+ caracteres; derivamos uma chave estável
+  // do segredo configurado para aceitar valores de qualquer tamanho.
+  const password = createHash("sha256").update(`dev-session:${secret}`, "utf8").digest("hex");
   return {
     password,
     name: "stop-developer",
