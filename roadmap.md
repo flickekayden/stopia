@@ -1,10 +1,10 @@
 # Roadmap
 
-- [ ] Add timed results readiness, host override and inactive-player bypass
-- [ ] Add continuous results with category shortcuts
-- [ ] Compact home entry, lobby tags/presence, and focused round header
-- [ ] Add podium and shareable champion summary
-- [ ] Verify multiplayer pacing and screen flows
+- [x] Add timed results readiness, host override and inactive-player bypass
+- [x] Add continuous results with category shortcuts
+- [x] Compact home entry, lobby tags/presence, and focused round header
+- [x] Add podium and shareable champion summary
+- [x] Verify multiplayer pacing and screen flows
 
 - [x] Add secure voice uploads and realtime distribution during results
 - [x] Add seven-second push-to-talk, cancellation, playback queue and saved mute
