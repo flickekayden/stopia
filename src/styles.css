@@ -50,9 +50,13 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+  --color-device-surround: var(--device-surround);
+  --color-overlay: var(--overlay);
 }
 
 :root {
+  --device-surround: oklch(0.1 0.01 285);
+  --overlay: oklch(0.08 0.015 285 / 0.8);
   --radius: 1rem;
   --background: oklch(0.17 0.03 285);
   --foreground: oklch(0.97 0.01 90);
@@ -105,6 +109,7 @@
 
   html {
     -webkit-text-size-adjust: 100%;
+    overscroll-behavior-y: none;
   }
 
   body {
@@ -118,8 +123,58 @@
   h2,
   .font-display {
     font-family: var(--font-display);
-    letter-spacing: 0.01em;
+    letter-spacing: 0;
   }
+}
+
+.mobile-app-frame {
+  position: relative;
+  width: min(100%, 28rem);
+  min-height: 100dvh;
+  margin-inline: auto;
+  background: var(--background);
+  overscroll-behavior-y: none;
+}
+.mobile-app-frame main { min-width: 0; }
+.mobile-bottom-bar { z-index: 30; }
+.mobile-app-frame [role="button"] { min-width: 48px; }
+.mobile-app-frame button { min-width: 48px; }
+.mobile-sheet {
+  position: fixed;
+  inset: auto 0 0;
+  top: auto !important;
+  bottom: var(--keyboard-inset, 0px);
+  width: min(100%, 28rem) !important;
+  max-width: 28rem !important;
+  max-height: calc(100dvh - 1rem - env(safe-area-inset-top) - var(--keyboard-inset, 0px));
+  margin-inline: auto;
+  transform: none !important;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-radius: 1.25rem 1.25rem 0 0 !important;
+  padding-top: 3.5rem;
+  padding-bottom: calc(1rem + env(safe-area-inset-bottom));
+}
+.mobile-sheet::before {
+  content: "";
+  position: absolute;
+  top: 0.75rem;
+  left: calc(50% - 1.5rem);
+  width: 3rem;
+  height: 0.25rem;
+  border-radius: 1rem;
+  background: var(--muted-foreground);
+}
+button, [role="button"], input:not([type="checkbox"]):not([type="radio"]), select, textarea {
+  min-height: 48px;
+  touch-action: manipulation;
+}
+button:has(> svg:only-child), [role="switch"] { min-width: 48px; }
+[role="switch"] { min-height: 48px; }
+input, select, textarea { font-size: max(16px, 1em); }
+@media (min-width: 448px) {
+  body { background: var(--device-surround); }
+  .mobile-app-frame { border-inline: 1px solid var(--border); }
 }
 
 @utility text-balance-safe {

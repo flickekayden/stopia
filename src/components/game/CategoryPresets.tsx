@@ -5,6 +5,7 @@ import { useServerFn } from "@tanstack/react-start";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { BUILTIN_CATEGORY_PRESETS, mergeCategories } from "@/lib/category-presets";
 import { DEFAULT_CATEGORIES } from "@/lib/game";
 import { supabase } from "@/integrations/supabase/client";
@@ -32,6 +33,10 @@ export function CategoryPresets({
   const [newItem, setNewItem] = useState("");
   const [merging, setMerging] = useState(false);
   const [applying, setApplying] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Preset | null>(null);
+  const [deletePassword, setDeletePassword] = useState("");
+  const [needsPassword, setNeedsPassword] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const remove = useServerFn(deleteCategoryPreset);
   const devStatus = useServerFn(getDeveloperStatus);
   const updatePreset = useServerFn(updateCategoryPreset);
@@ -77,21 +82,21 @@ export function CategoryPresets({
   }
 
   async function del(p: Preset) {
-    if (!window.confirm(`Apagar a lista "${p.name}"?`)) return;
+    setDeleting(true);
     try {
-      let res = await remove({ data: { presetId: p.id } });
+      const res = await remove({ data: { presetId: p.id, ...(needsPassword ? { password: deletePassword } : {}) } });
       if (res.needsPassword) {
-        const password = window.prompt("Senha de desenvolvedor");
-        if (!password) return;
-        res = await remove({ data: { presetId: p.id, password } });
-        if (res.needsPassword) { toast.error("Senha incorreta"); return; }
-        setIsDev(true);
+        if (needsPassword) toast.error("Senha incorreta");
+        setNeedsPassword(true);
+        return;
       }
+      if (needsPassword) setIsDev(true);
+      setDeleteTarget(null); setDeletePassword(""); setNeedsPassword(false);
       toast.success("Lista apagada");
       void load();
     } catch {
       toast.error("Não foi possível apagar a lista");
-    }
+    } finally { setDeleting(false); }
   }
 
   function startEdit(p: Preset) {
@@ -185,7 +190,7 @@ export function CategoryPresets({
                   variant="ghost"
                   size="icon"
                   className="size-12 shrink-0 rounded-2xl text-destructive"
-                  onClick={() => void del(p)}
+                  onClick={() => { setDeleteTarget(p); setNeedsPassword(false); setDeletePassword(""); }}
                 >
                   <Trash2 className="size-5" />
                 </Button>
@@ -243,6 +248,12 @@ export function CategoryPresets({
         </ul>
       )}
     </section>
+    <Dialog open={deleteTarget !== null} onOpenChange={(open) => { if (!open) { setDeleteTarget(null); setDeletePassword(""); } }}>
+      <DialogContent><DialogHeader><DialogTitle>Apagar lista {deleteTarget?.name}?</DialogTitle><DialogDescription>A lista salva será removida para todos.</DialogDescription></DialogHeader>
+        {needsPassword && <Input type="password" aria-label="Senha de desenvolvedor" placeholder="Senha de desenvolvedor" value={deletePassword} onChange={(event) => setDeletePassword(event.target.value)} />}
+        <DialogFooter><Button variant="secondary" disabled={deleting} onClick={() => setDeleteTarget(null)}>Cancelar</Button><Button variant="destructive" disabled={deleting || (needsPassword && !deletePassword)} onClick={() => { if (deleteTarget) void del(deleteTarget); }}>{deleting ? "Apagando..." : "Apagar lista"}</Button></DialogFooter>
+      </DialogContent>
+    </Dialog>
     </div>
   );
 }

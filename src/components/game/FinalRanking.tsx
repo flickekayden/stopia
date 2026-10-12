@@ -50,7 +50,7 @@ export function FinalRanking({
   }
 
   return (
-    <div className="space-y-4 pb-10">
+    <div className="space-y-4 pb-52">
       <div className="rounded-3xl border border-border bg-card p-6 text-center">
         <Trophy className="mx-auto size-10 text-gold" />
         <h2 className="mt-2 font-display text-3xl">Fim de jogo!</h2>
@@ -85,7 +85,6 @@ export function FinalRanking({
           </div>;
         })}
       </div>
-      <Button onClick={() => void shareSummary()} variant="outline" className="h-auto min-h-12 w-full whitespace-normal"><Share2 /> Compartilhar Resumo da Zoeira</Button>
 
       <div className="space-y-3">
         {ranking.map((p, i) => {
@@ -111,6 +110,8 @@ export function FinalRanking({
         })}
       </div>
 
+      <div className="mobile-bottom-bar fixed inset-x-0 bottom-0 mx-auto w-full max-w-md space-y-3 border-t border-border bg-background/95 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] backdrop-blur">
+      <Button onClick={() => void shareSummary()} variant="outline" className="h-auto min-h-12 w-full whitespace-normal"><Share2 /> Compartilhar Resumo da Zoeira</Button>
       {isHost ? (
         <Button
           onClick={onPlayAgain}
@@ -123,6 +124,7 @@ export function FinalRanking({
       ) : (
         <p className="text-center text-sm text-muted-foreground">Esperando o mestre preparar outra partida...</p>
       )}
+      </div>
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import { ChevronDown, Scale } from "lucide-react";
 import { useState } from "react";
+import { Button } from "@/components/ui/button";
 
 import { useEffectiveDevSettings } from "@/lib/dev-settings";
 
@@ -26,7 +27,7 @@ export function ScoringRules() {
 
   return (
     <section className="rounded-3xl border border-border bg-card p-5">
-      <button
+      <Button variant="ghost"
         type="button"
         onClick={() => setOpen((v) => !v)}
         className="flex w-full items-center justify-between gap-2"
@@ -39,7 +40,7 @@ export function ScoringRules() {
         <ChevronDown
           className={`size-5 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`}
         />
-      </button>
+      </Button>
       {open && (
         <ul className="mt-4 space-y-2">
           {free && (

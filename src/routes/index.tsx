@@ -25,6 +25,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { InstallApp } from "@/components/InstallApp";
 import { createRoom, joinRoom } from "@/lib/game.functions";
 import { devText, setDevKey, setDevToken, useEffectiveDevSettings } from "@/lib/dev-settings";
 import { deleteRoom, listRooms, unlockDeveloper } from "@/lib/room-admin.functions";
@@ -174,7 +175,7 @@ function Home() {
   }
 
   return (
-    <main className="mx-auto flex min-h-[100dvh] w-full max-w-md flex-col gap-5 px-5 py-6">
+    <main className="mx-auto flex min-h-[100dvh] w-full max-w-md flex-col gap-5 px-5 pt-[calc(1rem+env(safe-area-inset-top))] pb-52">
       <header className="text-center">
         <div className="inline-block -rotate-2 rounded-2xl bg-primary px-5 py-2 shadow-[0_8px_0_0_var(--color-accent)]">
           <h1 className="font-display text-5xl text-primary-foreground">{devText(devSettings.texts.appTitle, "STOP!")}</h1>
@@ -200,13 +201,6 @@ function Home() {
           <Button variant={entryMode === "create" ? "default" : "secondary"} onClick={() => setEntryMode("create")}>Criar nova sala</Button>
           <Button variant={entryMode === "join" ? "default" : "secondary"} onClick={() => setEntryMode("join")}>Entrar com código</Button>
         </div>
-        {entryMode === "create" && <Button
-          onClick={handleCreate}
-          disabled={loading !== null}
-          className="h-14 w-full rounded-2xl text-lg font-bold"
-        >
-          {loading === "create" ? "Criando..." : "Criar sala"}
-        </Button>}
       </section>
 
       {entryMode === "join" && <section className="space-y-3">
@@ -222,14 +216,6 @@ function Home() {
           onChange={(e) => setCode(e.target.value.toUpperCase())}
           className="h-14 rounded-2xl border-2 text-center font-display text-3xl tracking-[0.4em]"
         />
-        <Button
-          variant="secondary"
-          onClick={handleJoin}
-          disabled={loading !== null}
-          className="h-14 w-full rounded-2xl text-lg font-bold"
-        >
-          {loading === "join" ? "Entrando..." : "Entrar na sala"}
-        </Button>
       </section>}
 
       <section className="space-y-3 pb-4" aria-labelledby="salas-title">
@@ -301,6 +287,13 @@ function Home() {
           })}
         </div>}
       </section>
+
+      <div className="mobile-bottom-bar fixed inset-x-0 bottom-[var(--keyboard-inset,0px)] mx-auto w-full max-w-md space-y-3 border-t border-border bg-background/95 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] backdrop-blur">
+        <Button onClick={entryMode === "create" ? handleCreate : handleJoin} disabled={loading !== null} className="h-14 w-full rounded-2xl text-lg font-bold">
+          {loading === "create" ? "Criando..." : loading === "join" ? "Entrando..." : entryMode === "create" ? "Criar sala" : "Entrar na sala"}
+        </Button>
+        <InstallApp />
+      </div>
 
       <Dialog open={passwordOpen} onOpenChange={setPasswordOpen}>
         <DialogContent className="w-[calc(100%_-_2rem)] rounded-2xl">

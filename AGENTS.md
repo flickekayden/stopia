@@ -20,3 +20,6 @@
 - Room chat uses lightweight plain-text bubbles and design-system input controls rather than AI Markdown/attachment engines; append realtime messages and cap history at the newest 100 entries to bound work and memory.
 - Results and final rankings are lazy-loaded game phases; unchanged answer cards retain memoized renders so countdown ticks do not repaint every answer.
 - Independent server reads and score writes run in parallel with at most six outbound requests per batch to respect the deployed runtime budget.
+- All routes share a smartphone-width shell, and portal sheets/fixed controls use the same width and safe-area offsets so desktop preserves mobile ergonomics.
+- The installation worker is network-only for navigations and never caches game/session data so multiplayer state remains authoritative.
+- Device haptics and installation prompts run only in effects or user handlers with capability checks so SSR and unsupported browsers stay safe.

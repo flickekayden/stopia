@@ -81,7 +81,8 @@ export function ChatDrawer({
     try {
       const p = JSON.parse(window.localStorage.getItem("stop-chat-bubble-pos") ?? "null");
       if (p && typeof p.x === "number" && typeof p.y === "number") {
-        setBubblePos({ x: Math.min(p.x, window.innerWidth - 60), y: Math.min(p.y, window.innerHeight - 60) });
+        const left = Math.max(0, (window.innerWidth - 448) / 2);
+        setBubblePos({ x: Math.max(left + 4, Math.min(p.x, left + Math.min(window.innerWidth, 448) - 60)), y: Math.min(p.y, window.innerHeight - 60) });
       }
     } catch { /* ignore */ }
   }, []);
@@ -223,7 +224,7 @@ export function ChatDrawer({
           d.moved = true;
           const size = 56;
           setBubblePos({
-            x: Math.min(Math.max(4, e.clientX - d.dx), window.innerWidth - size - 4),
+            x: Math.min(Math.max(Math.max(0, (window.innerWidth - 448) / 2) + 4, e.clientX - d.dx), Math.max(0, (window.innerWidth - 448) / 2) + Math.min(window.innerWidth, 448) - size - 4),
             y: Math.min(Math.max(4, e.clientY - d.dy), window.innerHeight - size - 4),
           });
         }}
@@ -238,7 +239,7 @@ export function ChatDrawer({
           } else onOpenChange(true);
         }}
         style={bubblePos ? { left: bubblePos.x, top: bubblePos.y, right: "auto", bottom: "auto", touchAction: "none" } : { touchAction: "none" }}
-        className={`fixed ${voiceControls ? "bottom-[calc(19rem+env(safe-area-inset-bottom))]" : "bottom-[calc(4rem+env(safe-area-inset-bottom))]"} right-4 z-40 size-14 rounded-full shadow-lg md:hidden`}
+        className={`fixed ${voiceControls ? "bottom-[calc(19rem+env(safe-area-inset-bottom))]" : "bottom-[calc(7rem+env(safe-area-inset-bottom))]"} right-[max(1rem,calc((100vw-28rem)/2+1rem))] z-40 size-14 rounded-full shadow-lg touch-none`}
       >
         <MessageCircle className="size-6" />
         {unread > 0 && !open && (
@@ -262,7 +263,7 @@ export function ChatDrawer({
 
       <Drawer open={open} onOpenChange={onOpenChange} shouldScaleBackground={false}>
         <DrawerContent
-          className="h-[60dvh] max-h-[calc(100dvh-1rem)] md:hidden"
+          className="h-[70dvh] max-h-[calc(100dvh-1rem)]"
           style={{ bottom: keyboardInset }}
         >
           <DrawerHeader className="grid grid-cols-[minmax(0,1fr)_auto] items-center border-b border-border py-3 text-left">
