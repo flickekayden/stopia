@@ -1,12 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { List, Layers, FastForward, ArrowRight } from "lucide-react";
+import { FastForward, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { useSound } from "@/components/SoundProvider";
 import { AnswerCard, type AnswerCardData, answerCardId } from "@/components/game/AnswerCard";
-import { PlayerPresence } from "@/components/game/PlayerPresence";
-import { ScoringRules } from "@/components/game/ScoringRules";
 import { VoiceReactions } from "@/components/game/VoiceReactions";
 import type { Player, Room, Round } from "@/hooks/use-room";
 import { supabase } from "@/integrations/supabase/client";
@@ -39,7 +37,6 @@ export function RoundResults({
 }) {
   const { play } = useSound();
   const [index, setIndex] = useState(0);
-  const [mode, setMode] = useState<"list" | "steps">("list");
   const [now, setNow] = useState(() => Date.now());
   const [openedAt] = useState(() => Date.now());
   const [markingSeen, setMarkingSeen] = useState(false);
@@ -86,6 +83,12 @@ export function RoundResults({
     return () => window.cancelAnimationFrame(frame);
   }, [index, round.id]);
 
+  useEffect(() => {
+    if (!highlightedAnswer) return;
+    const target = cards.findIndex((item) => item.answers.some((answer) => answerCardId(answer) === highlightedAnswer));
+    if (target >= 0) setIndex(target);
+  }, [highlightedAnswer, cards]);
+
   async function markSeen() {
     if (markingSeen || players.some((p) => p.id === playerId && p.ready_round >= round.number)) return;
     setMarkingSeen(true);
@@ -101,43 +104,31 @@ export function RoundResults({
     }
   }
 
-  const visibleCategories = mode === "list" ? categories : [category];
+  const categoryCards = cards[index]?.answers ?? [];
 
   return (
     <div className="dock-clearance space-y-4">
-      <div ref={categoryHeading} className="scroll-mt-4 space-y-3 text-center">
+      <div ref={categoryHeading} className="scroll-mt-4 space-y-2 pt-2 text-center">
         <p className="text-sm text-muted-foreground">Rodada {round.number} · letra {round.letter}</p>
         <h2 className="font-display text-3xl">Resultado da rodada</h2>
-        <div className="grid grid-cols-2 gap-1 rounded-2xl border border-border p-1" role="group" aria-label="Visualização dos resultados">
-          <Button variant={mode === "list" ? "selected" : "segment"} aria-pressed={mode === "list"} onClick={() => setMode("list")}><List /> Todas</Button>
-          <Button variant={mode === "steps" ? "selected" : "segment"} aria-pressed={mode === "steps"} onClick={() => setMode("steps")}><Layers /> Por categoria</Button>
-        </div>
-        <div className="game-scroll flex gap-2 overflow-x-auto pb-2" aria-label="Categorias avaliadas">
-          {categories.map((c, i) => <Button key={c} size="sm" variant={index === i ? "selected" : "segment"} aria-pressed={index === i} className="h-auto max-w-40 shrink-0 truncate rounded-lg" onClick={() => {
-            setIndex(i);
-            if (mode === "list") document.getElementById(`result-category-${i}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
-          }}>{c}</Button>)}
-        </div>
       </div>
-      {visibleCategories.map((c) => {
-        const categoryCards = cards.find((item) => item.category === c)?.answers ?? [];
-        return <section key={c} id={`result-category-${categories.indexOf(c)}`} className="game-section scroll-mt-4 space-y-3">
-          <h2 className="text-balance-safe font-display text-2xl text-primary">{c}</h2>
+      <section key={category} id={`result-category-${index}`} className="game-section scroll-mt-4 space-y-3" aria-label={`Respostas de ${category}`}>
+          <div className="space-y-2 pb-1" aria-live="polite">
+            <p className="text-xs font-semibold tabular-nums text-muted-foreground">Categoria {Math.min(index + 1, categories.length)} de {categories.length}</p>
+            <h3 className="text-balance-safe font-display text-3xl text-primary">{category}</h3>
+            <progress aria-label="Categorias vistas" className="answer-progress h-1 w-full" value={index + 1} max={categories.length || 1} />
+          </div>
           {categoryCards.map((data) => <AnswerCard key={data.playerId} data={data} highlighted={highlightedAnswer === answerCardId(data)} onQuote={onQuote} />)}
-        </section>;
-      })}
-
-      <ScoringRules />
+      </section>
 
       <div className="mobile-bottom-bar fixed inset-x-0 bottom-0 mx-auto w-full max-w-md border-t border-border bg-background/95 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] backdrop-blur">
         {sessionId && <VoiceReactions key={round.id} roomId={room.id} roundId={round.id} playerId={playerId} sessionId={sessionId} />}
         <p className="mb-2 text-center text-xs tabular-nums text-muted-foreground" role="timer">{secondsLeft > 0 ? `Leitura · ${secondsLeft}s` : "Leitura concluída"}</p>
         {isHost && forceAvailable && !everyoneReady && <Button variant="outline" disabled={advancing} className="mb-2 w-full" onClick={() => onNextRound(true)}><FastForward /> {isLastRound ? "Forçar resultado final" : "Forçar avanço"}</Button>}
-        {mode === "steps" && !isLastCategory ? (
+        {!isLastCategory ? (
           <Button
-            variant="secondary"
             onClick={() => setIndex((i) => i + 1)}
-            className="h-14 w-full rounded-2xl text-lg font-bold"
+            className="h-14 w-full text-lg font-bold"
           >
             Próxima categoria <ArrowRight />
           </Button>
@@ -153,17 +144,7 @@ export function RoundResults({
               </Button>
             )}
             {!everyoneReady && (
-              <div className="game-scroll flex max-h-20 flex-wrap items-center justify-center gap-2 overflow-y-auto">
-                <span className="text-sm text-muted-foreground">Ainda vendo:</span>
-                {pending.map((p) => (
-                  <span
-                    key={p.id}
-                    className="text-balance-safe max-w-full rounded-full bg-secondary px-3 py-1 text-sm text-muted-foreground"
-                  >
-                    {p.nickname} <PlayerPresence player={p} />
-                  </span>
-                ))}
-              </div>
+              <p className="text-center text-sm text-muted-foreground">{pending.length} {pending.length === 1 ? "jogador ainda vendo" : "jogadores ainda vendo"}</p>
             )}
             {isHost && hasSeen ? (
               <Button
