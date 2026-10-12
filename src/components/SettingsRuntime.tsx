@@ -16,6 +16,14 @@ export function SettingsRuntime() {
       if (value) root.style.setProperty(`--${key}`, value);
       else root.style.removeProperty(`--${key}`);
     }
+    const theme = document.querySelector('meta[name="theme-color"]');
+    if (theme) {
+      const probe = document.createElement("span");
+      probe.style.color = "var(--background)";
+      root.appendChild(probe);
+      theme.setAttribute("content", getComputedStyle(probe).color);
+      probe.remove();
+    }
   }, [effective.colors]);
   useEffect(() => {
     let active = true;

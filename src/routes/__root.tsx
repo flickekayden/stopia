@@ -82,8 +82,12 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: "utf-8" },
       {
         name: "viewport",
-        content: "width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover",
+        content: "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover",
       },
+      { name: "theme-color", content: "#100d1e" },
+      { name: "apple-mobile-web-app-capable", content: "yes" },
+      { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" },
+      { name: "apple-mobile-web-app-title", content: "STOP!" },
       { title: "STOP! Adedonha online" },
       { name: "description", content: "Jogue Stop (Adedonha) online com os amigos, direto do celular." },
       { property: "og:type", content: "website" },
@@ -98,6 +102,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         href: "https://fonts.googleapis.com/css2?family=Anton&family=DM+Sans:ital,opsz,wght@0,9..40,400..800;1,9..40,400&display=swap",
       },
       { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
+      { rel: "manifest", href: "/manifest.webmanifest" },
+      { rel: "apple-touch-icon", href: "/icons/stop-192.png" },
     ],
   }),
   shellComponent: RootShell,
@@ -108,7 +114,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="pt-BR">
       <head>
         <HeadContent />
       </head>
@@ -127,7 +133,7 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       <SoundProvider>
         {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-        <Outlet />
+        <div className="mobile-app-frame"><Outlet /></div>
         <SettingsRuntime />
         <Toaster position="top-center" richColors />
       </SoundProvider>
