@@ -21,7 +21,7 @@
 - [x] Verify real multiplayer flows and record performance evidence
 
 - [x] Add timed results readiness, host override and inactive-player bypass
-- [x] Add continuous results with category shortcuts
+- [x] Simplify results to one category at a time with a next-category button
 - [x] Compact home entry, lobby tags/presence, and focused round header
 - [x] Add podium and shareable champion summary
 - [x] Verify multiplayer pacing and screen flows
