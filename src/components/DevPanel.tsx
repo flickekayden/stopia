@@ -1,6 +1,6 @@
 import { useServerFn } from "@tanstack/react-start";
 import { FlaskConical, Loader2, RefreshCw, RotateCcw, Save, Settings } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 
 import { AnswerCard, type AnswerCardData } from "@/components/game/AnswerCard";
@@ -21,13 +21,11 @@ import {
   setGlobalSettings,
   updateDevSettings,
   useDevRound,
-  useEffectiveDevSettings,
   useDevSettings,
   type DevSettings,
-  type GlobalSettings,
   type GeminiModel,
 } from "@/lib/dev-settings";
-import { evaluateRound, getGlobalSettings, saveAiSettings, testJudgment } from "@/lib/game.functions";
+import { evaluateRound, saveAiSettings, testJudgment } from "@/lib/game.functions";
 
 const COLOR_VARS = [
   ["primary", "Primária", "--primary"],
@@ -49,38 +47,11 @@ function sample(points: number, response: string, comment: string): AnswerCardDa
   return { roundId: "dev", category: "Animal", playerId: `dev-${points}-${response}`, playerName: "Testador", response, points, comment };
 }
 
-function useApplyTheme(s: DevSettings, active: boolean) {
-  useEffect(() => {
-    const root = document.documentElement;
-    for (const [key, , cssVar] of COLOR_VARS) {
-      const v = active ? s.colors[key] : "";
-      if (v) root.style.setProperty(cssVar, v);
-      else root.style.removeProperty(cssVar);
-    }
-  }, [active, s.colors]);
-}
-
 export function DevPanel() {
   const { isDev, settings: s } = useDevSettings();
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const save = useServerFn(saveAiSettings);
-  const fetchGlobal = useServerFn(getGlobalSettings);
-  const effective = useEffectiveDevSettings();
-  useApplyTheme(effective, true);
-  useEffect(() => {
-    let alive = true;
-    const pull = () => fetchGlobal().then((g) => alive && setGlobalSettings(g as GlobalSettings)).catch(() => {});
-    pull();
-    const id = window.setInterval(pull, 30000);
-    const onFocus = () => pull();
-    window.addEventListener("focus", onFocus);
-    return () => {
-      alive = false;
-      window.clearInterval(id);
-      window.removeEventListener("focus", onFocus);
-    };
-  }, [fetchGlobal]);
   if (!isDev) return null;
 
   const patch = (fn: (p: DevSettings) => DevSettings) => updateDevSettings(fn);

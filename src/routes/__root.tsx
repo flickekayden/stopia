@@ -14,7 +14,7 @@ import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { SoundProvider } from "@/components/SoundProvider";
 import { Toaster } from "@/components/ui/sonner";
-import { DevPanel } from "@/components/DevPanel";
+import { SettingsRuntime } from "@/components/SettingsRuntime";
 
 function NotFoundComponent() {
   return (
@@ -128,7 +128,7 @@ function RootComponent() {
       <SoundProvider>
         {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
         <Outlet />
-        <DevPanel />
+        <SettingsRuntime />
         <Toaster position="top-center" richColors />
       </SoundProvider>
     </QueryClientProvider>
