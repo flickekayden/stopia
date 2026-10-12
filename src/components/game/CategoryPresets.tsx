@@ -5,6 +5,8 @@ import { useServerFn } from "@tanstack/react-start";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { BUILTIN_CATEGORY_PRESETS, mergeCategories } from "@/lib/category-presets";
+import { DEFAULT_CATEGORIES } from "@/lib/game";
 import { supabase } from "@/integrations/supabase/client";
 import {
   deleteCategoryPreset,
@@ -19,7 +21,7 @@ export function CategoryPresets({
   onApply,
 }: {
   categories: string[];
-  onApply: (list: string[]) => void;
+  onApply: (list: string[]) => Promise<boolean>;
 }) {
   const [presets, setPresets] = useState<Preset[]>([]);
   const [name, setName] = useState("");
@@ -28,9 +30,23 @@ export function CategoryPresets({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<string[]>([]);
   const [newItem, setNewItem] = useState("");
+  const [merging, setMerging] = useState(false);
+  const [applying, setApplying] = useState(false);
   const remove = useServerFn(deleteCategoryPreset);
   const devStatus = useServerFn(getDeveloperStatus);
   const updatePreset = useServerFn(updateCategoryPreset);
+
+  async function apply(preset: Preset) {
+    setApplying(true);
+    try {
+      const list = merging ? mergeCategories(categories, preset.categories) : [...preset.categories];
+      if (await onApply(list)) toast.success(`Lista "${preset.name}" ${merging ? "mesclada" : "aplicada"}`);
+    } catch {
+      toast.error("Não consegui aplicar a lista");
+    } finally {
+      setApplying(false);
+    }
+  }
 
   async function load() {
     const { data } = await supabase
@@ -110,6 +126,22 @@ export function CategoryPresets({
   }
 
   return (
+    <div className="space-y-6">
+      <section className="space-y-3" aria-labelledby="preset-title">
+        <h2 id="preset-title" className="font-display text-xl">Presets de categorias</h2>
+        <div className="grid grid-cols-2 gap-2" role="group" aria-label="Como carregar a lista">
+          <Button variant={merging ? "secondary" : "default"} aria-pressed={!merging} onClick={() => setMerging(false)}>Substituir</Button>
+          <Button variant={merging ? "default" : "secondary"} aria-pressed={merging} onClick={() => setMerging(true)}>Mesclar</Button>
+        </div>
+        <div className="space-y-2">
+          {[{ id: "builtin-default", name: "Padrão base", categories: DEFAULT_CATEGORIES }, ...BUILTIN_CATEGORY_PRESETS].map((preset) => (
+            <Button key={preset.id} variant="secondary" disabled={applying} onClick={() => void apply(preset)} className="h-auto min-h-14 w-full justify-between gap-3 whitespace-normal px-4 py-3 text-left">
+              <span className="min-w-0 break-words">{preset.name}</span>
+              <span className="shrink-0 text-xs text-muted-foreground">{preset.categories.length}</span>
+            </Button>
+          ))}
+        </div>
+      </section>
     <section className="rounded-3xl border border-border bg-card p-5">
       <h2 className="font-display text-xl">Listas salvas</h2>
       <div className="mt-3 flex items-center gap-2">
@@ -129,16 +161,15 @@ export function CategoryPresets({
           {presets.map((p) => (
             <li key={p.id} className="space-y-2">
               <div className="flex items-center gap-2">
-                <button
-                  onClick={() => {
-                    onApply(p.categories);
-                    toast.success(`Lista "${p.name}" aplicada`);
-                  }}
-                  className="flex-1 rounded-2xl bg-secondary px-4 py-3 text-left"
+                <Button
+                  variant="secondary"
+                  disabled={applying}
+                  onClick={() => void apply(p)}
+                  className="h-auto min-w-0 flex-1 flex-col items-start whitespace-normal rounded-2xl px-4 py-3 text-left"
                 >
                   <span className="font-semibold">{p.name}</span>
                   <span className="block text-xs text-muted-foreground">{p.categories.length} categorias</span>
-                </button>
+                </Button>
                 {isDev && (
                   <Button
                     variant="ghost"
@@ -212,5 +243,6 @@ export function CategoryPresets({
         </ul>
       )}
     </section>
+    </div>
   );
 }

@@ -1,5 +1,5 @@
 import { Check, Copy, Crown, Plus, Trash2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -13,8 +13,6 @@ import type { Player, Room } from "@/hooks/use-room";
 import { supabase } from "@/integrations/supabase/client";
 import { LETTERS } from "@/lib/game";
 import { devText, useEffectiveDevSettings } from "@/lib/dev-settings";
-
-const STORAGE_KEY = "stop-categorias";
 
 export function Lobby({
   room,
@@ -34,29 +32,14 @@ export function Lobby({
   const [newCategory, setNewCategory] = useState("");
   const [copied, setCopied] = useState(false);
 
-  useEffect(() => {
-    if (!isHost) return;
-    const saved = window.localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      try {
-        const list = JSON.parse(saved) as string[];
-        if (Array.isArray(list) && list.length > 0 && room.current_round === 0) {
-          void update({ categories: list });
-        }
-      } catch {
-        /* ignore */
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   async function update(patch: Partial<Room>) {
     const { error } = await supabase.from("rooms").update(patch).eq("id", room.id);
     if (error) {
       play("error");
       toast.error("Não consegui salvar a configuração");
+      return false;
     }
-    if (patch.categories) window.localStorage.setItem(STORAGE_KEY, JSON.stringify(patch.categories));
+    return true;
   }
 
   function addCategory() {
@@ -240,6 +223,11 @@ export function Lobby({
             </div>
           </section>
 
+          <CategoryPresets
+            categories={room.categories}
+            onApply={(list) => update({ categories: list })}
+          />
+
           <section className="rounded-3xl border border-border bg-card p-5">
             <h2 className="font-display text-xl">Categorias ({room.categories.length})</h2>
             <p className="mt-1 text-sm text-muted-foreground">
@@ -282,11 +270,6 @@ export function Lobby({
               </Button>
             </div>
           </section>
-
-          <CategoryPresets
-            categories={room.categories}
-            onApply={(list) => void update({ categories: list })}
-          />
 
           <Button
             onClick={onStart}
