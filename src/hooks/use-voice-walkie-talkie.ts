@@ -46,6 +46,7 @@ export function useVoiceWalkieTalkie(identity: VoiceIdentity) {
     const done = () => {
       window.clearTimeout(watchdog);
       if (audio.current !== player) return;
+      player.pause();
       audio.current = null;
       setSpeaker(null);
       playNextRef.current();
@@ -177,7 +178,7 @@ export function useVoiceWalkieTalkie(identity: VoiceIdentity) {
     };
     const channel = supabase.channel(`voice-${identity.roomId}-${identity.playerId}-${identity.roundId}`)
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "room_voice_notes", filter: `room_id=eq.${identity.roomId}` }, (payload) => {
-        if (payload.new.round_id === identity.roundId && typeof payload.new.id === "string") receive(payload.new.id);
+        if (payload.new['round_id'] === identity.roundId && typeof payload.new['id'] === "string") receive(payload.new['id']);
       }).subscribe();
     const poll = async () => {
       const { data } = await supabase.from("room_voice_notes").select("id").eq("room_id", identity.roomId).eq("round_id", identity.roundId).gt("created_at", since).order("created_at").limit(50);

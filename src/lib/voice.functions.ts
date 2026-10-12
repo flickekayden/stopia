@@ -22,7 +22,7 @@ export const sendVoiceNote = createServerFn({ method: "POST" })
     const data = identity.extend({ durationMs: z.coerce.number().int().min(1).max(7000) }).parse(Object.fromEntries(input));
     const audio = input.get("audio");
     if (!(audio instanceof Blob) || !audio.size || audio.size > 500 * 1024) throw new Error("O áudio está vazio ou grande demais");
-    const mime = audio.type.split(";")[0];
+    const mime = audio.type.split(";")[0] ?? "";
     if (!["audio/webm", "audio/mp4", "audio/aac", "audio/ogg"].includes(mime)) throw new Error("Formato de áudio não suportado");
     return { ...data, audio, mime };
   })
@@ -52,7 +52,7 @@ export const getVoicePlayback = createServerFn({ method: "POST" })
     if (error || !signed) throw new Error("Não consegui abrir essa reação");
     // Keep URLs on the browser-facing origin, including isolated preview stacks.
     const signedUrl = new URL(signed.signedUrl);
-    const browserBase = import.meta.env.VITE_SUPABASE_URL;
+    const browserBase = import.meta.env['VITE_SUPABASE_URL'];
     const audioUrl = browserBase ? `${browserBase.replace(/\/$/, "")}${signedUrl.pathname}${signedUrl.search}` : signed.signedUrl;
     return { id: note.id, nickname: note.nickname, audioUrl, duration: note.duration_ms };
   });
