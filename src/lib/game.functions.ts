@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { createHash } from "node:crypto";
 import { z } from "zod";
+import { RESULTS_VIEW_MS, RESULTS_FORCE_MS, isResultsPlayerActive, resultsDeadline } from "./results-pacing";
 
 import {
   DEFAULT_CATEGORIES,
@@ -238,15 +239,33 @@ export const restartRoom = createServerFn({ method: "POST" })
 
 export const startNextRound = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) =>
-    z.object({ roomId: z.string().uuid(), playerId: z.string().uuid() }).parse(input),
+    z.object({ roomId: z.string().uuid(), playerId: z.string().uuid(), sessionId: z.string().uuid().optional(), force: z.boolean().optional(), expectedRound: z.number().int().optional() }).parse(input),
   )
   .handler(async ({ data }) => {
     const supabase = await db();
     const { data: room } = await supabase.from("rooms").select("*").eq("id", data.roomId).maybeSingle();
     if (!room) throw new Error("Sala não encontrada");
     if (room.host_player_id !== data.playerId) throw new Error("Só o mestre pode iniciar a rodada");
-    if (room.current_round >= room.total_rounds && room.status !== "lobby") {
-      throw new Error("A partida já acabou");
+    if (room.status !== "lobby") {
+      const { data: caller } = await supabase.from("players").select("session_id").eq("id", data.playerId).eq("room_id", room.id).maybeSingle();
+      if (!data.sessionId || caller?.session_id !== hashSessionId(data.sessionId)) throw new Error("Sessão inválida");
+      if (data.expectedRound !== room.current_round) throw new Error("A rodada já mudou");
+      const { data: current } = await supabase.from("rounds").select("status, ends_at").eq("room_id", room.id).eq("number", room.current_round).maybeSingle();
+      if (room.status !== "playing" || current?.status !== "results") throw new Error("A avaliação ainda não terminou");
+      const now = Date.now();
+      const deadline = resultsDeadline(current.ends_at);
+      const canForce = deadline !== null && now >= deadline - RESULTS_VIEW_MS + RESULTS_FORCE_MS;
+      const expired = deadline !== null && now >= deadline;
+      const { data: participants, error: participantsError } = await supabase.from("players").select("ready_round, is_online, last_seen").eq("room_id", room.id);
+      if (participantsError) throw new Error("Não foi possível conferir os jogadores");
+      const pending = (participants ?? []).some((p) => isResultsPlayerActive(p, now) && p.ready_round < room.current_round);
+      if (data.force && !canForce) throw new Error("Aguarde dez segundos para forçar o avanço");
+      if (pending && !expired && !(data.force && canForce)) throw new Error("Ainda há jogadores vendo os resultados");
+      if (room.current_round >= room.total_rounds) {
+        const { error } = await supabase.from("rooms").update({ status: "ended" }).eq("id", room.id).eq("current_round", room.current_round);
+        if (error) throw new Error("Não foi possível finalizar a partida");
+        return { roundId: null };
+      }
     }
 
     const nextNumber = room.current_round + 1;
@@ -569,7 +588,7 @@ export const evaluateRound = createServerFn({ method: "POST" })
     const evaluation: Evaluation = { resultados };
     await supabase
       .from("rounds")
-      .update(force ? { evaluation } : { evaluation, status: "results" })
+      .update(force ? { evaluation } : { evaluation, status: "results", ends_at: new Date(Date.now() + RESULTS_VIEW_MS).toISOString() })
       .eq("id", round.id);
 
     for (const p of players ?? []) {
