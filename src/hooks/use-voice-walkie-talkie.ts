@@ -204,6 +204,7 @@ export function useVoiceWalkieTalkie(identity: VoiceIdentity) {
       try {
         const { data } = await supabase.from("room_voice_notes").select("id").eq("room_id", identity.roomId).eq("round_id", identity.roundId).gt("created_at", since).order("created_at").limit(50);
         data?.forEach((note) => receive(note.id));
+      } catch { /* Realtime continues during transient polling failures. */
       } finally { polling = false; }
     };
     const fallback = window.setInterval(() => void poll(), 3000);

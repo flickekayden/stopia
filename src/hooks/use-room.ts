@@ -164,6 +164,7 @@ export function useRoom(code: string, presenceKey: string | null) {
         (payload) => {
           if (payload.eventType !== "UPDATE") { scheduleRefresh(); return; }
           const next = payload.new as Player;
+          if (refreshInFlight.current) refreshQueued.current = true;
           setPlayers((previous) => previous.map((player) => player.id === next.id ? sameData(player, next) : player));
         },
       )
@@ -205,6 +206,7 @@ export function useRoom(code: string, presenceKey: string | null) {
         "postgres_changes",
         { event: "*", schema: "public", table: "answers", filter: `round_id=eq.${currentRound.id}` },
         (payload) => {
+          if (refreshInFlight.current) refreshQueued.current = true;
           if (payload.eventType === "DELETE") {
             setAnswers((previous) => previous.filter((answer) => answer.id !== payload.old['id']));
             return;
@@ -215,7 +217,9 @@ export function useRoom(code: string, presenceKey: string | null) {
             : [...previous, next]);
         },
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (status === "SUBSCRIBED") void refresh();
+      });
 
     return () => {
       void supabase.removeChannel(channel);

@@ -94,14 +94,16 @@ export function ChatDrawer({
   const messageIds = useRef(new Set<string>());
   const messagesReady = useRef(false);
   const pendingMessages = useRef<ChatMessage[]>([]);
+  const latestMessages = useRef<ChatMessage[]>([]);
+  useEffect(() => { latestMessages.current = messages; }, [messages]);
 
   useEffect(() => { openRef.current = open; }, [open]);
   useEffect(() => { playersRef.current = players; }, [players]);
 
-  const refresh = useCallback(async (countUnread = false) => {
+  const refresh = useCallback(async () => {
     try {
       const next = await listMessages({ data: { roomId, playerId } });
-      const combined = [...next, ...pendingMessages.current].filter((message, index, all) => all.findIndex((item) => item.id === message.id) === index)
+      const combined = [...next, ...latestMessages.current, ...pendingMessages.current].filter((message, index, all) => all.findIndex((item) => item.id === message.id) === index)
         .sort((a, b) => a.created_at.localeCompare(b.created_at)).slice(-100);
       pendingMessages.current = [];
       messageIds.current = new Set(combined.map((message) => message.id));
@@ -116,7 +118,8 @@ export function ChatDrawer({
     messagesReady.current = false;
     messageIds.current.clear();
     pendingMessages.current = [];
-    void refresh(false);
+    latestMessages.current = [];
+    void refresh();
   }, [refresh]);
 
   useEffect(() => {
@@ -137,6 +140,7 @@ export function ChatDrawer({
         const message = payload.new as ChatMessage;
         if (messageIds.current.has(message.id)) return;
         messageIds.current.add(message.id);
+        if (messageIds.current.size > 200) messageIds.current = new Set([...messageIds.current].slice(-100));
         if (!messagesReady.current) pendingMessages.current.push(message);
         setMessages((current) => {
           const next = [...current, message].sort((a, b) => a.created_at.localeCompare(b.created_at)).slice(-100);
@@ -144,7 +148,7 @@ export function ChatDrawer({
         });
         if (incoming.player_id !== playerId && !openRef.current) setUnread((value) => value + 1);
       })
-      .subscribe();
+      .subscribe((status) => { if (status === "SUBSCRIBED") void refresh(); });
     return () => { void supabase.removeChannel(channel); };
   }, [playerId, play, refresh, roomId]);
 
