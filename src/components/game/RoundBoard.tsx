@@ -41,6 +41,18 @@ export function RoundBoard({
   const firstAnswerInput = useRef<HTMLInputElement | null>(null);
   const appKeyboard = dev.keyboard.mode === "app";
   const [focusedCat, setFocusedCat] = useState<string | null>(null);
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
+  const compactHeader = focusedCat !== null || keyboardOpen;
+  const filledCount = round.categories.filter((c) => (values[c] ?? "").trim()).length;
+
+  useEffect(() => {
+    const viewport = window.visualViewport;
+    if (!viewport) return;
+    const resize = () => setKeyboardOpen(window.innerHeight - viewport.height > 150);
+    viewport.addEventListener("resize", resize);
+    resize();
+    return () => viewport.removeEventListener("resize", resize);
+  }, []);
 
   // Nova rodada: começa sempre com os campos vazios.
   useEffect(() => {
@@ -194,24 +206,29 @@ export function RoundBoard({
 
   return (
     <div className={`space-y-4 ${appKeyboard ? "pb-72" : "pb-36"}`}>
-      <div className="flex items-center gap-4 rounded-3xl border border-border bg-card p-4">
-        <div className="flex size-20 shrink-0 items-center justify-center rounded-2xl bg-primary">
-          <span className="font-display text-5xl text-primary-foreground">{round.letter}</span>
+      <div className={`sticky top-0 z-20 flex items-center border border-border bg-background/95 backdrop-blur ${compactHeader ? "gap-3 rounded-lg px-3 py-2" : "gap-4 rounded-3xl p-4"}`}>
+        <div className={`flex shrink-0 items-center justify-center bg-primary ${compactHeader ? "size-10 rounded-md" : "size-20 rounded-2xl"}`}>
+          <span className={`font-display text-primary-foreground ${compactHeader ? "text-2xl" : "text-5xl"}`}>{round.letter}</span>
         </div>
-        <div className="min-w-0 flex-1">
+        <div className={`min-w-0 flex-1 ${compactHeader ? "flex items-center justify-between gap-2" : ""}`}>
           <p className="text-sm text-muted-foreground">
             Rodada {round.number} de {room.total_rounds}
           </p>
           {secondsLeft !== null ? (
             <p
-              className={`font-display text-4xl ${secondsLeft <= 10 ? "text-destructive" : "text-foreground"}`}
+              className={`font-display ${compactHeader ? "text-xl" : "text-4xl"} ${secondsLeft <= 10 ? "text-destructive" : "text-foreground"}`}
             >
               {Math.floor(secondsLeft / 60)}:{String(secondsLeft % 60).padStart(2, "0")}
             </p>
           ) : (
-            <p className="font-display text-2xl text-muted-foreground">Sem cronômetro</p>
+            <p className="text-sm text-muted-foreground">Sem cronômetro</p>
           )}
         </div>
+      </div>
+
+      <div className="space-y-1">
+        <div className="text-right text-xs tabular-nums text-muted-foreground">{filledCount}/{round.categories.length} preenchidas</div>
+        <progress aria-label="Respostas preenchidas" className="answer-progress h-1 w-full" value={filledCount} max={round.categories.length || 1} />
       </div>
 
       {round.status === "answering" && stopCountdown !== null && stopCountdown > 0 && (
@@ -262,6 +279,7 @@ export function RoundBoard({
               spellCheck={dev.keyboard.spellcheck}
               inputMode={appKeyboard ? "none" : "text"}
               onFocus={() => setFocusedCat(category)}
+              onBlur={() => { if (!appKeyboard) setFocusedCat(null); }}
               name={`stop-answer-${index}`}
               data-form-type="other"
               data-lpignore="true"

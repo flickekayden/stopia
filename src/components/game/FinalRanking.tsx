@@ -1,6 +1,7 @@
-import { Loader2, Trophy } from "lucide-react";
+import { Loader2, Share2, Trophy } from "lucide-react";
 import { useEffect, useRef } from "react";
 
+import { toast } from "sonner";
 import { useSound } from "@/components/SoundProvider";
 import { Button } from "@/components/ui/button";
 import type { Player, Room } from "@/hooks/use-room";
@@ -36,6 +37,18 @@ export function FinalRanking({
     play(ranking[0]?.id === playerId ? "victory" : "defeat");
   }, [playerId, play, ranking]);
 
+  async function shareSummary() {
+    const champion = ranking[0];
+    const roast = analysis?.analises.find((a) => a.jogador_id === champion?.id)?.texto;
+    const text = [`🏆 STOP! — Sala ${room.code}`, ...ranking.map((p, i) => `${i + 1}º ${p.nickname}: ${p.score} pontos`), roast ? `\n😂 ${champion?.nickname}: “${roast}”` : "", "\nBora jogar de novo?"].filter(Boolean).join("\n");
+    try {
+      if (navigator.share) await navigator.share({ title: "Resumo da Zoeira — STOP!", text });
+      else { await navigator.clipboard.writeText(text); toast.success("Resumo copiado para compartilhar!"); }
+    } catch (error) {
+      if (!(error instanceof DOMException && error.name === "AbortError")) toast.error("Não foi possível compartilhar o resumo");
+    }
+  }
+
   return (
     <div className="space-y-4 pb-10">
       <div className="rounded-3xl border border-border bg-card p-6 text-center">
@@ -57,6 +70,22 @@ export function FinalRanking({
           {analysisError} O ranking abaixo continua valendo.
         </div>
       )}
+
+      <div className="flex items-end justify-center gap-2 pt-4" aria-label="Pódio">
+        {[1, 0, 2].map((place) => {
+          const p = ranking[place];
+          if (!p) return null;
+          return <div key={p.id} className="min-w-0 flex-1 text-center">
+            <p className="text-balance-safe mb-2 text-sm font-bold">{p.nickname}</p>
+            <div className={`flex flex-col items-center justify-center rounded-t-lg border border-current ${place === 0 ? "h-36 bg-gold/15 text-gold" : place === 1 ? "h-28 bg-silver/15 text-silver" : "h-20 bg-bronze/15 text-bronze"}`}>
+              <span className="text-xl">{["🥇", "🥈", "🥉"][place]}</span>
+              <strong className="font-display text-2xl">{p.score}</strong>
+              <span className="text-xs">{place + 1}º lugar</span>
+            </div>
+          </div>;
+        })}
+      </div>
+      <Button onClick={() => void shareSummary()} variant="outline" className="h-auto min-h-12 w-full whitespace-normal"><Share2 /> Compartilhar Resumo da Zoeira</Button>
 
       <div className="space-y-3">
         {ranking.map((p, i) => {

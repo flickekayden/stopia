@@ -1,4 +1,4 @@
-import { Check, Copy, Crown, Plus, Trash2 } from "lucide-react";
+import { Check, Copy, Crown, Pencil, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -31,6 +31,7 @@ export function Lobby({
   const { play } = useSound();
   const [newCategory, setNewCategory] = useState("");
   const [copied, setCopied] = useState(false);
+  const [editingCategories, setEditingCategories] = useState(false);
 
   async function update(patch: Partial<Room>) {
     const { error } = await supabase.from("rooms").update(patch).eq("id", room.id);
@@ -114,13 +115,21 @@ export function Lobby({
         <h2 className="font-display text-xl">Jogadores ({players.length})</h2>
         <ul className="mt-3 space-y-2">
           {players.map((p) => (
-            <li key={p.id} className="flex items-center gap-2 rounded-2xl bg-secondary px-4 py-3">
+            <li key={p.id} className="animate-in fade-in slide-in-from-bottom-1 motion-reduce:animate-none flex items-center gap-2 rounded-2xl bg-secondary px-4 py-3">
+              <span className={`size-2 shrink-0 rounded-full ${p.is_online ? "bg-success motion-safe:animate-pulse" : "bg-muted-foreground"}`} aria-hidden="true" />
               {p.is_host && <Crown className="size-4 text-primary" />}
               <span className="font-semibold">{p.nickname}</span>
               <PlayerPresence player={p} />
             </li>
           ))}
         </ul>
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="font-display text-xl">Categorias ({room.categories.length})</h2>
+        <div className="flex flex-wrap gap-2">
+          {room.categories.map((c) => <span key={c} className="max-w-full rounded-full bg-secondary px-3 py-1.5 text-sm text-balance-safe">{c}</span>)}
+        </div>
       </section>
 
       <ScoringRules />
@@ -229,11 +238,11 @@ export function Lobby({
           />
 
           <section className="rounded-3xl border border-border bg-card p-5">
-            <h2 className="font-display text-xl">Categorias ({room.categories.length})</h2>
+            <Button variant="ghost" className="w-full justify-between" aria-expanded={editingCategories} onClick={() => setEditingCategories((v) => !v)}><span className="font-display text-xl">Editar categorias</span><Pencil className="size-4" /></Button>
             <p className="mt-1 text-sm text-muted-foreground">
               Cadastre quantas quiser. Cada rodada usa 8, em rodízio.
             </p>
-            <ul className="mt-3 space-y-2">
+            {editingCategories && <ul className="mt-3 space-y-2">
               {room.categories.map((c, i) => (
                 <li key={`${c}-${i}`} className="flex items-center gap-2">
                   <Input
@@ -254,7 +263,7 @@ export function Lobby({
                   </Button>
                 </li>
               ))}
-            </ul>
+            </ul>}
             <div className="mt-3 flex items-center gap-2">
               <Input
                 value={newCategory}
