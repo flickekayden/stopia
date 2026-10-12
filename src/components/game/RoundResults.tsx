@@ -6,6 +6,7 @@ import { useSound } from "@/components/SoundProvider";
 import { AnswerCard, type AnswerCardData, answerCardId } from "@/components/game/AnswerCard";
 import { PlayerPresence } from "@/components/game/PlayerPresence";
 import { ScoringRules } from "@/components/game/ScoringRules";
+import { VoiceReactions } from "@/components/game/VoiceReactions";
 import type { Player, Room, Round } from "@/hooks/use-room";
 import { supabase } from "@/integrations/supabase/client";
 import type { Evaluation } from "@/lib/game";
@@ -15,6 +16,7 @@ export function RoundResults({
   round,
   players,
   playerId,
+  sessionId,
   isHost,
   advancing,
   onNextRound,
@@ -25,6 +27,7 @@ export function RoundResults({
   round: Round;
   players: Player[];
   playerId: string;
+  sessionId: string | null;
   isHost: boolean;
   advancing: boolean;
   onNextRound: () => void;
@@ -37,7 +40,7 @@ export function RoundResults({
   const categoryHeading = useRef<HTMLDivElement | null>(null);
   const evaluation = round.evaluation as unknown as Evaluation | null;
   const categories = round.categories;
-  const category = categories[index]!;
+  const category = categories[index] ?? "";
   const isLastCategory = index >= categories.length - 1;
   const isLastRound = round.number >= room.total_rounds;
 
@@ -76,7 +79,7 @@ export function RoundResults({
   const rows = (evaluation?.resultados ?? []).filter((r) => r.categoria === category);
 
   return (
-    <div className="space-y-4 pb-32">
+    <div className="space-y-4 pb-52">
       <div ref={categoryHeading} className="scroll-mt-4 rounded-3xl border border-border bg-card p-4 text-center">
         <p className="text-sm text-muted-foreground">
           Rodada {round.number} · letra {round.letter} · categoria {index + 1} de {categories.length}
@@ -105,6 +108,7 @@ export function RoundResults({
       <ScoringRules />
 
       <div className="fixed inset-x-0 bottom-0 mx-auto w-full max-w-md border-t border-border bg-background/95 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] backdrop-blur">
+        {sessionId && <VoiceReactions key={round.id} roomId={room.id} roundId={round.id} playerId={playerId} sessionId={sessionId} />}
         {!isLastCategory ? (
           <Button
             onClick={() => setIndex((i) => i + 1)}

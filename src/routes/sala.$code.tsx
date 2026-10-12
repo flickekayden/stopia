@@ -408,6 +408,7 @@ function RoomPage() {
           round={currentRound}
           players={players}
           playerId={me.id}
+          sessionId={sessionId}
           isHost={isHost}
           advancing={busy}
           onNextRound={handleNext}

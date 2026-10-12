@@ -132,6 +132,11 @@
   animation: super-creative-glow 1.4s ease-in-out 2;
 }
 
+.voice-progress { appearance: none; border: none; overflow: hidden; border-radius: 4px; background: var(--secondary); }
+.voice-progress::-webkit-progress-bar { background: var(--secondary); }
+.voice-progress::-webkit-progress-value { background: var(--destructive); }
+.voice-progress::-moz-progress-bar { background: var(--destructive); }
+
 @media (prefers-reduced-motion: reduce) {
   .super-creative-answer { animation: none; box-shadow: var(--shadow-super-creative); }
 }
