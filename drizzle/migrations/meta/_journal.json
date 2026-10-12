@@ -1,5 +1,13 @@
 {
   "version": "7",
   "dialect": "postgresql",
-  "entries": []
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1791843181321,
+      "tag": "0000_room_voice_notes",
+      "breakpoints": true
+    }
+  ]
 }
