@@ -377,7 +377,7 @@ function AiTab({ s, patch }: { s: DevSettings; patch: (fn: (p: DevSettings) => D
         <Label className="flex items-center gap-2"><FlaskConical className="size-4" /> Laboratório</Label>
         <div className="grid grid-cols-[4rem_1fr] gap-2">
           <Input value={lab.letter} maxLength={1} onChange={(e) => setLab({ ...lab, letter: e.target.value })} placeholder="Letra" />
-          <Input value={lab.category} maxLength={60} onChange={(e) => setLab({ ...lab, category: e.target.value })} placeholder="Categoria" />
+          <Input value={lab.category} maxLength={160} onChange={(e) => setLab({ ...lab, category: e.target.value })} placeholder="Categoria" />
         </div>
         <Input value={lab.response} maxLength={80} onChange={(e) => setLab({ ...lab, response: e.target.value })} placeholder="Resposta" />
         <Button className="w-full" disabled={labBusy || !lab.letter || !lab.category} onClick={() => void runLab()}>

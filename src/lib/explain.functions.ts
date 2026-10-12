@@ -5,7 +5,7 @@ export const explainAnswer = createServerFn({ method: "POST" })
   .inputValidator((d) =>
     z
       .object({
-        category: z.string().max(60),
+        category: z.string().max(160),
         response: z.string().max(80),
         points: z.number().int().min(0).max(20),
         comment: z.string().max(300),

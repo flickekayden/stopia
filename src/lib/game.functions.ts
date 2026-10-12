@@ -593,7 +593,7 @@ export const testJudgment = createServerFn({ method: "POST" })
     z
       .object({
         letter: z.string().min(1).max(2),
-        category: z.string().min(1).max(60),
+        category: z.string().min(1).max(160),
         response: z.string().max(80),
         dev: devOverridesSchema,
       })

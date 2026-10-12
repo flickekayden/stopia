@@ -32,7 +32,7 @@ export function pickLetter(used: string[], excluded: string[]): string {
   const available = pool.filter((l) => !used.includes(l));
   const from = available.length > 0 ? available : pool;
   if (from.length === 0) return "A";
-  return from[Math.floor(Math.random() * from.length)]!;
+  return from[Math.floor(Math.random() * from.length)] ?? "A";
 }
 
 /** Rotation: least-recently-used categories first, random tie-break. */
@@ -41,7 +41,15 @@ export function pickCategories(
   usage: Record<string, number>,
   count = MAX_CATEGORIES_PER_ROUND,
 ): string[] {
-  const shuffled = [...all].sort(() => Math.random() - 0.5);
+  const shuffled = [...new Set(all.map((category) => category.trim()).filter(Boolean))];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const left = shuffled[i];
+    const right = shuffled[j];
+    if (left === undefined || right === undefined) continue;
+    shuffled[i] = right;
+    shuffled[j] = left;
+  }
   return shuffled.sort((a, b) => (usage[a] ?? -1) - (usage[b] ?? -1)).slice(0, count);
 }
 
