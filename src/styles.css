@@ -146,6 +146,7 @@
 .mobile-app-frame main { min-width: 0; }
 .mobile-bottom-bar { z-index: 30; box-shadow: var(--shadow-dock); max-height: calc(100dvh - 4rem - var(--keyboard-inset, 0px)); overflow-y: auto; overscroll-behavior: contain; }
 .dock-clearance { padding-bottom: calc(var(--active-dock-height, 10rem) + 5rem); }
+html { scroll-padding-top: 6rem; scroll-padding-bottom: calc(var(--active-dock-height, 0px) + 1rem); }
 .chat-launcher { bottom: calc(var(--active-dock-height, 5rem) + 1rem + var(--keyboard-inset, 0px)); }
 .mobile-app-frame img, .mobile-app-frame video { max-width: 100%; height: auto; }
 .mobile-sheet > *, .game-section > * { min-width: 0; }
