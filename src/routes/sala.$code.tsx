@@ -12,6 +12,7 @@ import { answerCardId, type AnswerCardData } from "@/components/game/AnswerCard"
 import { Button } from "@/components/ui/button";
 import { useSound } from "@/components/SoundProvider";
 import { Input } from "@/components/ui/input";
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
 import { useRoom } from "@/hooks/use-room";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -54,6 +55,7 @@ function RoomPage() {
   const [playerId, setPlayerId] = useState<string | null>(null);
   const [nickname, setNickname] = useState("");
   const [busy, setBusy] = useState(false);
+  const [removeTarget, setRemoveTarget] = useState<PlayerRemoval | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
   const [chatQuote, setChatQuote] = useState<AnswerCardData | null>(null);
   const [highlightedAnswer, setHighlightedAnswer] = useState<string | null>(null);
@@ -262,13 +264,13 @@ function RoomPage() {
     }
   }
 
-  async function handleRemove(targetId: string, nickname: string) {
+  async function handleRemove(targetId: string) {
     if (!room || !playerId) return;
-    if (!window.confirm(`Remover ${nickname} da sala?`)) return;
     setBusy(true);
     try {
       await removePlayer({ data: { roomId: room.id, requesterId: playerId, playerId: targetId } });
       await refresh();
+      setRemoveTarget(null);
     } catch (e) {
       play("error");
       toast.error(e instanceof Error ? e.message : "Não consegui remover o jogador");
@@ -348,9 +350,9 @@ function RoomPage() {
   }
 
   return (
-    <main className="mx-auto w-full max-w-md px-4 pt-5">
+    <main className="mx-auto w-full max-w-md px-4 pt-[calc(0.75rem+env(safe-area-inset-top))]">
       <header className="mb-4 space-y-3">
-        <div className="flex items-center justify-between gap-3 pr-12">
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 pr-14">
           <h1 className="font-display text-2xl text-primary">STOP!</h1>
           <Button
             variant="ghost"
@@ -379,7 +381,7 @@ function RoomPage() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={() => void handleRemove(p.id, p.nickname)}
+                    onClick={() => setRemoveTarget({ id: p.id, nickname: p.nickname })}
                     disabled={busy}
                     aria-label={`Remover ${p.nickname}`}
                     title={`Remover ${p.nickname}`}
@@ -446,6 +448,11 @@ function RoomPage() {
         onQuoteChange={setChatQuote}
         onNavigateQuote={handleNavigateQuote}
       />
+      <AlertDialog open={removeTarget !== null} onOpenChange={(open) => { if (!open) setRemoveTarget(null); }}>
+        <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Remover {removeTarget?.nickname}?</AlertDialogTitle><AlertDialogDescription>Este jogador sairá da sala.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel disabled={busy}>Cancelar</AlertDialogCancel><AlertDialogAction disabled={busy} onClick={(event) => { event.preventDefault(); if (removeTarget) void handleRemove(removeTarget.id); }}>Remover jogador</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
+      </AlertDialog>
     </main>
   );
 }
+
+type PlayerRemoval = { id: string; nickname: string };

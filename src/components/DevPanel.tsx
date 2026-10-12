@@ -63,12 +63,12 @@ export function DevPanel() {
         size="icon"
         aria-label="Configurações Dev"
         onClick={() => setOpen(true)}
-        className="fixed right-16 top-[calc(0.75rem+env(safe-area-inset-top))] z-50 size-11 rounded-full border border-border shadow-lg"
+        className="fixed right-[max(4rem,calc((100vw-28rem)/2+4rem))] top-[calc(0.75rem+env(safe-area-inset-top))] z-40 size-12 rounded-full border border-border shadow-lg"
       >
         <Settings className="size-5" />
       </Button>
       <Sheet open={open} onOpenChange={setOpen}>
-        <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-md">
+        <SheetContent side="bottom" className="mobile-sheet h-[85dvh] overflow-y-auto">
           <SheetHeader>
             <SheetTitle>⚙️ Configurações Dev</SheetTitle>
           </SheetHeader>

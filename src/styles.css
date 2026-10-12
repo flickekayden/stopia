@@ -137,6 +137,8 @@
 }
 .mobile-app-frame main { min-width: 0; }
 .mobile-bottom-bar { z-index: 30; }
+.mobile-app-frame [role="button"] { min-width: 48px; }
+.mobile-app-frame button { min-width: 48px; }
 .mobile-sheet {
   position: fixed;
   inset: auto 0 0;
