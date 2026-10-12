@@ -211,3 +211,7 @@ input, select, textarea { font-size: max(16px, 1em); }
   .answer-progress::-webkit-progress-value { transition: none; }
   .super-creative-answer { animation: none; box-shadow: var(--shadow-super-creative); }
 }
+
+#lovable-badge {
+  display: none !important;
+}
