@@ -239,7 +239,7 @@ export function ChatDrawer({
           } else onOpenChange(true);
         }}
         style={bubblePos ? { left: bubblePos.x, top: bubblePos.y, right: "auto", bottom: "auto", touchAction: "none" } : { touchAction: "none" }}
-        className={`fixed ${voiceControls ? "bottom-[calc(19rem+env(safe-area-inset-bottom))]" : "bottom-[calc(7rem+env(safe-area-inset-bottom))]"} right-[max(1rem,calc((100vw-28rem)/2+1rem))] z-40 size-14 rounded-full shadow-lg touch-none`}
+        className={`fixed ${locked && devCfg.keyboard.mode === "app" ? "bottom-[calc(21rem+env(safe-area-inset-bottom))]" : voiceControls ? "bottom-[calc(19rem+env(safe-area-inset-bottom))]" : "bottom-[calc(7rem+env(safe-area-inset-bottom))]"} right-[max(1rem,calc((100vw-28rem)/2+1rem))] z-40 size-14 rounded-full shadow-lg touch-none`}
       >
         <MessageCircle className="size-6" />
         {unread > 0 && !open && (
@@ -285,7 +285,7 @@ export function ChatDrawer({
                   <ChatBubble key={message.id} mine={mine}>
                     <ChatBubbleContent>
                       <span className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
-                        {author?.nickname ?? "Jogador"}
+                        <span className="text-balance-safe min-w-0">{author?.nickname ?? "Jogador"}</span>
                         {author && <PlayerPresence player={author} />}
                       </span>
                       {messageQuote && (
@@ -320,9 +320,9 @@ export function ChatDrawer({
                     <Button className="absolute right-1 top-1" variant="ghost" size="icon-sm" onClick={() => onQuoteChange(null)} aria-label="Remover citação"><X /></Button>
                   </div>
               )}
-              <div className="flex gap-2 overflow-x-auto pb-1">
+              <div className="game-scroll flex gap-2 overflow-x-auto pb-1">
                 {QUICK_MESSAGES.map((quick) => (
-                  <Button key={quick} type="button" variant="secondary" size="sm" className="shrink-0" disabled={sending} onClick={() => void submit(quick)}>
+                  <Button key={quick} type="button" variant="secondary" size="sm" className="shrink-0 px-4" disabled={sending} onClick={() => void submit(quick)}>
                     {quick}
                   </Button>
                 ))}
@@ -335,6 +335,8 @@ export function ChatDrawer({
                     onChange={(event) => setText(event.target.value.slice(0, 100))}
                     maxLength={100}
                     placeholder="Mensagem (até 100 caracteres)"
+                    aria-label="Mensagem para a sala"
+                    autoCapitalize="sentences"
                     disabled={sending}
                     className="field-sizing-content max-h-48 min-h-12"
                     onKeyDown={(event) => {

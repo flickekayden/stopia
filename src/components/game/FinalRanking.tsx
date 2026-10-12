@@ -51,16 +51,16 @@ export function FinalRanking({
 
   return (
     <div className="space-y-4 pb-52">
-      <div className="rounded-3xl border border-border bg-card p-6 text-center">
-        <Trophy className="mx-auto size-10 text-gold" />
-        <h2 className="mt-2 font-display text-3xl">Fim de jogo!</h2>
+      <div className="py-6 text-center">
+        <Trophy className="mx-auto size-12 text-gold" />
+        <h2 className="mt-3 font-display text-4xl">Fim de jogo!</h2>
         <p className="text-muted-foreground">
           {ranking[0] ? `${ranking[0].nickname} levou a melhor` : "Sem vencedores"}
         </p>
       </div>
 
       {loadingAnalysis && !analysis && (
-        <div className="flex items-center justify-center gap-2 rounded-2xl bg-secondary p-4">
+        <div role="status" className="flex items-center justify-center gap-2 rounded-lg bg-secondary p-4 text-sm">
           <Loader2 className="size-5 animate-spin" /> A IA está preparando as zoeiras finais...
         </div>
       )}
@@ -92,13 +92,13 @@ export function FinalRanking({
           return (
             <div
               key={p.id}
-              className={`rounded-2xl border p-4 ${i === 0 ? "border-gold bg-card" : "border-border bg-card"}`}
+              className={`rounded-lg border p-4 ${i === 0 ? "border-gold bg-card" : "border-border bg-card"}`}
             >
               <div className="flex items-center justify-between gap-3">
-                <p className="font-display text-xl">
+                <p className="text-balance-safe min-w-0 font-bold text-lg">
                   {i + 1}º {p.nickname}
                 </p>
-                <span className="font-display text-2xl text-primary">{p.score}</span>
+                <span className="shrink-0 font-display text-2xl tabular-nums text-primary">{p.score}</span>
               </div>
               {texto && (
                 <p className="text-balance-safe mt-2 text-sm break-words text-muted-foreground italic">
@@ -111,12 +111,12 @@ export function FinalRanking({
       </div>
 
       <div className="mobile-bottom-bar fixed inset-x-0 bottom-0 mx-auto w-full max-w-md space-y-3 border-t border-border bg-background/95 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] backdrop-blur">
-      <Button onClick={() => void shareSummary()} variant="outline" className="h-auto min-h-12 w-full whitespace-normal"><Share2 /> Compartilhar Resumo da Zoeira</Button>
+      <Button onClick={() => void shareSummary()} variant="outline" className="min-h-12 w-full whitespace-normal"><Share2 /> Compartilhar Resumo da Zoeira</Button>
       {isHost ? (
         <Button
           onClick={onPlayAgain}
           disabled={restarting}
-          variant="secondary"
+          variant="default"
           className="h-14 w-full rounded-2xl text-lg font-bold"
         >
           {restarting ? "Preparando sala..." : "Jogar de novo"}

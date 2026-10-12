@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { List, Layers, FastForward } from "lucide-react";
+import { List, Layers, FastForward, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -107,12 +107,13 @@ export function RoundResults({
     <div className="space-y-4 pb-72">
       <div ref={categoryHeading} className="scroll-mt-4 space-y-3 text-center">
         <p className="text-sm text-muted-foreground">Rodada {round.number} · letra {round.letter}</p>
-        <div className="flex justify-center gap-2" role="group" aria-label="Visualização dos resultados">
-          <Button variant={mode === "list" ? "default" : "secondary"} onClick={() => setMode("list")}><List /> Todas</Button>
-          <Button variant={mode === "steps" ? "default" : "secondary"} onClick={() => setMode("steps")}><Layers /> Por categoria</Button>
+        <h2 className="font-display text-3xl">Resultado da rodada</h2>
+        <div className="grid grid-cols-2 gap-1 rounded-2xl border border-border p-1" role="group" aria-label="Visualização dos resultados">
+          <Button variant={mode === "list" ? "selected" : "segment"} aria-pressed={mode === "list"} onClick={() => setMode("list")}><List /> Todas</Button>
+          <Button variant={mode === "steps" ? "selected" : "segment"} aria-pressed={mode === "steps"} onClick={() => setMode("steps")}><Layers /> Por categoria</Button>
         </div>
-        <div className="flex gap-2 overflow-x-auto pb-2" aria-label="Categorias avaliadas">
-          {categories.map((c, i) => <Button key={c} size="sm" variant="secondary" className="h-auto max-w-64 shrink-0 whitespace-normal break-words rounded-full" onClick={() => {
+        <div className="game-scroll flex gap-2 overflow-x-auto pb-2" aria-label="Categorias avaliadas">
+          {categories.map((c, i) => <Button key={c} size="sm" variant={index === i ? "selected" : "segment"} aria-pressed={index === i} className="h-auto max-w-64 shrink-0 whitespace-normal break-words rounded-lg" onClick={() => {
             setIndex(i);
             if (mode === "list") document.getElementById(`result-category-${i}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
           }}>{c}</Button>)}
@@ -120,24 +121,25 @@ export function RoundResults({
       </div>
       {visibleCategories.map((c) => {
         const categoryCards = cards.find((item) => item.category === c)?.answers ?? [];
-        return <section key={c} id={`result-category-${categories.indexOf(c)}`} className="scroll-mt-4 space-y-3">
-          <h2 className="text-balance-safe font-display text-3xl text-primary">{c}</h2>
+        return <section key={c} id={`result-category-${categories.indexOf(c)}`} className="game-section scroll-mt-4 space-y-3">
+          <h2 className="text-balance-safe font-display text-2xl text-primary">{c}</h2>
           {categoryCards.map((data) => <AnswerCard key={data.playerId} data={data} highlighted={highlightedAnswer === answerCardId(data)} onQuote={onQuote} />)}
         </section>;
       })}
 
       <ScoringRules />
 
-      <div className="fixed inset-x-0 bottom-0 mx-auto w-full max-w-md border-t border-border bg-background/95 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] backdrop-blur">
+      <div className="mobile-bottom-bar fixed inset-x-0 bottom-0 mx-auto w-full max-w-md border-t border-border bg-background/95 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] backdrop-blur">
         {sessionId && <VoiceReactions key={round.id} roomId={room.id} roundId={round.id} playerId={playerId} sessionId={sessionId} />}
         <p className="mb-2 text-center text-xs tabular-nums text-muted-foreground" role="timer">{secondsLeft > 0 ? `Leitura · ${secondsLeft}s` : "Leitura concluída"}</p>
         {isHost && forceAvailable && !everyoneReady && <Button variant="outline" disabled={advancing} className="mb-2 w-full" onClick={() => onNextRound(true)}><FastForward /> {isLastRound ? "Forçar resultado final" : "Forçar avanço"}</Button>}
         {mode === "steps" && !isLastCategory ? (
           <Button
+            variant="secondary"
             onClick={() => setIndex((i) => i + 1)}
             className="h-14 w-full rounded-2xl text-lg font-bold"
           >
-            Próxima categoria
+            Próxima categoria <ArrowRight />
           </Button>
         ) : (
           <div className="space-y-2">

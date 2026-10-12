@@ -1,5 +1,10 @@
 # Roadmap
 
+- [x] Review all screens before visual changes
+- [x] Polish shared controls, typography, contrast and sheets
+- [x] Refine home, lobby, round, results, ranking and chat without changing rules
+- [x] Verify real game flows and mobile/desktop layouts
+
 - [x] Adapt all screens to a smartphone frame and thumb-zone controls
 - [x] Add safe-area bottom sheets, large touch targets and keyboard navigation
 - [x] Add mobile installation, status-bar theme and supported haptics

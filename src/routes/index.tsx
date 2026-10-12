@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate, useRouter } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
-import { ChevronDown, DoorOpen, LockKeyhole, Trash2, Users } from "lucide-react";
+import { ArrowRight, ChevronDown, DoorOpen, Loader2, LockKeyhole, Plus, Trash2, Users } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -175,18 +175,18 @@ function Home() {
   }
 
   return (
-    <main className="mx-auto flex min-h-[100dvh] w-full max-w-md flex-col gap-5 px-5 pt-[calc(1rem+env(safe-area-inset-top))] pb-52">
-      <header className="text-center">
-        <div className="inline-block -rotate-2 rounded-2xl bg-primary px-5 py-2 shadow-[0_8px_0_0_var(--color-accent)]">
-          <h1 className="font-display text-5xl text-primary-foreground">{devText(devSettings.texts.appTitle, "STOP!")}</h1>
+    <main className="mx-auto flex min-h-[100dvh] w-full max-w-md flex-col gap-7 px-5 pt-[calc(2rem+env(safe-area-inset-top))] pb-44">
+      <header className="text-left">
+        <div className="brand-stamp inline-block -rotate-2 rounded-xl bg-primary px-5 py-2">
+          <h1 className="text-balance-safe font-display text-6xl text-primary-foreground">{devText(devSettings.texts.appTitle, "STOP!")}</h1>
         </div>
-        <p className="mt-5 text-base text-muted-foreground">
+        <p className="mt-6 max-w-80 text-base leading-relaxed text-muted-foreground">
           Adedonha online com os amigos. Sem cadastro, só apelido e vergonha na cara.
         </p>
       </header>
 
       <section className="space-y-3">
-        <label className="text-sm font-semibold text-muted-foreground" htmlFor="apelido">
+        <label className="block text-sm font-semibold text-foreground" htmlFor="apelido">
           Seu apelido
         </label>
         <Input
@@ -194,12 +194,15 @@ function Home() {
           value={nickname}
           maxLength={20}
           placeholder="Ex.: Juninho"
+          autoComplete="nickname"
+          enterKeyHint={entryMode === "create" ? "go" : "next"}
+          onKeyDown={(event) => { if (event.key === "Enter" && !event.nativeEvent.isComposing && !loading) { if (entryMode === "create") void handleCreate(); else document.getElementById("codigo")?.focus(); } }}
           onChange={(e) => setNickname(e.target.value)}
-          className="h-14 rounded-2xl border-2 text-lg"
+          className="h-14 text-lg"
         />
-        <div className="grid grid-cols-2 gap-2" role="group" aria-label="Entrada na sala">
-          <Button variant={entryMode === "create" ? "default" : "secondary"} onClick={() => setEntryMode("create")}>Criar nova sala</Button>
-          <Button variant={entryMode === "join" ? "default" : "secondary"} onClick={() => setEntryMode("join")}>Entrar com código</Button>
+        <div className="grid grid-cols-2 gap-1 rounded-2xl border border-border p-1" role="group" aria-label="Entrada na sala">
+          <Button variant={entryMode === "create" ? "selected" : "segment"} aria-pressed={entryMode === "create"} onClick={() => setEntryMode("create")}><Plus /> Criar nova sala</Button>
+          <Button variant={entryMode === "join" ? "selected" : "segment"} aria-pressed={entryMode === "join"} onClick={() => setEntryMode("join")}><DoorOpen /> Entrar com código</Button>
         </div>
       </section>
 
@@ -212,16 +215,21 @@ function Home() {
           value={code}
           maxLength={4}
           autoCapitalize="characters"
+          autoComplete="off"
+          autoCorrect="off"
+          spellCheck={false}
+          enterKeyHint="go"
+          onKeyDown={(event) => { if (event.key === "Enter" && !event.nativeEvent.isComposing && !loading) void handleJoin(); }}
           placeholder="ABCD"
           onChange={(e) => setCode(e.target.value.toUpperCase())}
-          className="h-14 rounded-2xl border-2 text-center font-display text-3xl tracking-[0.4em]"
+          className="h-16 text-center font-display text-3xl"
         />
       </section>}
 
-      <section className="space-y-3 pb-4" aria-labelledby="salas-title">
+      <section className="game-section space-y-3" aria-labelledby="salas-title">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <Button variant="ghost" onClick={() => setRoomsOpen((v) => !v)} aria-expanded={roomsOpen} className="px-0"><h2 id="salas-title" className="font-display text-2xl">Salas criadas</h2><ChevronDown className={roomsOpen ? "rotate-180" : ""} /></Button>
+            <Button variant="ghost" onClick={() => setRoomsOpen((v) => !v)} aria-expanded={roomsOpen} className="justify-start px-0"><h2 id="salas-title" className="text-lg font-bold">Salas criadas</h2><ChevronDown className={`transition-transform ${roomsOpen ? "rotate-180" : ""}`} /></Button>
             <p className="text-sm text-muted-foreground">
               {rooms.length === 0 ? "Nenhuma sala por aqui." : `${rooms.length} sala${rooms.length === 1 ? "" : "s"}`}
             </p>
@@ -245,7 +253,7 @@ function Home() {
             const waiting = room.status === "lobby";
             const finished = room.status === "ended" || room.status === "finished";
             return (
-              <article key={room.id} className="flex min-h-20 items-center gap-3 rounded-2xl border border-border bg-card p-3">
+              <article key={room.id} className="flex min-h-20 items-center gap-3 rounded-lg border border-border bg-card p-3">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <strong className="font-display text-xl">{room.code}</strong>
@@ -289,7 +297,8 @@ function Home() {
       </section>
 
       <div className="mobile-bottom-bar fixed inset-x-0 bottom-[var(--keyboard-inset,0px)] mx-auto w-full max-w-md space-y-3 border-t border-border bg-background/95 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] backdrop-blur">
-        <Button onClick={entryMode === "create" ? handleCreate : handleJoin} disabled={loading !== null} className="h-14 w-full rounded-2xl text-lg font-bold">
+        <Button onClick={entryMode === "create" ? handleCreate : handleJoin} disabled={loading !== null} aria-busy={loading !== null} className="h-14 w-full text-lg font-bold">
+          {loading ? <Loader2 className="animate-spin" /> : entryMode === "create" ? <Plus /> : <ArrowRight />}
           {loading === "create" ? "Criando..." : loading === "join" ? "Entrando..." : entryMode === "create" ? "Criar sala" : "Entrar na sala"}
         </Button>
         <InstallApp />

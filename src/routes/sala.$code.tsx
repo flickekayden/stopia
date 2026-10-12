@@ -312,7 +312,7 @@ function RoomPage() {
 
   if (loading) {
     return (
-      <main className="flex min-h-[100dvh] items-center justify-center">
+      <main role="status" aria-label="Carregando sala" className="flex min-h-[100dvh] items-center justify-center">
         <Loader2 className="size-8 animate-spin text-primary" />
       </main>
     );
@@ -335,10 +335,15 @@ function RoomPage() {
         <h1 className="text-center font-display text-3xl">
           Entrar na sala <span className="text-primary">{room.code}</span>
         </h1>
+        <label htmlFor="room-nickname" className="text-sm font-semibold">Seu apelido</label>
         <Input
+          id="room-nickname"
           value={nickname}
           maxLength={20}
           placeholder="Seu apelido"
+          autoComplete="nickname"
+          enterKeyHint="go"
+          onKeyDown={(event) => { if (event.key === "Enter" && !event.nativeEvent.isComposing && !busy) void handleJoin(); }}
           onChange={(e) => setNickname(e.target.value)}
           className="h-14 rounded-2xl border-2 text-lg"
         />
@@ -353,7 +358,7 @@ function RoomPage() {
     <main className="mx-auto w-full max-w-md px-4 pt-[calc(0.75rem+env(safe-area-inset-top))]">
       <header className="mb-4 space-y-3">
         <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 pr-28">
-          <h1 className="font-display text-2xl text-primary">STOP!</h1>
+          <div><h1 className="font-display text-2xl text-primary">STOP!</h1><p className="text-xs text-muted-foreground">Sala {room.code}</p></div>
           <Button
             variant="ghost"
             size="icon"
@@ -361,19 +366,19 @@ function RoomPage() {
             disabled={busy}
             aria-label="Sair da sala"
             title="Sair da sala"
-            className="size-10 text-muted-foreground"
+            className="size-12 text-muted-foreground"
           >
             <LogOut className="size-5" />
           </Button>
         </div>
-        <div className="flex flex-wrap gap-2 text-sm">
+        <div className="scoreboard flex items-center gap-2 overflow-x-auto pb-1 text-sm" aria-label="Jogadores e pontuação">
           {[...players]
             .sort((a, b) => b.score - a.score)
             .map((p) => (
               <span
                 key={p.id}
-                className={`flex items-center gap-1 rounded-full py-1 pl-3 ${
-                  p.id === me.id ? "bg-primary text-primary-foreground" : "bg-secondary"
+                className={`flex shrink-0 items-center gap-2 rounded-lg py-1 pl-3 ${
+                  p.id === me.id ? "bg-primary/10 text-primary ring-1 ring-primary/30" : "bg-secondary"
                 } ${isHost && p.id !== me.id ? "pr-1" : "pr-3"}`}
               >
                 {p.nickname} <strong>{p.score}</strong> <PlayerPresence player={p} />
@@ -385,7 +390,7 @@ function RoomPage() {
                     disabled={busy}
                     aria-label={`Remover ${p.nickname}`}
                     title={`Remover ${p.nickname}`}
-                    className="size-7 rounded-full text-destructive"
+                    className="size-12 rounded-lg text-destructive"
                   >
                     <X className="size-4" />
                   </Button>
