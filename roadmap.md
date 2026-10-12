@@ -1,9 +1,9 @@
 # Roadmap
 
-- [ ] Adapt all screens to a smartphone frame and thumb-zone controls
-- [ ] Add safe-area bottom sheets, large touch targets and keyboard navigation
-- [ ] Add mobile installation, status-bar theme and supported haptics
-- [ ] Verify mobile/desktop framing, real game flows and developer room controls
+- [x] Adapt all screens to a smartphone frame and thumb-zone controls
+- [x] Add safe-area bottom sheets, large touch targets and keyboard navigation
+- [x] Add mobile installation, status-bar theme and supported haptics
+- [x] Verify mobile/desktop framing, real game flows and developer room controls
 
 - [x] Audit application performance before making changes
 - [x] Reduce room refreshes and preserve multiplayer synchronization
