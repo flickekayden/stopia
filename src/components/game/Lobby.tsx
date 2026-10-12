@@ -145,7 +145,7 @@ export function Lobby({
               <p className="mb-2 text-sm font-semibold text-muted-foreground">Rodadas</p>
               <div className="grid grid-cols-4 gap-2">
                 {[4, 6, 8, 10].map((n) => (
-                  <button
+                  <Button variant="secondary"
                     key={n}
                     onClick={() => void update({ total_rounds: n })}
                     className={`h-12 rounded-2xl font-display text-xl transition ${
@@ -155,7 +155,7 @@ export function Lobby({
                     }`}
                   >
                     {n}
-                  </button>
+                  </Button>
                 ))}
               </div>
             </div>
@@ -174,7 +174,7 @@ export function Lobby({
             {room.timer_enabled && (
               <div className="grid grid-cols-4 gap-2">
                 {[60, 90, 120, 180].map((s) => (
-                  <button
+                  <Button variant="secondary"
                     key={s}
                     onClick={() => void update({ timer_seconds: s })}
                     className={`h-11 rounded-2xl text-sm font-bold transition ${
@@ -184,7 +184,7 @@ export function Lobby({
                     }`}
                   >
                     {s}s
-                  </button>
+                  </Button>
                 ))}
               </div>
             )}
@@ -196,7 +196,7 @@ export function Lobby({
                   { value: "anyone", label: "Todos" },
                   { value: "host", label: "Só o mestre" },
                 ].map((opt) => (
-                  <button
+                  <Button variant="secondary"
                     key={opt.value}
                     onClick={() => void update({ stop_policy: opt.value })}
                     className={`h-12 rounded-2xl font-bold transition ${
@@ -206,7 +206,7 @@ export function Lobby({
                     }`}
                   >
                     {opt.label}
-                  </button>
+                  </Button>
                 ))}
               </div>
             </div>
@@ -219,15 +219,15 @@ export function Lobby({
                 {LETTERS.map((l) => {
                   const off = (room.excluded_letters ?? []).includes(l);
                   return (
-                    <button
+                    <Button variant="secondary"
                       key={l}
                       onClick={() => toggleLetter(l)}
-                      className={`size-10 rounded-xl font-display text-lg transition ${
+                      className={`size-12 rounded-xl font-display text-lg transition ${
                         off ? "bg-muted text-muted-foreground line-through" : "bg-secondary text-foreground"
                       }`}
                     >
                       {l}
-                    </button>
+                    </Button>
                   );
                 })}
               </div>

@@ -219,7 +219,7 @@ export function RoundBoard({
   const evaluating = round.status !== "answering" || stopCountdown === 0;
 
   return (
-    <div className={`space-y-4 ${appKeyboard ? "pb-72" : "pb-36"}`}>
+    <div className={`space-y-4 ${appKeyboard ? "pb-[28rem]" : "pb-36"}`}>
       <div className={`sticky top-0 z-20 flex items-center border border-border bg-background/95 pt-[calc(0.75rem+env(safe-area-inset-top))] backdrop-blur ${compactHeader ? "gap-3 rounded-lg px-3 pb-2" : "gap-4 rounded-3xl px-4 pb-4"}`}>
         <div className={`flex shrink-0 items-center justify-center bg-primary ${compactHeader ? "size-10 rounded-md" : "size-20 rounded-2xl"}`}>
           <span className={`font-display text-primary-foreground ${compactHeader ? "text-2xl" : "text-5xl"}`}>{round.letter}</span>
@@ -315,12 +315,12 @@ export function RoundBoard({
 
       <div className={`mobile-bottom-bar fixed inset-x-0 bottom-[var(--keyboard-inset,0px)] mx-auto flex flex-wrap w-full max-w-md gap-3 ${dev.buttonLayout === "reversed" ? "flex-row-reverse" : dev.buttonLayout === "stacked" ? "flex-col" : ""} border-t border-border bg-background/95 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] backdrop-blur`}>
         {appKeyboard && !evaluating && (
-          <div className="grid w-full grid-cols-10 gap-1">
+          <div className="grid w-full grid-cols-7 gap-1">
             {[..."QWERTYUIOPASDFGHJKLÇZXCVBNM"].map((k) => (
-              <button key={k} type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => { const c = focusedCat ?? round.categories[0] ?? ""; setValue(c, (values[c] ?? "") + k); }} className="h-9 rounded-md bg-secondary text-sm font-bold">{k}</button>
+              <Button variant="secondary" key={k} type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => { const c = focusedCat ?? round.categories[0] ?? ""; setValue(c, (values[c] ?? "") + k); }} className="h-12 rounded-md bg-secondary text-sm font-bold">{k}</Button>
             ))}
-            <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => { const c = focusedCat ?? round.categories[0] ?? ""; setValue(c, (values[c] ?? "") + " "); }} className="col-span-2 h-9 rounded-md bg-secondary text-xs">Espaço</button>
-            <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => { const c = focusedCat ?? round.categories[0] ?? ""; setValue(c, (values[c] ?? "").slice(0, -1)); }} className="h-9 rounded-md bg-secondary text-sm">⌫</button>
+            <Button variant="secondary" type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => { const c = focusedCat ?? round.categories[0] ?? ""; setValue(c, (values[c] ?? "") + " "); }} className="col-span-2 h-12 rounded-md bg-secondary text-xs">Espaço</Button>
+            <Button variant="secondary" type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => { const c = focusedCat ?? round.categories[0] ?? ""; setValue(c, (values[c] ?? "").slice(0, -1)); }} className="h-12 rounded-md bg-secondary text-sm">⌫</Button>
           </div>
         )}
         {evaluating ? (

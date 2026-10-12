@@ -81,7 +81,8 @@ export function ChatDrawer({
     try {
       const p = JSON.parse(window.localStorage.getItem("stop-chat-bubble-pos") ?? "null");
       if (p && typeof p.x === "number" && typeof p.y === "number") {
-        setBubblePos({ x: Math.min(p.x, window.innerWidth - 60), y: Math.min(p.y, window.innerHeight - 60) });
+        const left = Math.max(0, (window.innerWidth - 448) / 2);
+        setBubblePos({ x: Math.max(left + 4, Math.min(p.x, left + Math.min(window.innerWidth, 448) - 60)), y: Math.min(p.y, window.innerHeight - 60) });
       }
     } catch { /* ignore */ }
   }, []);
@@ -223,7 +224,7 @@ export function ChatDrawer({
           d.moved = true;
           const size = 56;
           setBubblePos({
-            x: Math.min(Math.max(4, e.clientX - d.dx), window.innerWidth - size - 4),
+            x: Math.min(Math.max(Math.max(0, (window.innerWidth - 448) / 2) + 4, e.clientX - d.dx), Math.max(0, (window.innerWidth - 448) / 2) + Math.min(window.innerWidth, 448) - size - 4),
             y: Math.min(Math.max(4, e.clientY - d.dy), window.innerHeight - size - 4),
           });
         }}
