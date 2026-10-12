@@ -13,6 +13,7 @@ import type { Player, Room } from "@/hooks/use-room";
 import { supabase } from "@/integrations/supabase/client";
 import { LETTERS } from "@/lib/game";
 import { devText, useEffectiveDevSettings } from "@/lib/dev-settings";
+import { vibrate } from "@/lib/haptics";
 
 export function Lobby({
   room,
@@ -95,13 +96,14 @@ export function Lobby({
       }
     }
     await navigator.clipboard.writeText(url);
+    vibrate(15);
     setCopied(true);
     toast.success("Link copiado!");
     setTimeout(() => setCopied(false), 2000);
   }
 
   return (
-    <div className="space-y-6 pb-10">
+    <div className="space-y-6 pb-44">
       <section className="rounded-3xl border border-border bg-card p-5 text-center">
         <p className="text-sm text-muted-foreground">Código da sala</p>
         <p className="font-display text-5xl tracking-[0.3em] text-primary">{room.code}</p>
@@ -280,13 +282,13 @@ export function Lobby({
             </div>
           </section>
 
-          <Button
+          <div className="mobile-bottom-bar fixed inset-x-0 bottom-0 mx-auto w-full max-w-md border-t border-border bg-background/95 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] backdrop-blur"><Button
             onClick={onStart}
             disabled={starting || players.length === 0}
             className="h-16 w-full rounded-3xl font-display text-2xl"
           >
             {starting ? "Começando..." : devText(devSettings.texts.startButton, "Começar partida")}
-          </Button>
+          </Button></div>
         </>
       ) : (
         <p className="rounded-3xl border border-border bg-card p-5 text-center text-muted-foreground">

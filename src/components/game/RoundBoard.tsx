@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import type { Answer, Player, Room, Round } from "@/hooks/use-room";
 import { supabase } from "@/integrations/supabase/client";
 import { devText, useEffectiveDevSettings } from "@/lib/dev-settings";
+import { vibrate } from "@/lib/haptics";
 
 export function RoundBoard({
   room,
@@ -39,6 +40,7 @@ export function RoundBoard({
   const [showEveryoneFinished, setShowEveryoneFinished] = useState(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const firstAnswerInput = useRef<HTMLInputElement | null>(null);
+  const answerInputs = useRef<(HTMLInputElement | null)[]>([]);
   const appKeyboard = dev.keyboard.mode === "app";
   const [focusedCat, setFocusedCat] = useState<string | null>(null);
   const [keyboardOpen, setKeyboardOpen] = useState(false);
@@ -98,7 +100,12 @@ export function RoundBoard({
   }, [round.ends_at, now]);
 
   const firedTimer = useRef(false);
+  const timeoutHaptic = useRef(false);
   useEffect(() => {
+    if (secondsLeft === 0 && !timeoutHaptic.current && round.status === "answering") {
+      timeoutHaptic.current = true;
+      vibrate([50, 50, 50]);
+    }
     if (secondsLeft === 0 && !firedTimer.current && isHost && round.status === "answering") {
       firedTimer.current = true;
       void onStop("timer");
@@ -158,6 +165,7 @@ export function RoundBoard({
 
   async function markFinished() {
     if (sending) return;
+    vibrate(15);
     setSending(true);
     try {
       await flush(true);
@@ -168,6 +176,7 @@ export function RoundBoard({
 
   async function handleStopClick() {
     if (sending) return;
+    vibrate(40);
     setSending(true);
     try {
       await flush();
@@ -211,7 +220,7 @@ export function RoundBoard({
 
   return (
     <div className={`space-y-4 ${appKeyboard ? "pb-72" : "pb-36"}`}>
-      <div className={`sticky top-0 z-20 flex items-center border border-border bg-background/95 backdrop-blur ${compactHeader ? "gap-3 rounded-lg px-3 py-2" : "gap-4 rounded-3xl p-4"}`}>
+      <div className={`sticky top-0 z-20 flex items-center border border-border bg-background/95 pt-[calc(0.75rem+env(safe-area-inset-top))] backdrop-blur ${compactHeader ? "gap-3 rounded-lg px-3 pb-2" : "gap-4 rounded-3xl px-4 pb-4"}`}>
         <div className={`flex shrink-0 items-center justify-center bg-primary ${compactHeader ? "size-10 rounded-md" : "size-20 rounded-2xl"}`}>
           <span className={`font-display text-primary-foreground ${compactHeader ? "text-2xl" : "text-5xl"}`}>{round.letter}</span>
         </div>
@@ -273,15 +282,24 @@ export function RoundBoard({
           <div key={category} className="rounded-2xl border border-border bg-card p-3">
             <label className="text-sm font-semibold text-muted-foreground">{category}</label>
             <Input
-              ref={index === 0 ? firstAnswerInput : undefined}
+              ref={(input) => { answerInputs.current[index] = input; if (index === 0) firstAnswerInput.current = input; }}
+              aria-label={category}
               value={values[category] ?? ""}
               disabled={evaluating}
               onChange={(e) => setValue(category, e.target.value)}
               placeholder={`Com ${round.letter}...`}
-              autoComplete={dev.keyboard.autocomplete ? "on" : "off"}
-              autoCorrect={dev.keyboard.autocorrect ? "on" : "off"}
-              autoCapitalize={dev.keyboard.autocorrect ? "sentences" : "none"}
-              spellCheck={dev.keyboard.spellcheck}
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="words"
+              spellCheck={false}
+              enterKeyHint={index < round.categories.length - 1 ? "next" : "done"}
+              onKeyDown={(event) => {
+                if (event.key !== "Enter" || event.nativeEvent.isComposing) return;
+                event.preventDefault();
+                const next = answerInputs.current[index + 1];
+                if (next) { next.focus(); next.scrollIntoView({ behavior: "smooth", block: "center" }); }
+                else { event.currentTarget.blur(); setFocusedCat(null); }
+              }}
               inputMode={appKeyboard ? "none" : "text"}
               onFocus={() => setFocusedCat(category)}
               onBlur={() => { if (!appKeyboard) setFocusedCat(null); }}
@@ -295,7 +313,7 @@ export function RoundBoard({
         ))}
       </div>
 
-      <div className={`fixed inset-x-0 bottom-0 mx-auto flex flex-wrap w-full max-w-md gap-3 ${dev.buttonLayout === "reversed" ? "flex-row-reverse" : dev.buttonLayout === "stacked" ? "flex-col" : ""} border-t border-border bg-background/95 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] backdrop-blur`}>
+      <div className={`mobile-bottom-bar fixed inset-x-0 bottom-[var(--keyboard-inset,0px)] mx-auto flex flex-wrap w-full max-w-md gap-3 ${dev.buttonLayout === "reversed" ? "flex-row-reverse" : dev.buttonLayout === "stacked" ? "flex-col" : ""} border-t border-border bg-background/95 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] backdrop-blur`}>
         {appKeyboard && !evaluating && (
           <div className="grid w-full grid-cols-10 gap-1">
             {[..."QWERTYUIOPASDFGHJKLÇZXCVBNM"].map((k) => (

@@ -12,6 +12,7 @@ import type { Player, Room, Round } from "@/hooks/use-room";
 import { supabase } from "@/integrations/supabase/client";
 import type { Evaluation } from "@/lib/game";
 import { RESULTS_VIEW_MS, RESULTS_FORCE_MS, isResultsPlayerActive, resultsDeadline } from "@/lib/results-pacing";
+import { vibrate } from "@/lib/haptics";
 
 export function RoundResults({
   room,
@@ -142,7 +143,7 @@ export function RoundResults({
           <div className="space-y-2">
             {!hasSeen && (
               <Button
-                onClick={() => void markSeen()}
+                onClick={() => { vibrate(15); void markSeen(); }}
                 disabled={markingSeen}
                 className="h-14 w-full rounded-2xl text-lg font-bold"
               >

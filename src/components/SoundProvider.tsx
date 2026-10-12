@@ -71,7 +71,7 @@ export function SoundProvider({ children }: { children: ReactNode }) {
         onClick={toggle}
         aria-label={enabled ? "Desativar sons" : "Ativar sons"}
         title={enabled ? "Desativar sons" : "Ativar sons"}
-        className="fixed right-3 top-[calc(0.75rem+env(safe-area-inset-top))] z-50 size-11 rounded-full border border-border shadow-lg"
+        className="fixed right-[max(0.75rem,calc((100vw-28rem)/2+0.75rem))] top-[calc(0.75rem+env(safe-area-inset-top))] z-40 size-12 rounded-full border border-border shadow-lg"
       >
         {enabled ? <Volume2 className="size-5" /> : <VolumeX className="size-5" />}
       </Button>
