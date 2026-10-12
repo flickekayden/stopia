@@ -1,10 +1,15 @@
+import { createHash, createHmac, timingSafeEqual } from "node:crypto";
+
 import { useSession } from "@tanstack/react-start/server";
 
 export type DeveloperSession = { unlocked?: boolean };
 
 export function sessionConfig() {
-  const password = process.env["DEVELOPER_SESSION_SECRET"];
-  if (!password) throw new Error("A sessão de desenvolvedor não está configurada");
+  const secret = process.env["DEVELOPER_SESSION_SECRET"];
+  if (!secret) throw new Error("A sessão de desenvolvedor não está configurada");
+  // useSession exige senha com 32+ caracteres; derivamos uma chave estável
+  // do segredo configurado para aceitar valores de qualquer tamanho.
+  const password = createHash("sha256").update(`dev-session:${secret}`, "utf8").digest("hex");
   return {
     password,
     name: "stop-developer",
@@ -21,8 +26,6 @@ export async function developerIsUnlocked() {
   const session = await getDeveloperSession();
   return session.data.unlocked === true;
 }
-
-import { createHmac, timingSafeEqual } from "node:crypto";
 
 function sign(payload: string) {
   return createHmac("sha256", process.env["DEVELOPER_SESSION_SECRET"] ?? "").update(payload).digest("hex");
