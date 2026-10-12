@@ -103,7 +103,7 @@ export function Lobby({
   }
 
   return (
-    <div className="space-y-6 pb-44">
+    <div className="dock-clearance space-y-6">
       <section className="py-4 text-center">
         <p className="text-sm text-muted-foreground">Código da sala</p>
         <p className="mt-1 font-display text-5xl text-primary">{room.code}</p>
@@ -161,8 +161,8 @@ export function Lobby({
               </div>
             </div>
 
-            <div className="flex items-center justify-between gap-4">
-              <div>
+            <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4">
+              <div className="min-w-0">
                 <p className="font-semibold">Cronômetro</p>
                 <p className="text-sm text-muted-foreground">Encerra a rodada no tempo</p>
               </div>

@@ -2,10 +2,12 @@ import { lazy, Suspense, useEffect } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { getGlobalSettings } from "@/lib/game.functions";
 import { setGlobalSettings, useDevSettings, useEffectiveDevSettings, type GlobalSettings } from "@/lib/dev-settings";
+import { useDockLayout } from "@/hooks/use-dock-layout";
 
 const DevPanel = lazy(() => import("@/components/DevPanel").then((module) => ({ default: module.DevPanel })));
 
 export function SettingsRuntime() {
+  useDockLayout();
   const { isDev } = useDevSettings();
   const effective = useEffectiveDevSettings();
   const fetchGlobal = useServerFn(getGlobalSettings);

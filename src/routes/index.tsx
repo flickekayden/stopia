@@ -175,7 +175,7 @@ function Home() {
   }
 
   return (
-    <main className="mx-auto flex min-h-[100dvh] w-full max-w-md flex-col gap-7 px-5 pt-[calc(2rem+env(safe-area-inset-top))] pb-44">
+    <main className="dock-clearance mx-auto flex min-h-[100dvh] w-full max-w-md flex-col gap-7 px-5 pt-[calc(2rem+env(safe-area-inset-top))]">
       <header className="text-left">
         <div className="brand-stamp inline-block -rotate-2 rounded-xl bg-primary px-5 py-2">
           <h1 className="text-balance-safe font-display text-6xl text-primary-foreground">{devText(devSettings.texts.appTitle, "STOP!")}</h1>
