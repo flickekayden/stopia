@@ -1,14 +1,12 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { Loader2, LogOut, X } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
-import { FinalRanking } from "@/components/game/FinalRanking";
 import { Lobby } from "@/components/game/Lobby";
 import { PlayerPresence } from "@/components/game/PlayerPresence";
 import { RoundBoard } from "@/components/game/RoundBoard";
-import { RoundResults } from "@/components/game/RoundResults";
 import { ChatDrawer } from "@/components/game/ChatDrawer";
 import { answerCardId, type AnswerCardData } from "@/components/game/AnswerCard";
 import { Button } from "@/components/ui/button";
@@ -29,6 +27,9 @@ import {
 } from "@/lib/game.functions";
 import { devAiOverrides, setDevRound } from "@/lib/dev-settings";
 import { getLastNickname, getOrCreateSessionId, getPlayer, removePlayer as clearStoredPlayer, savePlayer } from "@/lib/session";
+
+const FinalRanking = lazy(() => import("@/components/game/FinalRanking").then((module) => ({ default: module.FinalRanking })));
+const RoundResults = lazy(() => import("@/components/game/RoundResults").then((module) => ({ default: module.RoundResults })));
 
 export const Route = createFileRoute("/sala/$code")({
   head: () => ({
@@ -94,11 +95,18 @@ function RoomPage() {
 
   useEffect(() => {
     if (!room || !playerId || !sessionId) return;
-    const beat = () => heartbeat({ data: { roomId: room.id, playerId, sessionId } }).then(() => refresh()).catch(() => undefined);
+    let inFlight = false;
+    const beat = async () => {
+      if (inFlight || document.hidden) return;
+      inFlight = true;
+      try { await heartbeat({ data: { roomId: room.id, playerId, sessionId } }); }
+      catch { /* Realtime and reconnection handle transient connection loss. */ }
+      finally { inFlight = false; }
+    };
     void beat();
     const timer = window.setInterval(() => void beat(), 5_000);
     return () => window.clearInterval(timer);
-  }, [heartbeat, playerId, refresh, room, sessionId]);
+  }, [heartbeat, playerId, room?.id, sessionId]);
 
   const me = players.find((p) => p.id === playerId) ?? null;
   const isHost = !!room && !!me && room.host_player_id === me.id;
@@ -385,6 +393,7 @@ function RoomPage() {
         </div>
       </header>
 
+      <Suspense fallback={<div className="flex min-h-64 items-center justify-center" role="status" aria-label="Carregando rodada"><Loader2 className="size-8 animate-spin text-primary" /></div>}>
       {room.status === "ended" || room.status === "finished" ? (
         <FinalRanking
           room={room}
@@ -424,6 +433,7 @@ function RoomPage() {
           onStop={handleStop}
         />
       )}
+      </Suspense>
       <ChatDrawer
         roomId={room.id}
         playerId={me.id}

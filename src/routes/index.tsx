@@ -61,7 +61,7 @@ function Home() {
   const join = useServerFn(joinRoom);
   const unlock = useServerFn(unlockDeveloper);
   const removeRoom = useServerFn(deleteRoom);
-  const [nickname, setNickname] = useState(() => getLastNickname());
+  const [nickname, setNickname] = useState("");
   const [entryMode, setEntryMode] = useState<"create" | "join">("create");
   const [roomsOpen, setRoomsOpen] = useState(false);
   const [code, setCode] = useState("");
@@ -74,6 +74,7 @@ function Home() {
 
   useEffect(() => {
     getOrCreateSessionId();
+    setNickname(getLastNickname());
   }, []);
   useEffect(() => {
     if (developerUnlocked) setDevKey(true);
