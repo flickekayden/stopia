@@ -147,13 +147,12 @@
 .mobile-bottom-bar { z-index: 30; box-shadow: var(--shadow-dock); max-height: calc(100dvh - 4rem - var(--keyboard-inset, 0px)); overflow-y: auto; overscroll-behavior: contain; }
 .dock-clearance { padding-bottom: calc(var(--active-dock-height, 10rem) + 5rem); }
 .chat-launcher { bottom: calc(var(--active-dock-height, 5rem) + 1rem + var(--keyboard-inset, 0px)); }
-.mobile-app-frame { container-type: inline-size; }
 .mobile-app-frame img, .mobile-app-frame video { max-width: 100%; height: auto; }
 .mobile-sheet > *, .game-section > * { min-width: 0; }
 .mobile-sheet h2, .mobile-sheet p, .mobile-bottom-bar p, .mobile-bottom-bar button { overflow-wrap: anywhere; }
 .mobile-bottom-bar button:not(.keyboard-key) { height: auto; min-height: 48px; }
 .mobile-bottom-bar .keyboard-key { overflow-wrap: normal; }
-@container (max-width: 359px) {
+@media (max-width: 359px) {
   .keyboard-row { gap: 2px; }
 }
 @media (max-height: 500px) {
