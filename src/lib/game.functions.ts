@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { RESULTS_VIEW_MS, RESULTS_FORCE_MS, isResultsPlayerActive, resultsDeadline } from "./results-pacing";
+import { ROUND_COUNTDOWN_MS, roundStartsAt } from "./round-pacing";
 
 import {
   DEFAULT_CATEGORIES,
@@ -282,8 +283,9 @@ export const startNextRound = createServerFn({ method: "POST" })
     const usage = (room.category_usage ?? {}) as Record<string, number>;
     const categories = pickCategories(all, usage, Math.min(MAX_CATEGORIES_PER_ROUND, all.length));
 
+    const startsAt = Date.now() + ROUND_COUNTDOWN_MS;
     const endsAt = room.timer_enabled
-      ? new Date(Date.now() + room.timer_seconds * 1000).toISOString()
+      ? new Date(startsAt + room.timer_seconds * 1000).toISOString()
       : null;
 
     const { data: round, error } = await supabase
@@ -294,6 +296,7 @@ export const startNextRound = createServerFn({ method: "POST" })
         letter,
         categories,
         status: "answering",
+        started_at: new Date(startsAt).toISOString(),
         ends_at: endsAt,
       })
       .select()
@@ -327,6 +330,7 @@ export const stopRound = createServerFn({ method: "POST" })
     const { data: round } = await supabase.from("rounds").select("*").eq("id", data.roundId).maybeSingle();
     if (!round) throw new Error("Rodada não encontrada");
     if (round.status !== "answering") return { ok: true };
+    if (Date.now() < roundStartsAt(round.started_at)) throw new Error("Aguarde a contagem para começar");
 
     const { data: room } = await supabase.from("rooms").select("*").eq("id", round.room_id).maybeSingle();
     if (!room) throw new Error("Sala não encontrada");

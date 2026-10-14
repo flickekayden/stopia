@@ -1,4 +1,4 @@
-import { Check, Loader2, Rocket, ShieldAlert } from "lucide-react";
+import { Check, Keyboard, Loader2, Rocket, ShieldAlert } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -10,6 +10,8 @@ import type { Answer, Player, Room, Round } from "@/hooks/use-room";
 import { supabase } from "@/integrations/supabase/client";
 import { devText, useEffectiveDevSettings } from "@/lib/dev-settings";
 import { vibrate } from "@/lib/haptics";
+import { EvaluationLoading } from "@/components/game/EvaluationLoading";
+import { roundStartsAt } from "@/lib/round-pacing";
 
 export function RoundBoard({
   room,
@@ -41,7 +43,25 @@ export function RoundBoard({
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const firstAnswerInput = useRef<HTMLInputElement | null>(null);
   const answerInputs = useRef<(HTMLInputElement | null)[]>([]);
-  const appKeyboard = dev.keyboard.mode === "app";
+  const [keyboardPreference, setKeyboardPreference] = useState<"native" | "app" | null>(null);
+  const appKeyboard = (keyboardPreference ?? dev.keyboard.mode) === "app";
+  const startsAt = roundStartsAt(round.started_at);
+  const starting = round.status === "answering" && now < startsAt;
+  const startCount = Math.max(0, Math.ceil((startsAt - now) / 1000));
+  const countdownCue = useRef<number | null>(null);
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem("stop-keyboard-mode");
+      if (saved === "native" || saved === "app") setKeyboardPreference(saved);
+    } catch { /* Device storage may be unavailable. */ }
+  }, []);
+  useEffect(() => {
+    if (round.status !== "answering" || now - startsAt > 600) return;
+    if (countdownCue.current === startCount) return;
+    countdownCue.current = startCount;
+    vibrate(startCount > 0 ? 15 : 30);
+    play(startCount > 0 ? "ready" : "allReady");
+  }, [now, play, round.status, startCount, startsAt]);
   const [focusedCat, setFocusedCat] = useState<string | null>(null);
   const [keyboardOpen, setKeyboardOpen] = useState(false);
   const compactHeader = focusedCat !== null || keyboardOpen;
@@ -63,13 +83,13 @@ export function RoundBoard({
   }, [round.id]);
 
   useEffect(() => {
-    if (round.status !== "answering") return;
+    if (round.status !== "answering" || starting) return;
     const frame = window.requestAnimationFrame(() => {
       firstAnswerInput.current?.focus({ preventScroll: true });
       firstAnswerInput.current?.scrollIntoView({ behavior: "smooth", block: "center" });
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [round.id, round.status]);
+  }, [round.id, round.status, starting]);
 
   useEffect(() => {
     if (hydrated) return;
@@ -85,10 +105,10 @@ export function RoundBoard({
   }, [mine, hydrated, round.categories]);
 
   useEffect(() => {
-    if (round.status !== "answering" || (!round.ends_at && !round.stop_requested_at)) return;
-    const id = setInterval(() => setNow(Date.now()), 1_000);
+    if (round.status !== "answering") return;
+    const id = setInterval(() => setNow(Date.now()), now < startsAt + 600 ? 100 : 1_000);
     return () => clearInterval(id);
-  }, [round.status, round.ends_at, round.stop_requested_at]);
+  }, [round.status, round.ends_at, round.stop_requested_at, startsAt, starting]);
 
   useEffect(() => () => {
     if (saveTimer.current) clearTimeout(saveTimer.current);
@@ -96,8 +116,8 @@ export function RoundBoard({
 
   const secondsLeft = useMemo(() => {
     if (!round.ends_at) return null;
-    return Math.max(0, Math.ceil((new Date(round.ends_at).getTime() - now) / 1000));
-  }, [round.ends_at, now]);
+    return Math.max(0, Math.ceil((new Date(round.ends_at).getTime() - Math.max(now, startsAt)) / 1000));
+  }, [round.ends_at, now, startsAt]);
 
   const firedTimer = useRef(false);
   const timeoutHaptic = useRef(false);
@@ -158,13 +178,14 @@ export function RoundBoard({
   }
 
   function setValue(category: string, value: string) {
+    if (starting || round.status !== "answering") return;
     const next = { ...values, [category]: value };
     setValues(next);
     persist(next);
   }
 
   async function markFinished() {
-    if (sending) return;
+    if (sending || starting) return;
     vibrate(15);
     setSending(true);
     try {
@@ -175,7 +196,7 @@ export function RoundBoard({
   }
 
   async function handleStopClick() {
-    if (sending) return;
+    if (sending || starting) return;
     vibrate(40);
     setSending(true);
     try {
@@ -238,7 +259,14 @@ export function RoundBoard({
             <p className="text-sm text-muted-foreground">Sem cronômetro</p>
           )}
         </div>
+        <div id="round-chat-slot" className="relative shrink-0" />
       </div>
+
+      {round.status === "answering" && now < startsAt + 600 && (
+        <div className="pointer-events-none fixed inset-y-0 left-1/2 z-30 grid w-full max-w-md -translate-x-1/2 place-items-center bg-background/70 backdrop-blur-sm" role="status" aria-live="assertive" aria-label={starting ? `Começa em ${startCount}` : "VALENDO!"}>
+          <span key={startCount} className="evaluation-phrase font-display text-7xl text-primary">{starting ? startCount : "VALENDO!"}</span>
+        </div>
+      )}
 
       <div className="space-y-1">
         <div className="text-right text-sm font-medium tabular-nums text-muted-foreground">{filledCount}/{round.categories.length} preenchidas</div>
@@ -286,7 +314,7 @@ export function RoundBoard({
               ref={(input) => { answerInputs.current[index] = input; if (index === 0) firstAnswerInput.current = input; }}
               aria-label={category}
               value={values[category] ?? ""}
-              disabled={evaluating}
+              disabled={evaluating || starting}
               onChange={(e) => setValue(category, e.target.value)}
               placeholder={`Com ${round.letter}...`}
               autoComplete="off"
@@ -315,7 +343,14 @@ export function RoundBoard({
       </div>
 
       <div className={`mobile-bottom-bar fixed inset-x-0 bottom-[var(--keyboard-inset,0px)] mx-auto flex flex-wrap w-full max-w-md gap-3 ${dev.buttonLayout === "reversed" ? "flex-row-reverse" : dev.buttonLayout === "stacked" ? "flex-col" : ""} border-t border-border bg-background/95 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] backdrop-blur`}>
-        {appKeyboard && !evaluating && (() => {
+        {!evaluating && <Button variant="ghost" disabled={starting} className="w-full justify-center text-xs text-muted-foreground" onClick={() => {
+          const next = appKeyboard ? "native" : "app";
+          setKeyboardPreference(next);
+          try { window.localStorage.setItem("stop-keyboard-mode", next); } catch { /* Keep the in-memory choice. */ }
+          const index = Math.max(0, round.categories.indexOf(focusedCat ?? ""));
+          window.requestAnimationFrame(() => answerInputs.current[index]?.focus({ preventScroll: true }));
+        }}><Keyboard className="size-4" />{appKeyboard ? "Teclado do celular" : "Teclado da tela"}</Button>}
+        {appKeyboard && !evaluating && !starting && (() => {
           const target = () => focusedCat ?? round.categories[0] ?? "";
           const type = (k: string) => { const c = target(); setValue(c, (values[c] ?? "") + k); };
           const back = () => { const c = target(); setValue(c, (values[c] ?? "").slice(0, -1)); };
@@ -340,14 +375,12 @@ export function RoundBoard({
           );
         })()}
         {evaluating ? (
-          <div role="status" className="flex h-14 w-full items-center justify-center gap-2 rounded-xl bg-secondary font-bold">
-            <Loader2 className="size-5 animate-spin" /> Avaliando respostas...
-          </div>
+          <EvaluationLoading />
         ) : (
           <>
             <Button
               variant="secondary"
-              disabled={sending}
+              disabled={sending || starting}
               onClick={() => void markFinished()}
               className="h-14 flex-1 rounded-2xl text-base font-bold"
             >
@@ -355,7 +388,7 @@ export function RoundBoard({
             </Button>
             <Button
               onClick={() => void handleStopClick()}
-              disabled={!canStop || sending || stopCountdown !== null}
+              disabled={!canStop || sending || starting || stopCountdown !== null}
               className="h-14 flex-1 rounded-2xl bg-accent font-display text-2xl text-accent-foreground hover:bg-accent/90"
             >
               {devText(dev.texts.stopButton, "STOP!")}

@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { Loader2, LogOut, X } from "lucide-react";
+import { Copy, Loader2, LogOut, UserPlus, X } from "lucide-react";
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -28,6 +28,7 @@ import {
 } from "@/lib/game.functions";
 import { devAiOverrides, setDevRound } from "@/lib/dev-settings";
 import { getLastNickname, getOrCreateSessionId, getPlayer, removePlayer as clearStoredPlayer, savePlayer } from "@/lib/session";
+import { vibrate } from "@/lib/haptics";
 
 const FinalRanking = lazy(() => import("@/components/game/FinalRanking").then((module) => ({ default: module.FinalRanking })));
 const RoundResults = lazy(() => import("@/components/game/RoundResults").then((module) => ({ default: module.RoundResults })));
@@ -126,6 +127,7 @@ function RoomPage() {
     window.setTimeout(() => setHighlightedAnswer((current) => current === id ? null : current), 2400);
   }, []);
   const previousPlayerIds = useRef<Set<string> | null>(null);
+  const previousPlayerNames = useRef(new Map<string, string>());
 
   useEffect(() => {
     const currentIds = new Set(players.map((player) => player.id));
@@ -134,10 +136,14 @@ function RoomPage() {
       for (const player of players) {
         if (!previous.has(player.id) && player.id !== playerId) {
           play("playerJoin");
-          toast(`👋 @${player.nickname} entrou na sala.`, { duration: 2_500 });
+          toast(`@${player.nickname} entrou na sala.`, { icon: <UserPlus className="size-5 text-success" />, duration: 2_500 });
         }
       }
+      for (const id of previous) {
+        if (!currentIds.has(id) && id !== playerId) toast(`@${previousPlayerNames.current.get(id) ?? "Jogador"} saiu da sala.`, { icon: <LogOut className="size-5 text-muted-foreground" />, duration: 2_500 });
+      }
     }
+    previousPlayerNames.current = new Map(players.map((player) => [player.id, player.nickname]));
     previousPlayerIds.current = currentIds;
   }, [playerId, players, play]);
 
@@ -358,7 +364,13 @@ function RoomPage() {
     <main className="mx-auto w-full max-w-md px-4 pt-[calc(0.75rem+env(safe-area-inset-top))]">
       <header className="mb-4 space-y-3">
         <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 pr-28">
-          <div><h1 className="font-display text-2xl text-primary">STOP!</h1><p className="text-xs text-muted-foreground">Sala {room.code}</p></div>
+          <div className="min-w-0"><h1 className="font-display text-2xl text-primary">STOP!</h1><Button variant="ghost" title="Copiar link da sala" aria-label={`Copiar link da sala ${room.code}`} className="max-w-full justify-start gap-1.5 px-0 text-xs text-muted-foreground" onClick={async () => {
+            try {
+              await navigator.clipboard.writeText(`${window.location.origin}/sala/${room.code}`);
+              vibrate(15);
+              toast.success("Copiado!", { duration: 1_500 });
+            } catch { toast.error("Não foi possível copiar o link."); }
+          }}>Sala {room.code}<Copy className="size-3.5 shrink-0" /></Button></div>
           <Button
             variant="ghost"
             size="icon"

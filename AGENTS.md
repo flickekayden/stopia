@@ -26,3 +26,6 @@
 - UI hierarchy uses unframed game-section bands, shared segmented Button variants and global semantic surface/focus tokens; keep presentation changes separate from multiplayer state and developer overrides.
 - Built-in keyboard keys use the keyboard-key exception to the global minimum-width rule so standard QWERTY rows fit the smartphone shell without horizontal overflow.
 - SettingsRuntime mounts useDockLayout to measure the active action bar and share scroll/chat clearance; short viewports keep bars in document flow so content remains reachable without changing game state.
+- Round starts use a future server-issued started_at and matching ends_at; shared timing helpers gate inputs and STOP without a schema change or device-local countdown origin.
+- ChatDrawer owns one chat subscription and portals its compact launcher into the active round header so message state survives phase transitions without floating over inputs.
+- Device keyboard overrides hydrate from storage in effects and fall back to global developer settings until explicitly chosen, preserving SSR and device preference boundaries.
