@@ -1,5 +1,9 @@
 # Roadmap
 
+- [ ] Add compact round chat, rotating evaluation feedback and synchronized pre-round countdown
+- [ ] Add saved keyboard switch, results clearance, consistent entry/exit icons and copyable room link
+- [ ] Add results keyboard shortcuts and verify the package in real multiplayer matches
+
 - [x] Audit every route, shared control and game phase across narrow, short and wide viewports
 - [x] Adapt fixed actions, forms, dialogs, game keyboard and long content without changing rules
 - [x] Verify real multiplayer, chat and final rankings across device sizes
