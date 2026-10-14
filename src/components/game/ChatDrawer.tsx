@@ -1,6 +1,7 @@
 import { useServerFn } from "@tanstack/react-start";
 import { CornerDownLeft, Loader2, MessageCircle, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { toast } from "sonner";
 
 import {
@@ -88,6 +89,8 @@ export function ChatDrawer({
   }, []);
   const [sending, setSending] = useState(false);
   const [unread, setUnread] = useState(0);
+  const [roundSlot, setRoundSlot] = useState<HTMLElement | null>(null);
+  useEffect(() => { setRoundSlot(locked ? document.getElementById("round-chat-slot") : null); }, [locked]);
   const [lastIncoming, setLastIncoming] = useState<{ playerId: string; content: string } | null>(null);
   const [keyboardInset, setKeyboardInset] = useState(0);
   const openRef = useRef(open);
@@ -205,19 +208,20 @@ export function ChatDrawer({
     }
   }, [locked, onQuoteChange, playerId, quote, roomId, sendMessage, sending]);
 
-  return (
-    <>
+  const launcher = (
       <Button
         type="button"
         size="icon"
-        aria-label="Abrir chat (arraste para mover)"
+        aria-label={locked ? `Abrir chat${unread ? ` (${unread} não lidas)` : ""}` : "Abrir chat (arraste para mover)"}
         onPointerDown={(e) => {
+          if (locked) return;
           const el = e.currentTarget;
           const r = el.getBoundingClientRect();
           dragRef.current = { dx: e.clientX - r.left, dy: e.clientY - r.top, sx: e.clientX, sy: e.clientY, moved: false };
           el.setPointerCapture(e.pointerId);
         }}
         onPointerMove={(e) => {
+          if (locked) return;
           const d = dragRef.current;
           if (!d) return;
           if (!d.moved && Math.hypot(e.clientX - d.sx, e.clientY - d.sy) < 8) return;
@@ -238,8 +242,9 @@ export function ChatDrawer({
             });
           } else onOpenChange(true);
         }}
-        style={bubblePos ? { left: bubblePos.x, top: bubblePos.y, right: "auto", bottom: "auto", touchAction: "none" } : { touchAction: "none" }}
-        className="chat-launcher fixed right-[max(1rem,calc((100vw-28rem)/2+1rem))] z-40 size-14 rounded-full shadow-lg touch-none"
+        style={locked ? undefined : bubblePos ? { left: bubblePos.x, top: bubblePos.y, right: "auto", bottom: "auto", touchAction: "none" } : { touchAction: "none" }}
+        variant={locked ? "ghost" : "default"}
+        className={locked ? "relative size-12 rounded-lg text-muted-foreground" : "chat-launcher fixed right-[max(1rem,calc((100vw-28rem)/2+1rem))] z-40 size-14 rounded-full shadow-lg touch-none"}
       >
         <MessageCircle className="size-6" />
         {unread > 0 && !open && (
@@ -247,7 +252,7 @@ export function ChatDrawer({
             <span className="absolute -right-1 -top-1 grid min-h-5 min-w-5 animate-pulse place-items-center rounded-full bg-destructive px-1 text-xs font-bold text-destructive-foreground">
               {unread > 99 ? "99+" : unread}
             </span>
-            {lastIncoming && (
+            {lastIncoming && !locked && (
               <span className="absolute right-[4.5rem] top-1/2 w-52 max-w-[calc(100vw-6.5rem)] -translate-y-1/2 animate-in fade-in slide-in-from-right-2 rounded-2xl border border-border bg-popover px-3 py-2 text-left text-popover-foreground shadow-lg">
                 <span className="block truncate text-xs font-bold text-muted-foreground">
                   @{playersById.get(lastIncoming.playerId)?.nickname ?? "Jogador"}
@@ -260,7 +265,10 @@ export function ChatDrawer({
           </>
         )}
       </Button>
-
+  );
+  return (
+    <>
+      {locked ? roundSlot && createPortal(launcher, roundSlot) : launcher}
       <Drawer open={open} onOpenChange={onOpenChange} shouldScaleBackground={false}>
         <DrawerContent
           className="h-[70dvh] max-h-[calc(100dvh-1rem)]"

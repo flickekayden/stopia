@@ -106,8 +106,22 @@ export function RoundResults({
 
   const categoryCards = cards[index]?.answers ?? [];
 
+  useEffect(() => {
+    const advance = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.repeat || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey || isLastCategory) return;
+      if (event.key !== " " && event.key !== "ArrowRight") return;
+      const target = event.target;
+      if (target instanceof Element && target.closest("input, textarea, select, button, a, [contenteditable]:not([contenteditable='false']), [role='button'], [role='dialog']")) return;
+      if (document.querySelector("[role='dialog'][data-state='open'], [role='alertdialog']")) return;
+      event.preventDefault();
+      setIndex((current) => Math.min(current + 1, categories.length - 1));
+    };
+    window.addEventListener("keydown", advance);
+    return () => window.removeEventListener("keydown", advance);
+  }, [categories.length, isLastCategory]);
+
   return (
-    <div className="dock-clearance space-y-4">
+    <div className="dock-clearance results-clearance space-y-4">
       <div ref={categoryHeading} className="scroll-mt-4 space-y-2 pt-2 text-center">
         <p className="text-sm text-muted-foreground">Rodada {round.number} · letra {round.letter}</p>
         <h2 className="font-display text-3xl">Resultado da rodada</h2>

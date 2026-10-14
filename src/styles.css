@@ -148,6 +148,11 @@
 .dock-clearance { padding-bottom: calc(var(--active-dock-height, 10rem) + 5rem); }
 html { scroll-padding-top: 6rem; scroll-padding-bottom: calc(var(--active-dock-height, 0px) + 1rem); }
 .chat-launcher { bottom: calc(var(--active-dock-height, 5rem) + 1rem + var(--keyboard-inset, 0px)); }
+.results-clearance { padding-bottom: calc(var(--active-dock-height, 10rem) + 3rem + env(safe-area-inset-bottom)); }
+.evaluation-phrase { animation: evaluation-enter 250ms ease-out; }
+.evaluation-progress { animation: evaluation-travel 1.8s ease-in-out infinite alternate; }
+@keyframes evaluation-enter { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes evaluation-travel { from { transform: translateX(0); } to { transform: translateX(200%); } }
 .mobile-app-frame img, .mobile-app-frame video { max-width: 100%; height: auto; }
 .mobile-sheet > *, .game-section > * { min-width: 0; }
 .mobile-sheet h2, .mobile-sheet p, .mobile-bottom-bar p, .mobile-bottom-bar button { overflow-wrap: anywhere; }
