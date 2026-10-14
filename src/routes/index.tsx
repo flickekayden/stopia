@@ -72,6 +72,7 @@ function Home() {
   const [unlocking, setUnlocking] = useState(false);
   const [roomToDelete, setRoomToDelete] = useState<{ id: string; code: string } | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [entryError, setEntryError] = useState<string | null>(null);
 
   useEffect(() => {
     getOrCreateSessionId();
@@ -84,11 +85,13 @@ function Home() {
 
   async function handleCreate() {
     if (!nickname.trim()) {
+      setEntryError("Informe seu apelido para continuar.");
       play("error");
       toast.error("Coloca um apelido primeiro");
       return;
     }
     setLoading("create");
+    setEntryError(null);
     try {
       const sessionId = getOrCreateSessionId();
       const res = await create({ data: { nickname: nickname.trim(), sessionId } });
@@ -105,16 +108,19 @@ function Home() {
 
   async function handleJoin() {
     if (!nickname.trim()) {
+      setEntryError("Informe seu apelido para continuar.");
       play("error");
       toast.error("Coloca um apelido primeiro");
       return;
     }
     if (code.trim().length < 4) {
+      setEntryError("O código da sala deve ter 4 caracteres.");
       play("error");
       toast.error("Digite o código da sala");
       return;
     }
     setLoading("join");
+    setEntryError(null);
     try {
       const sessionId = getOrCreateSessionId();
       const res = await join({ data: { code: code.trim(), nickname: nickname.trim(), sessionId } });
@@ -193,6 +199,8 @@ function Home() {
           id="apelido"
           value={nickname}
           maxLength={20}
+          aria-describedby="nickname-count entry-error"
+          aria-invalid={!!entryError && !nickname.trim()}
           placeholder="Ex.: Juninho"
           autoComplete="nickname"
           enterKeyHint={entryMode === "create" ? "go" : "next"}
@@ -200,6 +208,8 @@ function Home() {
           onChange={(e) => setNickname(e.target.value)}
           className="h-14 text-lg"
         />
+        <p id="nickname-count" className="text-right text-xs tabular-nums text-muted-foreground">{nickname.length}/20 caracteres</p>
+        {entryError && <p id="entry-error" role="alert" className="text-sm text-destructive">{entryError}</p>}
         <div className="grid grid-cols-2 gap-1 rounded-2xl border border-border p-1" role="group" aria-label="Entrada na sala">
           <Button variant={entryMode === "create" ? "selected" : "segment"} aria-pressed={entryMode === "create"} onClick={() => setEntryMode("create")}><Plus /> Criar nova sala</Button>
           <Button variant={entryMode === "join" ? "selected" : "segment"} aria-pressed={entryMode === "join"} onClick={() => setEntryMode("join")}><DoorOpen /> Entrar com código</Button>
@@ -214,6 +224,8 @@ function Home() {
           id="codigo"
           value={code}
           maxLength={4}
+          aria-describedby={entryError ? "entry-error" : undefined}
+          aria-invalid={!!entryError && code.trim().length < 4}
           autoCapitalize="characters"
           autoComplete="off"
           autoCorrect="off"

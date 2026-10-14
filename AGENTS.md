@@ -29,3 +29,6 @@
 - Round starts use a future server-issued started_at and matching ends_at; shared timing helpers gate inputs and STOP without a schema change or device-local countdown origin.
 - ChatDrawer owns one chat subscription and portals its compact launcher into the active round header so message state survives phase transitions without floating over inputs.
 - Device keyboard overrides hydrate from storage in effects and fall back to global developer settings until explicitly chosen, preserving SSR and device preference boundaries.
+- Final rankings use a browser-safe competition-rank helper so equal totals share a place without changing stored scoring rules.
+- Answer saves are serialized per round and late hydration preserves locally edited fields so slow acknowledgements cannot overwrite newer input.
+- Non-AI game actions verify the existing hashed player session in addition to host membership; direct table policies remain a separately audited security boundary.

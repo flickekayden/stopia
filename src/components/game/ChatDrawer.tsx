@@ -88,6 +88,9 @@ export function ChatDrawer({
     } catch { /* ignore */ }
   }, []);
   const [sending, setSending] = useState(false);
+  const [historyError, setHistoryError] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(true);
+  const sendInFlight = useRef(false);
   const [unread, setUnread] = useState(0);
   const [roundSlot, setRoundSlot] = useState<HTMLElement | null>(null);
   useEffect(() => { setRoundSlot(locked ? document.getElementById("round-chat-slot") : null); }, [locked]);
@@ -112,9 +115,12 @@ export function ChatDrawer({
       pendingMessages.current = [];
       messageIds.current = new Set(combined.map((message) => message.id));
       messagesReady.current = true;
+      setHistoryError(false);
       setMessages(combined);
     } catch {
-      // A transient refresh failure should not interrupt the game.
+      setHistoryError(true);
+    } finally {
+      setHistoryLoading(false);
     }
   }, [listMessages, playerId, roomId]);
 
@@ -189,10 +195,11 @@ export function ChatDrawer({
   const playersById = useMemo(() => new Map(players.map((player) => [player.id, player])), [players]);
 
   const submit = useCallback(async (content: string) => {
-    if (sending) return;
+    if (sendInFlight.current) return;
     const clean = content.trim().slice(0, 100);
     if (locked && !QUICK_MESSAGES.includes(clean)) return;
     if (!clean && !quote) return;
+    sendInFlight.current = true;
     setSending(true);
     try {
       const message = await sendMessage({ data: { roomId, playerId, content: clean, quote } });
@@ -204,6 +211,7 @@ export function ChatDrawer({
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Não foi possível enviar");
     } finally {
+      sendInFlight.current = false;
       setSending(false);
     }
   }, [locked, onQuoteChange, playerId, quote, roomId, sendMessage, sending]);
@@ -283,6 +291,8 @@ export function ChatDrawer({
 
           <Conversation className="min-h-0">
             <ConversationContent className="gap-3 p-3">
+              {historyLoading && <p role="status" className="text-center text-sm text-muted-foreground">Carregando mensagens...</p>}
+              {historyError && <div role="alert" className="text-center text-sm text-muted-foreground"><p>Não foi possível atualizar as mensagens.</p><Button variant="ghost" onClick={() => void refresh()}>Tentar novamente</Button></div>}
               {messages.length === 0 ? (
                 <ConversationEmptyState title="Ninguém falou ainda" description="A zoeira começa nos resultados." icon={<MessageCircle />} />
               ) : messages.map((message) => {

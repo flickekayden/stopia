@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { Copy, Loader2, LogOut, UserPlus, X } from "lucide-react";
+import { Copy, Loader2, LogOut, RefreshCw, UserPlus, X } from "lucide-react";
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -52,7 +52,7 @@ function RoomPage() {
   const { code } = Route.useParams();
   const navigate = useNavigate();
   const [sessionId, setSessionId] = useState<string | null>(null);
-  const { room, players, currentRound, answers, loading, missing, refresh } = useRoom(code, sessionId);
+  const { room, players, currentRound, answers, loading, missing, connectionError, refresh, reconnect } = useRoom(code, sessionId);
   const [playerId, setPlayerId] = useState<string | null>(null);
   const [nickname, setNickname] = useState("");
   const [busy, setBusy] = useState(false);
@@ -207,9 +207,9 @@ function RoomPage() {
 
   const handleStop = useCallback(
     async (reason: "stop" | "timer") => {
-      if (!currentRound || !playerId) return;
+      if (!currentRound || !playerId || !sessionId) return;
       try {
-        await stop({ data: { roundId: currentRound.id, playerId, reason } });
+        await stop({ data: { roundId: currentRound.id, playerId, sessionId, reason } });
         await refresh();
       } catch (e) {
         play("error");
@@ -217,14 +217,14 @@ function RoomPage() {
         throw e;
       }
     },
-    [currentRound, playerId, stop, refresh, play],
+    [currentRound, playerId, sessionId, stop, refresh, play],
   );
 
   async function handleStart() {
-    if (!room || !playerId) return;
+    if (!room || !playerId || !sessionId || busy) return;
     setBusy(true);
     try {
-      await start({ data: { roomId: room.id, playerId } });
+      await start({ data: { roomId: room.id, playerId, sessionId } });
       await refresh();
     } catch (e) {
       play("error");
@@ -271,10 +271,10 @@ function RoomPage() {
   }
 
   async function handleRemove(targetId: string) {
-    if (!room || !playerId) return;
+    if (!room || !playerId || !sessionId || busy) return;
     setBusy(true);
     try {
-      await removePlayer({ data: { roomId: room.id, requesterId: playerId, playerId: targetId } });
+      await removePlayer({ data: { roomId: room.id, requesterId: playerId, playerId: targetId, sessionId } });
       await refresh();
       setRemoveTarget(null);
     } catch (e) {
@@ -286,10 +286,10 @@ function RoomPage() {
   }
 
   async function handleExit() {
-    if (!room || !playerId) return;
+    if (!room || !playerId || !sessionId || busy) return;
     setBusy(true);
     try {
-      await removePlayer({ data: { roomId: room.id, requesterId: playerId, playerId } });
+      await removePlayer({ data: { roomId: room.id, requesterId: playerId, playerId, sessionId } });
       clearStoredPlayer(code);
       window.close();
       if (!window.closed) await navigate({ to: "/" });
@@ -301,10 +301,10 @@ function RoomPage() {
   }
 
   async function handlePlayAgain() {
-    if (!room || !playerId) return;
+    if (!room || !playerId || !sessionId || busy) return;
     setBusy(true);
     try {
-      await restart({ data: { roomId: room.id, playerId } });
+      await restart({ data: { roomId: room.id, playerId, sessionId } });
       analysisFailed.current = false;
       setAnalysisError(null);
       await refresh();
@@ -322,6 +322,10 @@ function RoomPage() {
         <Loader2 className="size-8 animate-spin text-primary" />
       </main>
     );
+  }
+
+  if (connectionError && !room) {
+    return <main className="mx-auto flex min-h-[100dvh] w-full max-w-md flex-col items-center justify-center gap-4 px-5 text-center"><h1 className="font-display text-3xl">Não foi possível conectar</h1><p role="alert" className="text-muted-foreground">{connectionError}</p><Button onClick={reconnect}><RefreshCw /> Tentar novamente</Button><Button variant="ghost" onClick={() => navigate({ to: "/" })}>Voltar ao início</Button></main>;
   }
 
   if (missing || !room) {
@@ -362,6 +366,7 @@ function RoomPage() {
 
   return (
     <main className="mx-auto w-full max-w-md px-4 pt-[calc(0.75rem+env(safe-area-inset-top))]">
+      {connectionError && <div role="alert" className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-destructive p-3 text-sm"><p className="min-w-0 flex-1">{connectionError}</p><Button variant="outline" onClick={reconnect}><RefreshCw /> Reconectar</Button></div>}
       <header className="mb-4 space-y-3">
         <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 pr-28">
           <div className="min-w-0"><h1 className="font-display text-2xl text-primary">STOP!</h1><Button variant="ghost" title="Copiar link da sala" aria-label={`Copiar link da sala ${room.code}`} className="max-w-full justify-start gap-1.5 px-0 text-xs text-muted-foreground" onClick={async () => {
