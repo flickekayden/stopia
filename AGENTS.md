@@ -31,3 +31,4 @@
 - Device keyboard overrides hydrate from storage in effects and fall back to global developer settings until explicitly chosen, preserving SSR and device preference boundaries.
 - Final rankings use a browser-safe competition-rank helper so equal totals share a place without changing stored scoring rules.
 - Answer saves are serialized per round and late hydration preserves locally edited fields so slow acknowledgements cannot overwrite newer input.
+- Non-AI game actions verify the existing hashed player session in addition to host membership; direct table policies remain a separately audited security boundary.

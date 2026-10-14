@@ -1,9 +1,9 @@
 # Roadmap
 
-- [ ] Audit current UI, multiplayer protections and AI boundaries
-- [ ] Refine entry validation, lobby settings, result clarity and honest tied rankings
-- [ ] Improve recovery, input preservation and duplicate-action feedback without changing AI
-- [ ] Run real multiplayer and regression checks; document tested limits
+- [x] Audit current UI, multiplayer protections and AI boundaries
+- [x] Refine entry validation, lobby settings, result clarity and honest tied rankings
+- [x] Improve recovery, input preservation and duplicate-action feedback without changing AI
+- [x] Run real multiplayer and regression checks; document tested limits
 
 - [x] Add compact round chat, rotating evaluation feedback and synchronized pre-round countdown
 - [x] Add saved keyboard switch, results clearance, consistent entry/exit icons and copyable room link
