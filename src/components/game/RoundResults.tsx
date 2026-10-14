@@ -107,17 +107,18 @@ export function RoundResults({
   const categoryCards = cards[index]?.answers ?? [];
 
   useEffect(() => {
-    const advance = (event: KeyboardEvent) => {
-      if (event.defaultPrevented || event.repeat || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey || isLastCategory) return;
-      if (event.key !== " " && event.key !== "ArrowRight") return;
+    const navigate = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.repeat || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+      if (isLastCategory || (event.key !== " " && event.key !== "ArrowRight")) return;
       const target = event.target;
       if (target instanceof Element && target.closest("input, textarea, select, button, a, [contenteditable]:not([contenteditable='false']), [role='button'], [role='dialog']")) return;
       if (document.querySelector("[role='dialog'][data-state='open'], [role='alertdialog']")) return;
+      
       event.preventDefault();
       setIndex((current) => Math.min(current + 1, categories.length - 1));
     };
-    window.addEventListener("keydown", advance);
-    return () => window.removeEventListener("keydown", advance);
+    window.addEventListener("keydown", navigate);
+    return () => window.removeEventListener("keydown", navigate);
   }, [categories.length, isLastCategory]);
 
   return (
@@ -139,48 +140,51 @@ export function RoundResults({
         {sessionId && <VoiceReactions key={round.id} roomId={room.id} roundId={round.id} playerId={playerId} sessionId={sessionId} />}
         <p className="mb-2 text-center text-xs tabular-nums text-muted-foreground" role="timer">{secondsLeft > 0 ? `Leitura · ${secondsLeft}s` : "Leitura concluída"}</p>
         {isHost && forceAvailable && !everyoneReady && <Button variant="outline" disabled={advancing} className="mb-2 w-full" onClick={() => onNextRound(true)}><FastForward /> {isLastRound ? "Forçar resultado final" : "Forçar avanço"}</Button>}
-        {!isLastCategory ? (
-          <Button
-            onClick={() => setIndex((i) => i + 1)}
-            className="h-14 w-full text-lg font-bold"
-          >
-            Próxima categoria <ArrowRight />
-          </Button>
-        ) : (
-          <div className="space-y-2">
-            {!hasSeen && (
-              <Button
-                onClick={() => { vibrate(15); void markSeen(); }}
-                disabled={markingSeen}
-                className="h-14 w-full rounded-2xl text-lg font-bold"
-              >
-                {markingSeen ? "Marcando..." : "Terminei"}
-              </Button>
-            )}
-            {!everyoneReady && (
-              <p className="text-center text-sm text-muted-foreground">{pending.length} {pending.length === 1 ? "jogador ainda vendo" : "jogadores ainda vendo"}</p>
-            )}
-            {isHost && hasSeen ? (
-              <Button
-                onClick={() => onNextRound()}
-                disabled={advancing || !everyoneReady}
-                className="h-14 w-full rounded-2xl text-lg font-bold"
-              >
-                {advancing
-                  ? "Aguarde..."
-                  : !everyoneReady
-                    ? "Esperando todos verem..."
-                    : isLastRound
-                      ? "Ver resultado final"
-                      : "Próxima rodada"}
-              </Button>
-            ) : hasSeen ? (
-              <p className="py-4 text-center text-muted-foreground">
-                Esperando o mestre seguir para a próxima etapa...
-              </p>
-            ) : null}
-          </div>
-        )}
+        
+        <div className="flex gap-2">
+          {!isLastCategory ? (
+            <Button
+              onClick={() => { vibrate(15); setIndex((i) => Math.min(i + 1, categories.length - 1)); }}
+              className="h-14 flex-1 text-lg font-bold"
+            >
+              Próxima categoria <ArrowRight />
+            </Button>
+          ) : (
+            <div className="flex-1 space-y-2">
+              {!hasSeen && (
+                <Button
+                  onClick={() => { vibrate(15); void markSeen(); }}
+                  disabled={markingSeen}
+                  className="h-14 w-full rounded-2xl text-lg font-bold"
+                >
+                  {markingSeen ? "Marcando..." : "Terminei"}
+                </Button>
+              )}
+              {!everyoneReady && (
+                <p className="text-center text-sm text-muted-foreground">{pending.length} {pending.length === 1 ? "jogador ainda vendo" : "jogadores ainda vendo"}</p>
+              )}
+              {isHost && hasSeen ? (
+                <Button
+                  onClick={() => onNextRound()}
+                  disabled={advancing || !everyoneReady}
+                  className="h-14 w-full rounded-2xl text-lg font-bold"
+                >
+                  {advancing
+                    ? "Aguarde..."
+                    : !everyoneReady
+                      ? "Esperando todos verem..."
+                      : isLastRound
+                        ? "Ver resultado final"
+                        : "Próxima rodada"}
+                </Button>
+              ) : hasSeen ? (
+                <p className="py-4 text-center text-muted-foreground">
+                  Esperando o mestre seguir para a próxima etapa...
+                </p>
+              ) : null}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

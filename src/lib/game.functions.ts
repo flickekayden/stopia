@@ -24,6 +24,13 @@ function hashSessionId(sessionId: string) {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
+async function requirePlayerSession(roomId: string, playerId: string, sessionId: string) {
+  const supabase = await db();
+  const { data: player, error } = await supabase.from("players").select("id, nickname").eq("room_id", roomId).eq("id", playerId).eq("session_id", hashSessionId(sessionId)).maybeSingle();
+  if (error || !player) throw new Error("Sessão inválida. Entre novamente na sala.");
+  return player;
+}
+
 export const createRoom = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) =>
     z.object({ nickname: z.string().min(1).max(20), sessionId: z.string().uuid() }).parse(input),
@@ -168,6 +175,7 @@ export const removeRoomPlayer = createServerFn({ method: "POST" })
         roomId: z.string().uuid(),
         requesterId: z.string().uuid(),
         playerId: z.string().uuid(),
+        sessionId: z.string().uuid(),
       })
       .parse(input),
   )
@@ -177,6 +185,7 @@ export const removeRoomPlayer = createServerFn({ method: "POST" })
     if (!room) throw new Error("Sala não encontrada");
 
     const isSelf = data.requesterId === data.playerId;
+    await requirePlayerSession(room.id, data.requesterId, data.sessionId);
     if (!isSelf && room.host_player_id !== data.requesterId) {
       throw new Error("Só o mestre pode remover outro jogador");
     }
@@ -211,13 +220,15 @@ export const removeRoomPlayer = createServerFn({ method: "POST" })
 
 export const restartRoom = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) =>
-    z.object({ roomId: z.string().uuid(), playerId: z.string().uuid() }).parse(input),
+    z.object({ roomId: z.string().uuid(), playerId: z.string().uuid(), sessionId: z.string().uuid() }).parse(input),
   )
   .handler(async ({ data }) => {
     const supabase = await db();
     const { data: room } = await supabase.from("rooms").select("*").eq("id", data.roomId).maybeSingle();
     if (!room) throw new Error("Sala não encontrada");
     if (room.host_player_id !== data.playerId) throw new Error("Só o mestre pode reiniciar a sala");
+    await requirePlayerSession(room.id, data.playerId, data.sessionId);
+    if (room.status !== "ended" && room.status !== "finished") throw new Error("Espere a partida terminar para jogar novamente");
 
     const { data: rounds } = await supabase.from("rounds").select("id").eq("room_id", room.id);
     const roundIds = (rounds ?? []).map((round) => round.id);
@@ -240,13 +251,14 @@ export const restartRoom = createServerFn({ method: "POST" })
 
 export const startNextRound = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) =>
-    z.object({ roomId: z.string().uuid(), playerId: z.string().uuid(), sessionId: z.string().uuid().optional(), force: z.boolean().optional(), expectedRound: z.number().int().optional() }).parse(input),
+    z.object({ roomId: z.string().uuid(), playerId: z.string().uuid(), sessionId: z.string().uuid(), force: z.boolean().optional(), expectedRound: z.number().int().optional() }).parse(input),
   )
   .handler(async ({ data }) => {
     const supabase = await db();
     const { data: room } = await supabase.from("rooms").select("*").eq("id", data.roomId).maybeSingle();
     if (!room) throw new Error("Sala não encontrada");
     if (room.host_player_id !== data.playerId) throw new Error("Só o mestre pode iniciar a rodada");
+    await requirePlayerSession(room.id, data.playerId, data.sessionId);
     if (room.status !== "lobby") {
       const { data: caller } = await supabase.from("players").select("session_id").eq("id", data.playerId).eq("room_id", room.id).maybeSingle();
       if (!data.sessionId || caller?.session_id !== hashSessionId(data.sessionId)) throw new Error("Sessão inválida");
@@ -323,7 +335,7 @@ export const startNextRound = createServerFn({ method: "POST" })
 
 export const stopRound = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) =>
-    z.object({ roundId: z.string().uuid(), playerId: z.string().uuid(), reason: z.string() }).parse(input),
+    z.object({ roundId: z.string().uuid(), playerId: z.string().uuid(), sessionId: z.string().uuid(), reason: z.enum(["stop", "timer"]) }).parse(input),
   )
   .handler(async ({ data }) => {
     const supabase = await db();
@@ -334,6 +346,8 @@ export const stopRound = createServerFn({ method: "POST" })
 
     const { data: room } = await supabase.from("rooms").select("*").eq("id", round.room_id).maybeSingle();
     if (!room) throw new Error("Sala não encontrada");
+    const verifiedPlayer = await requirePlayerSession(room.id, data.playerId, data.sessionId);
+    if (data.reason === "timer" && (room.host_player_id !== data.playerId || !round.ends_at || Date.now() < Date.parse(round.ends_at))) throw new Error("O tempo da rodada ainda não terminou");
     if (data.reason === "stop" && room.stop_policy === "host" && room.host_player_id !== data.playerId) {
       throw new Error("Só o mestre pode apertar STOP");
     }
@@ -354,7 +368,7 @@ export const stopRound = createServerFn({ method: "POST" })
       await supabase
         .from("rounds")
         .update({
-          stopped_by: player?.nickname ?? "alguém",
+          stopped_by: verifiedPlayer.nickname,
           stop_requested_at: new Date().toISOString(),
         })
         .eq("id", data.roundId)

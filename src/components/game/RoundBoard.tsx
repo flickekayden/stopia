@@ -39,6 +39,10 @@ export function RoundBoard({
   const [hydrated, setHydrated] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const [sending, setSending] = useState(false);
+  const [saveError, setSaveError] = useState(false);
+  const actionInFlight = useRef(false);
+  const editedCategories = useRef(new Set<string>());
+  const saveQueue = useRef<Promise<boolean>>(Promise.resolve(true));
   const [showEveryoneFinished, setShowEveryoneFinished] = useState(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const firstAnswerInput = useRef<HTMLInputElement | null>(null);
@@ -54,7 +58,7 @@ export function RoundBoard({
     try {
       const saved = window.localStorage.getItem("stop-keyboard-mode");
       if (saved === "native" || saved === "app") setKeyboardPreference(saved);
-    } catch { /* Device storage may be unavailable. */ }
+    } catch { /* ignore */ }
   }, []);
   useEffect(() => {
     if (round.status !== "answering" || now - startsAt > 600) return;
@@ -77,7 +81,6 @@ export function RoundBoard({
     return () => viewport.removeEventListener("resize", resize);
   }, []);
 
-  // Nova rodada: começa sempre com os campos vazios.
   useEffect(() => {
     setValues({});
     setHydrated(false);
@@ -100,7 +103,7 @@ export function RoundBoard({
       for (const category of round.categories) {
         if (saved[category]) onlyThisRound[category] = saved[category];
       }
-      setValues(onlyThisRound);
+      setValues((current) => ({ ...onlyThisRound, ...Object.fromEntries(Object.entries(current).filter(([category]) => editedCategories.current.has(category))) }));
       setHydrated(true);
     }
   }, [mine, hydrated, round.categories]);
@@ -129,7 +132,7 @@ export function RoundBoard({
     }
     if (secondsLeft === 0 && !firedTimer.current && isHost && round.status === "answering") {
       firedTimer.current = true;
-      void onStop("timer");
+      void onStop("timer").catch(() => { firedTimer.current = false; });
     }
   }, [secondsLeft, isHost, round.status, onStop]);
 
@@ -143,8 +146,9 @@ export function RoundBoard({
   const latestValues = useRef(values);
   latestValues.current = values;
 
-  async function save(next: Record<string, string>, finished: boolean) {
-    if (Date.now() < startsAt) return;
+  function save(next: Record<string, string>, finished: boolean): Promise<boolean> {
+    const task = saveQueue.current.then(async () => {
+    if (Date.now() < startsAt) return false;
     const { error } = await supabase.from("answers").upsert(
       {
         round_id: round.id,
@@ -156,10 +160,15 @@ export function RoundBoard({
       { onConflict: "round_id,player_id" },
     );
     if (error) {
-      console.error("save answers", error);
       play("error");
-      toast.error("Não consegui salvar suas respostas. Confira a internet.");
+      setSaveError(true);
+      return false;
     }
+    setSaveError(false);
+    return true;
+    }).catch(() => { setSaveError(true); return false; });
+    saveQueue.current = task;
+    return task;
   }
 
   function persist(next: Record<string, string>) {
@@ -170,41 +179,48 @@ export function RoundBoard({
     }, 400);
   }
 
-  // Grava na hora o que estiver pendente (antes de "Terminei" ou do STOP).
   async function flush(finished?: boolean) {
     if (saveTimer.current) {
       clearTimeout(saveTimer.current);
       saveTimer.current = null;
     }
-    await save(latestValues.current, finished ?? mine?.finished ?? false);
+    return save(latestValues.current, finished ?? mine?.finished ?? false);
   }
 
   function setValue(category: string, value: string) {
     if (starting || round.status !== "answering") return;
     const next = { ...values, [category]: value };
+    editedCategories.current.add(category);
+    latestValues.current = next;
     setValues(next);
     persist(next);
   }
 
   async function markFinished() {
-    if (sending || starting) return;
+    if (actionInFlight.current || starting) return;
+    actionInFlight.current = true;
     vibrate(15);
     setSending(true);
     try {
       await flush(true);
     } finally {
+      actionInFlight.current = false;
       setSending(false);
     }
   }
 
   async function handleStopClick() {
-    if (sending || starting) return;
+    if (actionInFlight.current || starting) return;
+    actionInFlight.current = true;
     vibrate(40);
     setSending(true);
     try {
-      await flush();
+      if (!await flush()) return;
       await onStop("stop");
+    } catch {
+      // The room action already displays its failure.
     } finally {
+      actionInFlight.current = false;
       setSending(false);
     }
   }
@@ -253,6 +269,8 @@ export function RoundBoard({
           </p>
           {secondsLeft !== null ? (
             <p
+              role="timer"
+              aria-label={`${secondsLeft} segundos restantes${secondsLeft <= 10 ? ", tempo acabando" : ""}`}
               className={`font-display ${compactHeader ? "text-xl" : "text-4xl"} ${secondsLeft <= 10 ? "text-destructive" : "text-foreground"}`}
             >
               {Math.floor(secondsLeft / 60)}:{String(secondsLeft % 60).padStart(2, "0")}
@@ -271,8 +289,8 @@ export function RoundBoard({
       )}
 
       <div className="space-y-1">
-        <div className="text-right text-sm font-medium tabular-nums text-muted-foreground">{filledCount}/{round.categories.length} preenchidas</div>
-        <progress aria-label="Respostas preenchidas" className="answer-progress h-1.5 w-full" value={filledCount} max={round.categories.length || 1} />
+        <div className="text-right text-sm font-medium tabular-nums text-muted-foreground" aria-hidden="true">{filledCount}/{round.categories.length} preenchidas</div>
+        <progress aria-label="Progresso das respostas" className="answer-progress h-1.5 w-full" value={filledCount} max={round.categories.length || 1} />
       </div>
 
       {round.status === "answering" && stopCountdown !== null && stopCountdown > 0 && (
@@ -344,11 +362,12 @@ export function RoundBoard({
         ))}
       </div>
 
+      {saveError && <div role="alert" className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-destructive p-3 text-sm"><p>Suas respostas continuam aqui, mas ainda não foram salvas.</p><Button variant="outline" disabled={sending || starting || round.status !== "answering"} onClick={() => void flush()}>Tentar salvar</Button></div>}
       <div className={`mobile-bottom-bar fixed inset-x-0 bottom-[var(--keyboard-inset,0px)] mx-auto flex flex-wrap w-full max-w-md gap-3 ${dev.buttonLayout === "reversed" ? "flex-row-reverse" : dev.buttonLayout === "stacked" ? "flex-col" : ""} border-t border-border bg-background/95 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] backdrop-blur`}>
-        {!evaluating && <Button variant="ghost" disabled={starting} className="w-full justify-center text-xs text-muted-foreground" onClick={() => {
+        {!evaluating && <Button variant="ghost" disabled={starting || sending} className="w-full justify-center text-xs text-muted-foreground" onClick={() => {
           const next = appKeyboard ? "native" : "app";
           setKeyboardPreference(next);
-          try { window.localStorage.setItem("stop-keyboard-mode", next); } catch { /* Keep the in-memory choice. */ }
+          try { window.localStorage.setItem("stop-keyboard-mode", next); } catch { /* ignore */ }
           const index = Math.max(0, round.categories.indexOf(focusedCat ?? ""));
           window.requestAnimationFrame(() => answerInputs.current[index]?.focus({ preventScroll: true }));
         }}><Keyboard className="size-4" />{appKeyboard ? "Teclado do celular" : "Teclado da tela"}</Button>}
@@ -357,7 +376,7 @@ export function RoundBoard({
           const type = (k: string) => { const c = target(); setValue(c, (values[c] ?? "") + k); };
           const back = () => { const c = target(); setValue(c, (values[c] ?? "").slice(0, -1)); };
           const key = (k: string) => (
-            <Button variant="secondary" key={k} type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => type(k)} className="keyboard-key h-12 min-h-12 min-w-0 flex-1 rounded-md px-0 text-base font-bold">{k}</Button>
+            <Button variant="secondary" key={k} type="button" disabled={sending} onMouseDown={(e) => e.preventDefault()} onClick={() => type(k)} className="keyboard-key h-12 min-h-12 min-w-0 flex-1 rounded-md px-0 text-base font-bold">{k}</Button>
           );
           return (
             <div className="flex w-full flex-col gap-1.5">
@@ -366,11 +385,11 @@ export function RoundBoard({
               <div className="keyboard-row flex gap-1">
                 <div className="flex-[0.5]" />
                 {[..."ZXCVBNM"].map(key)}
-                <Button variant="secondary" type="button" aria-label="Apagar" onMouseDown={(e) => e.preventDefault()} onClick={back} className="keyboard-key h-12 min-h-12 min-w-0 flex-[1.5] rounded-md px-0 text-base">⌫</Button>
+                <Button variant="secondary" type="button" aria-label="Apagar" disabled={sending} onMouseDown={(e) => e.preventDefault()} onClick={back} className="keyboard-key h-12 min-h-12 min-w-0 flex-[1.5] rounded-md px-0 text-base">⌫</Button>
               </div>
               <div className="flex gap-1">
                 <div className="flex-[2]" />
-                <Button variant="secondary" type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => type(" ")} className="h-12 min-h-12 flex-[6] rounded-md text-sm">Espaço</Button>
+                <Button variant="secondary" type="button" disabled={sending} onMouseDown={(e) => e.preventDefault()} onClick={() => type(" ")} className="h-12 min-h-12 flex-[6] rounded-md text-sm">Espaço</Button>
                 <div className="flex-[2]" />
               </div>
             </div>
@@ -393,7 +412,7 @@ export function RoundBoard({
               disabled={!canStop || sending || starting || stopCountdown !== null}
               className="h-14 flex-1 rounded-2xl bg-accent font-display text-2xl text-accent-foreground hover:bg-accent/90"
             >
-              {devText(dev.texts.stopButton, "STOP!")}
+              {sending ? <Loader2 className="animate-spin" /> : devText(dev.texts.stopButton, "STOP!")}
             </Button>
           </>
         )}

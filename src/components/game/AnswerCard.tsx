@@ -1,4 +1,4 @@
-import { memo, useState } from "react";
+import { memo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { HelpCircle, Loader2, MessageCircle, Sparkles } from "lucide-react";
 
@@ -46,16 +46,28 @@ export const AnswerCard = memo(function AnswerCard({
   const explain = useServerFn(explainAnswer);
   const [explanation, setExplanation] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [explanationError, setExplanationError] = useState(false);
+  const requestInFlight = useRef(false);
   const verify = async () => {
-    if (loading || explanation) return;
+    if (requestInFlight.current || explanation) return;
+    requestInFlight.current = true;
+    setExplanationError(false);
     setLoading(true);
     try {
-      const r = await explain({ data: { category: data.category, response: data.response.slice(0, 80), points: data.points, comment: data.comment.slice(0, 300) } });
+      const r = await explain({
+        data: {
+          category: data.category,
+          response: data.response.slice(0, 80),
+          points: data.points,
+          comment: data.comment.slice(0, 300),
+        },
+      });
       setExplanation(r.text);
     } catch {
-      setExplanation("Não foi possível explicar agora. Tente de novo.");
+      setExplanationError(true);
     } finally {
       setLoading(false);
+      requestInFlight.current = false;
     }
   };
   return (
@@ -71,23 +83,42 @@ export const AnswerCard = memo(function AnswerCard({
       onClick={onClick}
       role={onClick ? "button" : undefined}
       tabIndex={onClick ? 0 : undefined}
-      onKeyDown={onClick ? (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onClick(); } } : undefined}
+      onKeyDown={
+        onClick
+          ? (event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                onClick();
+              }
+            }
+          : undefined
+      }
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <p className="truncate text-xs font-semibold text-muted-foreground">
+          <p className="text-balance-safe text-xs font-semibold text-muted-foreground">
             {data.playerName} · {data.category}
           </p>
-          <p className={cn("text-balance-safe break-words font-bold", compact ? "text-sm" : "text-lg")}>
+          <p className={cn("break-words text-balance-safe font-bold", compact ? "text-sm" : "text-lg")}>
             {data.response.trim() ? data.response : "— em branco —"}
           </p>
         </div>
-        <span aria-label={`${data.points} pontos`} className={cn("flex min-w-10 shrink-0 items-center justify-center rounded-lg px-2 py-1 font-display tabular-nums", compact ? "text-base" : "text-xl", pointsStyle(data.points))}>
+        <span
+          aria-label={`${data.points} pontos`}
+          className={cn(
+            "flex min-w-10 shrink-0 items-center justify-center rounded-lg px-2 py-1 font-display tabular-nums",
+            compact ? "text-base" : "text-xl",
+            pointsStyle(data.points)
+          )}
+        >
           {data.points}
         </span>
       </div>
+      {!compact && <p className="mt-2 text-xs font-semibold text-muted-foreground">{!data.response.trim() ? "Em branco" : data.points === 0 ? "Inválida" : "Resposta pontuada"}</p>}
       {data.comment && (
-        <p className="text-balance-safe mt-3 break-words text-sm leading-relaxed text-muted-foreground italic">“{data.comment}”</p>
+        <p className="mt-3 break-words text-sm italic leading-relaxed text-muted-foreground text-balance-safe">
+          “{data.comment}”
+        </p>
       )}
       {superCreative && (
         <div className="mt-2 flex items-center gap-1 text-xs font-bold text-gold">
@@ -100,17 +131,24 @@ export const AnswerCard = memo(function AnswerCard({
             type="button"
             variant="ghost"
             size="sm"
-            className="mt-3 w-full justify-start border-t border-border rounded-none px-0 text-muted-foreground"
+            className="mt-3 w-full justify-start rounded-none border-t border-border px-0 text-muted-foreground"
             disabled={loading}
             onClick={(event) => {
               event.stopPropagation();
               void verify();
             }}
           >
-            {loading ? <Loader2 className="animate-spin" /> : <HelpCircle />} {explanation ? "Explicação da IA" : "Verificar pontuação"}
+            {loading ? <Loader2 className="animate-spin" /> : <HelpCircle />} {loading ? "Consultando..." : explanation ? "Explicação da IA" : explanationError ? "Tentar explicação novamente" : "Entender pontuação"}
           </Button>
+          {explanationError && <p role="alert" className="mt-1 text-sm text-destructive">Não foi possível explicar agora. Você pode tentar novamente.</p>}
           {explanation && (
-            <p className="text-balance-safe mt-1 break-words rounded-lg bg-secondary p-2 text-xs">{explanation}</p>
+            <p
+              className="mt-1 break-words rounded-lg bg-secondary p-2 text-xs text-balance-safe"
+              role="status"
+              aria-live="polite"
+            >
+              {explanation}
+            </p>
           )}
         </>
       )}
@@ -130,6 +168,16 @@ export const AnswerCard = memo(function AnswerCard({
       )}
     </div>
   );
-}, (previous, next) => previous.compact === next.compact && previous.highlighted === next.highlighted && previous.onQuote === next.onQuote && previous.onClick === next.onClick
-  && previous.data.roundId === next.data.roundId && previous.data.category === next.data.category && previous.data.playerId === next.data.playerId
-  && previous.data.playerName === next.data.playerName && previous.data.response === next.data.response && previous.data.points === next.data.points && previous.data.comment === next.data.comment);
+}, (previous, next) =>
+  previous.compact === next.compact &&
+  previous.highlighted === next.highlighted &&
+  previous.onQuote === next.onQuote &&
+  previous.onClick === next.onClick &&
+  previous.data.roundId === next.data.roundId &&
+  previous.data.category === next.data.category &&
+  previous.data.playerId === next.data.playerId &&
+  previous.data.playerName === next.data.playerName &&
+  previous.data.response === next.data.response &&
+  previous.data.points === next.data.points &&
+  previous.data.comment === next.data.comment
+);
