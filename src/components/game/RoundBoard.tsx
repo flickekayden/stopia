@@ -47,6 +47,7 @@ export function RoundBoard({
   const appKeyboard = (keyboardPreference ?? dev.keyboard.mode) === "app";
   const startsAt = roundStartsAt(round.started_at);
   const starting = round.status === "answering" && now < startsAt;
+  const countdownVisible = round.status === "answering" && now < startsAt + 600;
   const startCount = Math.max(0, Math.ceil((startsAt - now) / 1000));
   const countdownCue = useRef<number | null>(null);
   useEffect(() => {
@@ -106,9 +107,9 @@ export function RoundBoard({
 
   useEffect(() => {
     if (round.status !== "answering") return;
-    const id = setInterval(() => setNow(Date.now()), now < startsAt + 600 ? 100 : 1_000);
+    const id = setInterval(() => setNow(Date.now()), countdownVisible ? 100 : 1_000);
     return () => clearInterval(id);
-  }, [round.status, round.ends_at, round.stop_requested_at, startsAt, starting]);
+  }, [round.status, round.ends_at, round.stop_requested_at, countdownVisible]);
 
   useEffect(() => () => {
     if (saveTimer.current) clearTimeout(saveTimer.current);
@@ -143,6 +144,7 @@ export function RoundBoard({
   latestValues.current = values;
 
   async function save(next: Record<string, string>, finished: boolean) {
+    if (Date.now() < startsAt) return;
     const { error } = await supabase.from("answers").upsert(
       {
         round_id: round.id,
@@ -262,7 +264,7 @@ export function RoundBoard({
         <div id="round-chat-slot" className="relative shrink-0" />
       </div>
 
-      {round.status === "answering" && now < startsAt + 600 && (
+      {countdownVisible && (
         <div className="pointer-events-none fixed inset-y-0 left-1/2 z-30 grid w-full max-w-md -translate-x-1/2 place-items-center bg-background/70 backdrop-blur-sm" role="status" aria-live="assertive" aria-label={starting ? `Começa em ${startCount}` : "VALENDO!"}>
           <span key={startCount} className="evaluation-phrase font-display text-7xl text-primary">{starting ? startCount : "VALENDO!"}</span>
         </div>
