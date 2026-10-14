@@ -138,7 +138,7 @@ export function CategoryPresets({
           <Button variant={merging ? "segment" : "selected"} aria-pressed={!merging} onClick={() => setMerging(false)}>Substituir</Button>
           <Button variant={merging ? "selected" : "segment"} aria-pressed={merging} onClick={() => setMerging(true)}>Mesclar</Button>
         </div>
-        <div className="space-y-2">
+        <div className="preset-list space-y-0">
           {[{ id: "builtin-default", name: "Padrão base", categories: DEFAULT_CATEGORIES }, ...BUILTIN_CATEGORY_PRESETS].map((preset) => (
             <Button key={preset.id} variant="secondary" disabled={applying} onClick={() => void apply(preset)} className="h-auto min-h-14 w-full justify-between gap-3 whitespace-normal px-4 py-3 text-left">
               <span className="min-w-0 break-words">{preset.name}</span>

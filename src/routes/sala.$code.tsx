@@ -367,7 +367,7 @@ function RoomPage() {
   return (
     <main className="mx-auto w-full max-w-md px-4 pt-[calc(0.75rem+env(safe-area-inset-top))]">
       {connectionError && <div role="alert" className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-destructive p-3 text-sm"><p className="min-w-0 flex-1">{connectionError}</p><Button variant="outline" onClick={reconnect}><RefreshCw /> Reconectar</Button></div>}
-      <header className="mb-4 space-y-3">
+      <header className="mb-5 space-y-3 border-b border-border/60 pb-4">
         <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 pr-28">
           <div className="min-w-0"><h1 className="font-display text-2xl text-primary">STOP!</h1><Button variant="ghost" title="Copiar link da sala" aria-label={`Copiar link da sala ${room.code}`} className="max-w-full justify-start gap-1.5 px-0 text-xs text-muted-foreground" onClick={async () => {
             try {
@@ -394,8 +394,8 @@ function RoomPage() {
             .map((p) => (
               <span
                 key={p.id}
-                className={`flex shrink-0 items-center gap-2 rounded-lg py-1 pl-3 ${
-                  p.id === me.id ? "bg-primary/10 text-primary ring-1 ring-primary/30" : "bg-secondary"
+                className={`room-score flex shrink-0 items-center gap-2 rounded-lg py-1 pl-3 ${
+                  p.id === me.id ? "bg-primary/10 text-primary" : "bg-card text-muted-foreground"
                 } ${isHost && p.id !== me.id ? "pr-1" : "pr-3"}`}
               >
                 {p.nickname} <strong>{p.score}</strong> <PlayerPresence player={p} />

@@ -77,10 +77,10 @@ export function FinalRanking({
   }
 
   return (
-    <div className="dock-clearance space-y-4">
+    <div className="game-screen dock-clearance space-y-4">
       <div className="py-6 text-center">
         <Trophy className="mx-auto size-12 text-gold" />
-        <h2 className="mt-3 font-display text-4xl">Fim de jogo!</h2>
+        <h2 className="mt-4 text-3xl">Fim de jogo!</h2>
         <p className="text-balance-safe text-muted-foreground">
           {winners.length > 1 ? `Empate no 1º lugar · ${winners.map((p) => p.nickname).join(" e ")}` : ranking[0] ? `${ranking[0].nickname} levou a melhor` : "Sem vencedores"}
         </p>
@@ -127,7 +127,7 @@ export function FinalRanking({
           return (
             <div
               key={p.id}
-              className={`rounded-lg border p-4 ${rank === 1 ? "border-gold bg-card" : "border-border bg-card"}`}
+              className={`ranking-row border p-4 ${rank === 1 ? "border-gold bg-card" : "border-border bg-card"}`}
             >
               <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
                 <p className="min-w-0 text-balance-safe text-lg font-bold">
