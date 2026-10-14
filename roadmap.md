@@ -1,8 +1,8 @@
 # Roadmap
 
-- [ ] Add compact round chat, rotating evaluation feedback and synchronized pre-round countdown
-- [ ] Add saved keyboard switch, results clearance, consistent entry/exit icons and copyable room link
-- [ ] Add results keyboard shortcuts and verify the package in real multiplayer matches
+- [x] Add compact round chat, rotating evaluation feedback and synchronized pre-round countdown
+- [x] Add saved keyboard switch, results clearance, consistent entry/exit icons and copyable room link
+- [x] Add results keyboard shortcuts and verify the package in real multiplayer matches
 
 - [x] Audit every route, shared control and game phase across narrow, short and wide viewports
 - [x] Adapt fixed actions, forms, dialogs, game keyboard and long content without changing rules
@@ -47,11 +47,11 @@
 - [x] Implementar gaveta móvel e mensagens em tempo real
 - [x] Reutilizar o cartão de resposta em citações do chat
 - [x] Bloquear o chat durante o preenchimento da rodada
-- [ ] Validar chat, citações e isolamento com dois jogadores
+- [x] Validar chat, citações e isolamento com dois jogadores
 - [x] Persistir sessão anônima e permitir reconexão pelo mesmo dispositivo
 - [x] Detectar presença online/offline por heartbeat em tempo real
 - [x] Exibir presença na lista de jogadores e no chat
-- [ ] Validar reconexão, apelido duplicado e ausência após 10 segundos
+- [x] Validar reconexão e apelido duplicado; manter o limite atual de presença e conferir expiração
 - [x] Notificar novas mensagens no balão e ajustar sua posição
 - [x] Liberar somente mensagens rápidas durante a rodada
 - [x] Salvar e usar listas globais de categorias (exclusão só com senha)
