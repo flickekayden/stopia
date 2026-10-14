@@ -18,7 +18,7 @@ export function VoiceReactions(props: { roomId: string; roundId: string; playerI
           <AudioLines aria-hidden className="size-5 shrink-0 animate-pulse text-primary motion-reduce:animate-none" />
         </div>, document.body
       )}
-      <div className="mb-3 flex items-center gap-3 border-b border-border pb-3">
+      <div className="mb-2 flex items-center gap-3">
         <Button variant="ghost" size="icon" className="size-11 shrink-0" onClick={voice.toggleMute} aria-pressed={voice.muted} aria-label={voice.muted ? "Ativar reações de voz" : "Silenciar reações"} title={voice.muted ? "Áudios silenciados" : "Áudios ativados"}>
           {voice.muted ? <VolumeX className="size-5" /> : <Volume2 className="size-5" />}
         </Button>

@@ -122,15 +122,15 @@ export function RoundResults({
   }, [categories.length, isLastCategory]);
 
   return (
-    <div className="dock-clearance results-clearance space-y-4">
+    <div className="game-screen result-screen dock-clearance results-clearance space-y-4">
       <div ref={categoryHeading} className="scroll-mt-4 space-y-2 pt-2 text-center">
         <p className="text-sm text-muted-foreground">Rodada {round.number} · letra {round.letter}</p>
-        <h2 className="font-display text-3xl">Resultado da rodada</h2>
+        <h2 className="text-2xl">Resultado da rodada</h2>
       </div>
       <section key={category} id={`result-category-${index}`} className="game-section scroll-mt-4 space-y-3" aria-label={`Respostas de ${category}`}>
           <div className="space-y-2 pb-1" aria-live="polite">
             <p className="text-xs font-semibold tabular-nums text-muted-foreground">Categoria {Math.min(index + 1, categories.length)} de {categories.length}</p>
-            <h3 className="text-balance-safe font-display text-3xl text-primary">{category}</h3>
+            <h3 className="text-balance-safe text-2xl text-primary">{category}</h3>
             <progress aria-label="Categorias vistas" className="answer-progress h-1 w-full" value={index + 1} max={categories.length || 1} />
           </div>
           {categoryCards.map((data) => <AnswerCard key={data.playerId} data={data} highlighted={highlightedAnswer === answerCardId(data)} onQuote={onQuote} />)}

@@ -181,12 +181,12 @@ function Home() {
   }
 
   return (
-    <main className="dock-clearance mx-auto flex min-h-[100dvh] w-full max-w-md flex-col gap-7 px-5 pt-[calc(2rem+env(safe-area-inset-top))]">
+    <main className="home-screen game-screen dock-clearance mx-auto flex min-h-[100dvh] w-full max-w-md flex-col gap-7 px-5 pt-[calc(2rem+env(safe-area-inset-top))]">
       <header className="text-left">
-        <div className="brand-stamp inline-block -rotate-2 rounded-xl bg-primary px-5 py-2">
-          <h1 className="text-balance-safe font-display text-6xl text-primary-foreground">{devText(devSettings.texts.appTitle, "STOP!")}</h1>
+        <div className="inline-block">
+          <h1 className="text-balance-safe font-display text-6xl text-primary">{devText(devSettings.texts.appTitle, "STOP!")}</h1>
         </div>
-        <p className="mt-6 max-w-80 text-base leading-relaxed text-muted-foreground">
+        <p className="mt-4 max-w-80 text-sm leading-relaxed text-muted-foreground">
           Adedonha online com os amigos. Sem cadastro, só apelido e vergonha na cara.
         </p>
       </header>
@@ -210,7 +210,7 @@ function Home() {
         />
         <p id="nickname-count" className="text-right text-xs tabular-nums text-muted-foreground">{nickname.length}/20 caracteres</p>
         {entryError && <p id="entry-error" role="alert" className="text-sm text-destructive">{entryError}</p>}
-        <div className="grid grid-cols-2 gap-1 rounded-2xl border border-border p-1" role="group" aria-label="Entrada na sala">
+        <div className="entry-tabs grid grid-cols-2 gap-1 rounded-2xl border border-border p-1" role="group" aria-label="Entrada na sala">
           <Button variant={entryMode === "create" ? "selected" : "segment"} aria-pressed={entryMode === "create"} onClick={() => setEntryMode("create")}><Plus /> Criar nova sala</Button>
           <Button variant={entryMode === "join" ? "selected" : "segment"} aria-pressed={entryMode === "join"} onClick={() => setEntryMode("join")}><DoorOpen /> Entrar com código</Button>
         </div>

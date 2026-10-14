@@ -258,8 +258,8 @@ export function RoundBoard({
   const evaluating = round.status !== "answering" || stopCountdown === 0;
 
   return (
-    <div className="dock-clearance space-y-4">
-      <div className={`sticky top-0 z-20 flex items-center border border-border bg-background/95 pt-[calc(0.75rem+env(safe-area-inset-top))] backdrop-blur ${compactHeader ? "gap-3 rounded-b-lg border-t-0 px-3 pb-2" : "gap-4 rounded-b-3xl border-t-0 px-4 pb-4"}`}>
+    <div className="game-screen dock-clearance space-y-4">
+      <div className={`sticky top-0 z-20 flex items-center border-b border-border bg-background/95 pt-[calc(0.75rem+env(safe-area-inset-top))] backdrop-blur ${compactHeader ? "gap-3 px-0 pb-3" : "gap-4 px-0 pb-4"}`}>
         <div className={`flex shrink-0 items-center justify-center bg-primary ${compactHeader ? "size-10 rounded-md" : "size-20 rounded-2xl"}`}>
           <span className={`font-display text-primary-foreground ${compactHeader ? "text-2xl" : "text-5xl"}`}>{round.letter}</span>
         </div>
@@ -403,14 +403,14 @@ export function RoundBoard({
               variant="secondary"
               disabled={sending || starting}
               onClick={() => void markFinished()}
-              className="h-14 flex-1 rounded-2xl text-base font-bold"
+              className="h-14 flex-1 rounded-lg text-base font-bold"
             >
               {sending ? <Loader2 className="animate-spin" /> : mine?.finished ? <Check /> : null}{devText(dev.texts.finishButton, "Terminei")}
             </Button>
             <Button
               onClick={() => void handleStopClick()}
               disabled={!canStop || sending || starting || stopCountdown !== null}
-              className="h-14 flex-1 rounded-2xl bg-accent font-display text-2xl text-accent-foreground hover:bg-accent/90"
+              className="h-14 flex-1 rounded-lg bg-accent font-display text-2xl text-accent-foreground hover:bg-accent/90"
             >
               {sending ? <Loader2 className="animate-spin" /> : devText(dev.texts.stopButton, "STOP!")}
             </Button>

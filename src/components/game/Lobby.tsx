@@ -118,11 +118,11 @@ export function Lobby({
   }
 
   return (
-    <div className="dock-clearance space-y-6">
+    <div className="game-screen lobby-screen dock-clearance space-y-4">
       <section className="py-4 text-center">
         <p className="text-sm text-muted-foreground">Código da sala</p>
-        <p className="mt-1 font-display text-5xl text-primary">{room.code}</p>
-        <Button onClick={share} variant="secondary" disabled={sharing} className="mt-4 h-12 w-full rounded-2xl font-bold">
+        <p className="lobby-code mt-2 text-primary">{room.code}</p>
+        <Button onClick={share} variant="outline" disabled={sharing} className="mt-4 h-12 w-full rounded-lg font-semibold">
           {copied ? <Check className="mr-2 size-5" /> : <Copy className="mr-2 size-5" />}
           Compartilhar sala
         </Button>
@@ -166,7 +166,7 @@ export function Lobby({
                     disabled={updatingSettings}
                     onClick={() => void update({ total_rounds: n })}
                     aria-pressed={room.total_rounds === n}
-                    className={`h-12 rounded-2xl font-display text-xl transition ${
+                    className={`h-12 rounded-lg text-base transition ${
                       room.total_rounds === n
                         ? "bg-primary text-primary-foreground"
                         : "bg-secondary text-foreground"
@@ -329,13 +329,13 @@ export function Lobby({
             onClick={onStart}
             disabled={starting || updatingSettings || players.length === 0}
             aria-busy={starting || updatingSettings}
-            className="h-14 w-full rounded-xl font-display text-2xl"
+            className="h-14 w-full rounded-lg text-base font-bold"
           >
             {starting ? "Começando..." : devText(devSettings.texts.startButton, "Começar partida")}
           </Button></div>
         </>
       ) : (
-        <p className="rounded-3xl border border-border bg-card p-5 text-center text-muted-foreground">
+        <p className="border-t border-border py-6 text-center text-sm text-muted-foreground">
           Esperando o mestre começar a partida...
         </p>
       )}

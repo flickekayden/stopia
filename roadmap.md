@@ -1,5 +1,8 @@
 # Roadmap
 
+- [x] Refresh shared visual language and all game screens without changing functions
+- [x] Verify the redesigned multiplayer flow and narrow/wide layouts
+
 - [x] Audit current UI, multiplayer protections and AI boundaries
 - [x] Refine entry validation, lobby settings, result clarity and honest tied rankings
 - [x] Improve recovery, input preservation and duplicate-action feedback without changing AI

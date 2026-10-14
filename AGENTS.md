@@ -24,6 +24,7 @@
 - The installation worker is network-only for navigations and never caches game/session data so multiplayer state remains authoritative.
 - Device haptics and installation prompts run only in effects or user handlers with capability checks so SSR and unsupported browsers stay safe.
 - UI hierarchy uses unframed game-section bands, shared segmented Button variants and global semantic surface/focus tokens; keep presentation changes separate from multiplayer state and developer overrides.
+- Visual refresh uses game-screen-scoped typography and layout classes with shared control variants so developer overrides and multiplayer logic remain independent of presentation.
 - Built-in keyboard keys use the keyboard-key exception to the global minimum-width rule so standard QWERTY rows fit the smartphone shell without horizontal overflow.
 - SettingsRuntime mounts useDockLayout to measure the active action bar and share scroll/chat clearance; short viewports keep bars in document flow so content remains reachable without changing game state.
 - Round starts use a future server-issued started_at and matching ends_at; shared timing helpers gate inputs and STOP without a schema change or device-local countdown origin.
