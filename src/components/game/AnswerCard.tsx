@@ -74,7 +74,7 @@ export const AnswerCard = memo(function AnswerCard({
     <div
       id={compact ? undefined : answerCardId(data)}
       className={cn(
-        "border border-border bg-card transition-shadow",
+        "answer-card border border-border/70 bg-card transition-shadow",
         compact ? "rounded-lg p-3" : "rounded-lg p-4",
         highlighted && "ring-2 ring-primary ring-offset-2 ring-offset-background",
         superCreative && "super-creative-answer border-gold",
@@ -106,7 +106,7 @@ export const AnswerCard = memo(function AnswerCard({
         <span
           aria-label={`${data.points} pontos`}
           className={cn(
-            "flex min-w-10 shrink-0 items-center justify-center rounded-lg px-2 py-1 font-display tabular-nums",
+            "flex min-w-10 shrink-0 items-center justify-center rounded-md px-2 py-1 font-bold tabular-nums",
             compact ? "text-base" : "text-xl",
             pointsStyle(data.points)
           )}
@@ -126,12 +126,12 @@ export const AnswerCard = memo(function AnswerCard({
         </div>
       )}
       {!compact && (
-        <>
+        <div className="answer-actions">
           <Button
             type="button"
             variant="ghost"
             size="sm"
-            className="mt-3 w-full justify-start rounded-none border-t border-border px-0 text-muted-foreground"
+            className="justify-start px-0 text-muted-foreground"
             disabled={loading}
             onClick={(event) => {
               event.stopPropagation();
@@ -150,9 +150,10 @@ export const AnswerCard = memo(function AnswerCard({
               {explanation}
             </p>
           )}
-        </>
+          {onQuote && <Button type="button" variant="ghost" size="sm" className="justify-start px-0 text-muted-foreground" onClick={(event) => { event.stopPropagation(); onQuote(data); }}><MessageCircle /> Reagir / comentar</Button>}
+        </div>
       )}
-      {onQuote && (
+      {onQuote && compact && (
         <Button
           type="button"
           variant="ghost"
