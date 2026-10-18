@@ -1,4 +1,4 @@
-import { Check, Keyboard, Loader2, Rocket, ShieldAlert } from "lucide-react";
+import { Check, Loader2, Rocket, ShieldAlert } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -47,19 +47,11 @@ export function RoundBoard({
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const firstAnswerInput = useRef<HTMLInputElement | null>(null);
   const answerInputs = useRef<(HTMLInputElement | null)[]>([]);
-  const [keyboardPreference, setKeyboardPreference] = useState<"native" | "app" | null>(null);
-  const appKeyboard = (keyboardPreference ?? dev.keyboard.mode) === "app";
   const startsAt = roundStartsAt(round.started_at);
   const starting = round.status === "answering" && now < startsAt;
   const countdownVisible = round.status === "answering" && now < startsAt + 600;
   const startCount = Math.max(0, Math.ceil((startsAt - now) / 1000));
   const countdownCue = useRef<number | null>(null);
-  useEffect(() => {
-    try {
-      const saved = window.localStorage.getItem("stop-keyboard-mode");
-      if (saved === "native" || saved === "app") setKeyboardPreference(saved);
-    } catch { /* ignore */ }
-  }, []);
   useEffect(() => {
     if (round.status !== "answering" || now - startsAt > 600) return;
     if (countdownCue.current === startCount) return;
@@ -349,9 +341,9 @@ export function RoundBoard({
                 if (next) { next.focus(); next.scrollIntoView({ behavior: "smooth", block: "center" }); }
                 else { event.currentTarget.blur(); setFocusedCat(null); }
               }}
-              inputMode={appKeyboard ? "none" : "text"}
+              inputMode="text"
               onFocus={() => setFocusedCat(category)}
-              onBlur={() => { if (!appKeyboard) setFocusedCat(null); }}
+              onBlur={() => setFocusedCat(null)}
               name={`stop-answer-${index}`}
               data-form-type="other"
               data-lpignore="true"
@@ -363,38 +355,7 @@ export function RoundBoard({
       </div>
 
       {saveError && <div role="alert" className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-destructive p-3 text-sm"><p>Suas respostas continuam aqui, mas ainda não foram salvas.</p><Button variant="outline" disabled={sending || starting || round.status !== "answering"} onClick={() => void flush()}>Tentar salvar</Button></div>}
-      <div className={`mobile-bottom-bar fixed inset-x-0 bottom-[var(--keyboard-inset,0px)] mx-auto flex flex-wrap w-full max-w-md gap-3 ${dev.buttonLayout === "reversed" ? "flex-row-reverse" : dev.buttonLayout === "stacked" ? "flex-col" : ""} border-t border-border bg-background/95 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] backdrop-blur`}>
-        {!evaluating && <Button variant="ghost" disabled={starting || sending} className="w-full justify-center text-xs text-muted-foreground" onClick={() => {
-          const next = appKeyboard ? "native" : "app";
-          setKeyboardPreference(next);
-          try { window.localStorage.setItem("stop-keyboard-mode", next); } catch { /* ignore */ }
-          const index = Math.max(0, round.categories.indexOf(focusedCat ?? ""));
-          window.requestAnimationFrame(() => answerInputs.current[index]?.focus({ preventScroll: true }));
-        }}><Keyboard className="size-4" />{appKeyboard ? "Teclado do celular" : "Teclado da tela"}</Button>}
-        {appKeyboard && !evaluating && !starting && (() => {
-          const target = () => focusedCat ?? round.categories[0] ?? "";
-          const type = (k: string) => { const c = target(); setValue(c, (values[c] ?? "") + k); };
-          const back = () => { const c = target(); setValue(c, (values[c] ?? "").slice(0, -1)); };
-          const key = (k: string) => (
-            <Button variant="secondary" key={k} type="button" disabled={sending} onMouseDown={(e) => e.preventDefault()} onClick={() => type(k)} className="keyboard-key h-12 min-h-12 min-w-0 flex-1 rounded-md px-0 text-base font-bold">{k}</Button>
-          );
-          return (
-            <div className="flex w-full flex-col gap-1.5">
-              <div className="keyboard-row flex gap-1">{[..."QWERTYUIOP"].map(key)}</div>
-              <div className="keyboard-row flex gap-1">{[..."ASDFGHJKLÇ"].map(key)}</div>
-              <div className="keyboard-row flex gap-1">
-                <div className="flex-[0.5]" />
-                {[..."ZXCVBNM"].map(key)}
-                <Button variant="secondary" type="button" aria-label="Apagar" disabled={sending} onMouseDown={(e) => e.preventDefault()} onClick={back} className="keyboard-key h-12 min-h-12 min-w-0 flex-[1.5] rounded-md px-0 text-base">⌫</Button>
-              </div>
-              <div className="flex gap-1">
-                <div className="flex-[2]" />
-                <Button variant="secondary" type="button" disabled={sending} onMouseDown={(e) => e.preventDefault()} onClick={() => type(" ")} className="h-12 min-h-12 flex-[6] rounded-md text-sm">Espaço</Button>
-                <div className="flex-[2]" />
-              </div>
-            </div>
-          );
-        })()}
+      <div className={`mt-6 flex w-full flex-wrap gap-3 ${dev.buttonLayout === "reversed" ? "flex-row-reverse" : dev.buttonLayout === "stacked" ? "flex-col" : ""} border-t border-border pt-4 pb-[calc(2rem+env(safe-area-inset-bottom))]`}>
         {evaluating ? (
           <EvaluationLoading />
         ) : (
