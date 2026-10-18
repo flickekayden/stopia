@@ -1,15 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { FastForward, ArrowRight } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { useSound } from "@/components/SoundProvider";
 import { AnswerCard, type AnswerCardData, answerCardId } from "@/components/game/AnswerCard";
-import { VoiceReactions } from "@/components/game/VoiceReactions";
 import type { Player, Room, Round } from "@/hooks/use-room";
 import { supabase } from "@/integrations/supabase/client";
 import type { Evaluation } from "@/lib/game";
-import { RESULTS_VIEW_MS, RESULTS_FORCE_MS, isResultsPlayerActive, resultsDeadline } from "@/lib/results-pacing";
+import { RESULTS_VIEW_MS, isResultsPlayerActive, resultsDeadline } from "@/lib/results-pacing";
 import { vibrate } from "@/lib/haptics";
 
 export function RoundResults({
@@ -56,7 +55,6 @@ export function RoundResults({
 
   const deadline = resultsDeadline(round.ends_at) ?? openedAt + RESULTS_VIEW_MS;
   const secondsLeft = Math.max(0, Math.ceil((deadline - now) / 1000));
-  const forceAvailable = now >= deadline - RESULTS_VIEW_MS + RESULTS_FORCE_MS;
   const pending = secondsLeft === 0 ? [] : players.filter((p) => isResultsPlayerActive(p, now) && p.ready_round < round.number);
   const everyoneReady = pending.length === 0;
   const hasSeen = secondsLeft === 0 || players.some((p) => p.id === playerId && p.ready_round >= round.number);
@@ -137,9 +135,7 @@ export function RoundResults({
       </section>
 
       <div className="mobile-bottom-bar fixed inset-x-0 bottom-0 mx-auto w-full max-w-md border-t border-border bg-background/95 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] backdrop-blur">
-        {sessionId && <VoiceReactions key={round.id} roomId={room.id} roundId={round.id} playerId={playerId} sessionId={sessionId} />}
         <p className="mb-2 text-center text-xs tabular-nums text-muted-foreground" role="timer">{secondsLeft > 0 ? `Leitura · ${secondsLeft}s` : "Leitura concluída"}</p>
-        {isHost && forceAvailable && !everyoneReady && <Button variant="outline" disabled={advancing} className="mb-2 w-full" onClick={() => onNextRound(true)}><FastForward /> {isLastRound ? "Forçar resultado final" : "Forçar avanço"}</Button>}
         
         <div className="flex gap-2">
           {!isLastCategory ? (
