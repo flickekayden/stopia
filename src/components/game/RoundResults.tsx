@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 
@@ -134,7 +134,7 @@ export function RoundResults({
             <h3 className="text-balance-safe text-3xl leading-tight text-primary">{category}</h3>
             <progress aria-label="Categorias vistas" className="answer-progress h-1.5 w-full" value={index + 1} max={categories.length || 1} />
           </div>
-          {categoryCards.map((data, cardIndex) => <div key={data.playerId} style={{ "--enter-index": cardIndex } as React.CSSProperties}><AnswerCard data={data} highlighted={highlightedAnswer === answerCardId(data)} onQuote={onQuote} /></div>)}
+          {categoryCards.map((data, cardIndex) => <div key={data.playerId} style={{ "--enter-index": cardIndex } as CSSProperties}><AnswerCard data={data} highlighted={highlightedAnswer === answerCardId(data)} onQuote={onQuote} /></div>)}
       </section>
 
       <div className="mobile-bottom-bar fixed inset-x-0 bottom-0 mx-auto w-full max-w-md border-t border-border bg-background/95 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] backdrop-blur">
