@@ -184,15 +184,16 @@ function Home() {
     <main className="home-screen game-screen dock-clearance mx-auto flex min-h-[100dvh] w-full max-w-md flex-col gap-7 px-5 pt-[calc(2rem+env(safe-area-inset-top))]">
       <header className="text-left">
         <div className="inline-block">
-          <h1 className="text-balance-safe font-display text-6xl text-primary">{devText(devSettings.texts.appTitle, "STOP!")}</h1>
+          <h1 className="text-balance-safe font-display text-7xl leading-none text-primary">{devText(devSettings.texts.appTitle, "STOP!")}</h1>
+          <span className="mt-3 block h-1 w-14 rounded-full bg-primary" aria-hidden="true" />
         </div>
-        <p className="mt-4 max-w-80 text-sm leading-relaxed text-muted-foreground">
+        <p className="mt-4 max-w-80 text-base leading-relaxed text-muted-foreground">
           Adedonha online com os amigos. Sem cadastro, só apelido e vergonha na cara.
         </p>
       </header>
 
       <section className="space-y-3">
-        <label className="block text-sm font-semibold text-foreground" htmlFor="apelido">
+        <label className="section-label block" htmlFor="apelido">
           Seu apelido
         </label>
         <Input
@@ -210,14 +211,14 @@ function Home() {
         />
         <p id="nickname-count" className="text-right text-xs tabular-nums text-muted-foreground">{nickname.length}/20 caracteres</p>
         {entryError && <p id="entry-error" role="alert" className="text-sm text-destructive">{entryError}</p>}
-        <div className="entry-tabs grid grid-cols-2 gap-1 rounded-2xl border border-border p-1" role="group" aria-label="Entrada na sala">
+        <div className="entry-tabs grid grid-cols-2" role="group" aria-label="Entrada na sala">
           <Button variant={entryMode === "create" ? "selected" : "segment"} aria-pressed={entryMode === "create"} onClick={() => setEntryMode("create")}><Plus /> Criar nova sala</Button>
           <Button variant={entryMode === "join" ? "selected" : "segment"} aria-pressed={entryMode === "join"} onClick={() => setEntryMode("join")}><DoorOpen /> Entrar com código</Button>
         </div>
       </section>
 
       {entryMode === "join" && <section className="space-y-3">
-        <label className="text-sm font-semibold text-muted-foreground" htmlFor="codigo">
+        <label className="section-label block" htmlFor="codigo">
           Entrar com código
         </label>
         <Input
@@ -234,7 +235,7 @@ function Home() {
           onKeyDown={(event) => { if (event.key === "Enter" && !event.nativeEvent.isComposing && !loading) void handleJoin(); }}
           placeholder="ABCD"
           onChange={(e) => setCode(e.target.value.toUpperCase())}
-          className="h-16 text-center font-display text-3xl"
+          className="h-16 text-center font-display text-3xl tracking-[0.3em]"
         />
       </section>}
 
@@ -265,11 +266,11 @@ function Home() {
             const waiting = room.status === "lobby";
             const finished = room.status === "ended" || room.status === "finished";
             return (
-              <article key={room.id} className="flex min-h-20 items-center gap-3 rounded-lg border border-border bg-card p-3">
+              <article key={room.id} className="player-row flex min-h-20 items-center gap-3 rounded-xl border border-border/70 bg-background p-3">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <strong className="font-display text-xl">{room.code}</strong>
-                    <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground">
+                    <strong className="font-display text-xl tracking-wider">{room.code}</strong>
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${waiting ? "bg-primary/12 text-primary" : "bg-muted text-muted-foreground"}`}>
                       {waiting ? "Aguardando" : finished ? "Encerrada" : `Rodada ${room.currentRound}/${room.totalRounds}`}
                     </span>
                   </div>
@@ -317,7 +318,7 @@ function Home() {
       </div>
 
       <Dialog open={passwordOpen} onOpenChange={setPasswordOpen}>
-        <DialogContent className="w-[calc(100%_-_2rem)] rounded-2xl">
+        <DialogContent className="w-[calc(100%_-_2rem)] rounded-2xl border-border bg-card">
           <form onSubmit={handleUnlock} className="space-y-4">
             <DialogHeader>
               <DialogTitle>Acesso de desenvolvedor</DialogTitle>
@@ -342,7 +343,7 @@ function Home() {
       </Dialog>
 
       <AlertDialog open={roomToDelete !== null} onOpenChange={(open) => !open && setRoomToDelete(null)}>
-        <AlertDialogContent className="w-[calc(100%_-_2rem)] rounded-2xl">
+        <AlertDialogContent className="w-[calc(100%_-_2rem)] rounded-2xl border-border bg-card">
           <AlertDialogHeader>
             <AlertDialogTitle>Apagar sala {roomToDelete?.code}?</AlertDialogTitle>
             <AlertDialogDescription>
