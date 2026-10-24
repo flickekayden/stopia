@@ -352,14 +352,14 @@ export function RoundBoard({
               data-form-type="other"
               data-lpignore="true"
               data-1p-ignore="true"
-              className="mt-2 h-12 rounded-lg text-base"
+              className="mt-2.5 h-12 rounded-lg text-base font-semibold"
             />
           </div>
         ))}
       </div>
 
-      {saveError && <div role="alert" className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-destructive p-3 text-sm"><p>Suas respostas continuam aqui, mas ainda não foram salvas.</p><Button variant="outline" disabled={sending || starting || round.status !== "answering"} onClick={() => void flush()}>Tentar salvar</Button></div>}
-      <div className={`mt-6 flex w-full flex-wrap gap-3 ${dev.buttonLayout === "reversed" ? "flex-row-reverse" : dev.buttonLayout === "stacked" ? "flex-col" : ""} border-t border-border pt-4 pb-[calc(2rem+env(safe-area-inset-bottom))]`}>
+      {saveError && <div role="alert" className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-destructive/70 bg-destructive/10 p-3 text-sm"><p>Suas respostas continuam aqui, mas ainda não foram salvas.</p><Button variant="outline" disabled={sending || starting || round.status !== "answering"} onClick={() => void flush()}>Tentar salvar</Button></div>}
+      <div className={`mt-6 flex w-full flex-wrap gap-3 ${dev.buttonLayout === "reversed" ? "flex-row-reverse" : dev.buttonLayout === "stacked" ? "flex-col" : ""} border-t border-border/70 pt-5 pb-[calc(2rem+env(safe-area-inset-bottom))]`}>
         {evaluating ? (
           <EvaluationLoading />
         ) : (
@@ -368,14 +368,16 @@ export function RoundBoard({
               variant="secondary"
               disabled={sending || starting}
               onClick={() => void markFinished()}
-              className="h-14 flex-1 rounded-lg text-base font-bold"
+              aria-busy={sending}
+              className={`h-16 flex-1 rounded-xl text-base font-bold ${mine?.finished ? "border-success/50 text-success" : ""}`}
             >
               {sending ? <Loader2 className="animate-spin" /> : mine?.finished ? <Check /> : null}{devText(dev.texts.finishButton, "Terminei")}
             </Button>
             <Button
               onClick={() => void handleStopClick()}
               disabled={!canStop || sending || starting || stopCountdown !== null}
-              className="h-14 flex-1 rounded-lg bg-accent font-display text-2xl text-accent-foreground hover:bg-accent/90"
+              aria-busy={sending}
+              className="stop-button h-16 flex-[1.4] rounded-xl text-3xl"
             >
               {sending ? <Loader2 className="animate-spin" /> : devText(dev.texts.stopButton, "STOP!")}
             </Button>
