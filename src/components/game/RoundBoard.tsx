@@ -251,19 +251,20 @@ export function RoundBoard({
 
   return (
     <div className="game-screen dock-clearance space-y-4">
-      <div className={`sticky top-0 z-20 flex items-center border-b border-border bg-background/95 pt-[calc(0.75rem+env(safe-area-inset-top))] backdrop-blur ${compactHeader ? "gap-3 px-0 pb-3" : "gap-4 px-0 pb-4"}`}>
-        <div className={`flex shrink-0 items-center justify-center bg-primary ${compactHeader ? "size-10 rounded-md" : "size-20 rounded-2xl"}`}>
-          <span className={`font-display text-primary-foreground ${compactHeader ? "text-2xl" : "text-5xl"}`}>{round.letter}</span>
+      <div className={`round-hud sticky top-0 z-20 -mx-4 flex items-center border-b border-border/70 px-4 pt-[calc(0.75rem+env(safe-area-inset-top))] backdrop-blur-md transition-[padding] duration-200 ${compactHeader ? "gap-3 pb-3" : "gap-4 pb-4"}`}>
+        <div className={`letter-tile flex shrink-0 items-center justify-center transition-[width,height,border-radius] duration-200 ${compactHeader ? "size-11 rounded-lg" : "size-20 rounded-2xl"}`} aria-label={`Letra ${round.letter}`}>
+          <span className={`font-display leading-none ${compactHeader ? "text-3xl" : "text-6xl"}`}>{round.letter}</span>
         </div>
-        <div className={`min-w-0 flex-1 ${compactHeader ? "flex items-center justify-between gap-2" : ""}`}>
-          <p className="text-sm text-muted-foreground">
-            Rodada {round.number} de {room.total_rounds}
+        <div className={`min-w-0 flex-1 ${compactHeader ? "flex items-center justify-between gap-2" : "space-y-1.5"}`}>
+          <p className="section-label">
+            Rodada <span className="tabular-nums text-foreground">{round.number}</span> de {room.total_rounds}
           </p>
           {secondsLeft !== null ? (
             <p
               role="timer"
               aria-label={`${secondsLeft} segundos restantes${secondsLeft <= 10 ? ", tempo acabando" : ""}`}
-              className={`font-display ${compactHeader ? "text-xl" : "text-4xl"} ${secondsLeft <= 10 ? "text-destructive" : "text-foreground"}`}
+              data-state={secondsLeft <= 10 ? "critical" : secondsLeft <= 30 ? "low" : "normal"}
+              className={`round-timer ${compactHeader ? "text-2xl" : "text-5xl"} text-foreground`}
             >
               {Math.floor(secondsLeft / 60)}:{String(secondsLeft % 60).padStart(2, "0")}
             </p>
