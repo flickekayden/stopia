@@ -121,17 +121,20 @@ export function RoundResults({
 
   return (
     <div className="game-screen result-screen dock-clearance results-clearance space-y-4">
-      <div ref={categoryHeading} className="scroll-mt-4 space-y-2 pt-2 text-center">
-        <p className="text-sm text-muted-foreground">Rodada {round.number} · letra {round.letter}</p>
-        <h2 className="text-2xl">Resultado da rodada</h2>
+      <div ref={categoryHeading} className="scroll-mt-4 flex items-center gap-3 pt-2">
+        <span className="letter-tile grid size-12 shrink-0 place-items-center rounded-xl font-display text-3xl" aria-hidden="true">{round.letter}</span>
+        <div className="min-w-0">
+          <p className="section-label">Rodada {round.number} · letra {round.letter}</p>
+          <h2 className="text-2xl leading-tight">Resultado da rodada</h2>
+        </div>
       </div>
       <section key={category} id={`result-category-${index}`} className="game-section scroll-mt-4 space-y-3" aria-label={`Respostas de ${category}`}>
           <div className="space-y-2 pb-1" aria-live="polite">
-            <p className="text-xs font-semibold tabular-nums text-muted-foreground">Categoria {Math.min(index + 1, categories.length)} de {categories.length}</p>
-            <h3 className="text-balance-safe text-2xl text-primary">{category}</h3>
-            <progress aria-label="Categorias vistas" className="answer-progress h-1 w-full" value={index + 1} max={categories.length || 1} />
+            <p className="section-label tabular-nums">Categoria <span className="text-foreground">{Math.min(index + 1, categories.length)}</span> de {categories.length}</p>
+            <h3 className="text-balance-safe text-3xl leading-tight text-primary">{category}</h3>
+            <progress aria-label="Categorias vistas" className="answer-progress h-1.5 w-full" value={index + 1} max={categories.length || 1} />
           </div>
-          {categoryCards.map((data) => <AnswerCard key={data.playerId} data={data} highlighted={highlightedAnswer === answerCardId(data)} onQuote={onQuote} />)}
+          {categoryCards.map((data, cardIndex) => <div key={data.playerId} style={{ "--enter-index": cardIndex } as React.CSSProperties}><AnswerCard data={data} highlighted={highlightedAnswer === answerCardId(data)} onQuote={onQuote} /></div>)}
       </section>
 
       <div className="mobile-bottom-bar fixed inset-x-0 bottom-0 mx-auto w-full max-w-md border-t border-border bg-background/95 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] backdrop-blur">
