@@ -1,5 +1,11 @@
 # Roadmap
 
+- [ ] Competitive Premium: palette, shared controls and global surfaces
+- [ ] Competitive Premium: round screen (letter, timer, fields, STOP)
+- [ ] Competitive Premium: lobby, results, final podium, home and states
+- [ ] Verify real match, sizes and untouched AI/game logic
+
+
 - [x] Refresh shared visual language and all game screens without changing functions
 - [x] Verify the redesigned multiplayer flow and narrow/wide layouts
 
