@@ -80,8 +80,7 @@ export function FinalRanking({
     <div className="game-screen dock-clearance space-y-4">
       <div className="stage-glow -mx-4 px-4 py-6 text-center">
         <span className="letter-tile mx-auto grid size-16 place-items-center rounded-2xl"><Trophy className="size-8" aria-hidden="true" /></span>
-        <p className="section-label mt-4">Fim de jogo</p>
-        <h2 className="mt-1 text-3xl leading-tight">Fim de jogo!</h2>
+        <h2 className="mt-4 text-3xl leading-tight">Fim de jogo!</h2>
         <p className="mt-1 text-balance-safe text-muted-foreground">
           {winners.length > 1 ? `Empate no 1º lugar · ${winners.map((p) => p.nickname).join(" e ")}` : ranking[0] ? <><span className="font-bold text-primary">{ranking[0].nickname}</span> levou a melhor</> : "Sem vencedores"}
         </p>
