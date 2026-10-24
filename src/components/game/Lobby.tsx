@@ -119,23 +119,32 @@ export function Lobby({
 
   return (
     <div className="game-screen lobby-screen dock-clearance space-y-4">
-      <section className="py-4 text-center">
-        <p className="text-sm text-muted-foreground">Código da sala</p>
+      <section className="room-ticket px-5 pb-5 pt-6 text-center" aria-label="Código da sala">
+        <p className="section-label">Código da sala</p>
         <p className="lobby-code mt-2 text-primary">{room.code}</p>
-        <Button onClick={share} variant="outline" disabled={sharing} className="mt-4 h-12 w-full rounded-lg font-semibold">
-          {copied ? <Check className="mr-2 size-5" /> : <Copy className="mr-2 size-5" />}
-          Compartilhar sala
+        <p className="mt-1 text-sm text-muted-foreground">Chame a galera com este código</p>
+        <Button onClick={share} variant={copied ? "selected" : "outline"} disabled={sharing} aria-busy={sharing} className="mt-5 h-12 w-full font-semibold">
+          {copied ? <Check className="size-5" /> : <Copy className="size-5" />}
+          {copied ? "Link copiado" : "Compartilhar sala"}
         </Button>
       </section>
 
       <section className="game-section">
-        <h2 className="text-lg font-bold">Jogadores <span className="text-muted-foreground">· {players.length}</span></h2>
-        <ul className="mt-3 space-y-2">
-          {players.map((p) => (
-            <li key={p.id} className="animate-in fade-in slide-in-from-bottom-1 motion-reduce:animate-none flex items-center gap-3 border-b border-border/50 px-1 py-3 last:border-0">
-              <span className={`size-2 shrink-0 rounded-full ${p.is_online ? "bg-success motion-safe:animate-pulse" : "bg-muted-foreground"}`} aria-hidden="true" />
-              {p.is_host && <Crown aria-label="Anfitrião" className="size-4 text-primary" />}
-              <span className="min-w-0 flex-1 font-semibold text-balance-safe">{p.nickname}</span>
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <h2 className="text-lg font-bold">Jogadores</h2>
+          <span className="rounded-full bg-secondary px-2.5 py-0.5 text-sm font-bold tabular-nums text-foreground">{players.length}</span>
+        </div>
+        <ul className="space-y-1">
+          {players.map((p, index) => (
+            <li key={p.id} style={{ animationDelay: `${Math.min(index, 8) * 40}ms` }} className="player-row flex items-center gap-3 border-b border-border/50 py-2.5 last:border-0">
+              <span className="player-avatar relative size-10 text-lg" data-host={p.is_host ? "true" : "false"} aria-hidden="true">
+                {p.nickname.trim().charAt(0).toUpperCase() || "?"}
+                <span className={`absolute -bottom-0.5 -right-0.5 size-3 rounded-full border-2 border-card ${p.is_online ? "bg-success" : "bg-muted-foreground"}`} />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block font-semibold text-balance-safe">{p.nickname}</span>
+                {p.is_host && <span className="inline-flex items-center gap-1 text-xs font-bold text-primary"><Crown aria-label="Anfitrião" className="size-3.5" /> Mestre da sala</span>}
+              </span>
               <PlayerPresence player={p} />
             </li>
           ))}
@@ -143,14 +152,17 @@ export function Lobby({
       </section>
 
       <section className="game-section space-y-3">
-        <h2 className="text-lg font-bold">Categorias <span className="text-muted-foreground">· {room.categories.length}</span></h2>
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-lg font-bold">Categorias</h2>
+          <span className="rounded-full bg-secondary px-2.5 py-0.5 text-sm font-bold tabular-nums text-foreground">{room.categories.length}</span>
+        </div>
         <div className="flex flex-wrap gap-2">
-          {room.categories.map((c) => <span key={c} className="game-chip rounded-lg bg-secondary px-3 py-1.5 text-sm text-balance-safe">{c}</span>)}
+          {room.categories.map((c) => <span key={c} className="game-chip text-balance-safe">{c}</span>)}
         </div>
       </section>
 
       <ScoringRules />
-      <p className="text-balance-safe text-center text-sm text-muted-foreground">{room.total_rounds} rodadas · {Math.min(MAX_CATEGORIES_PER_ROUND, room.categories.length)} categorias por rodada · {room.timer_enabled ? `${room.timer_seconds}s por rodada` : "sem cronômetro"} · avaliação automática</p>
+      <p className="text-balance-safe text-center text-sm text-muted-foreground"><span className="font-semibold text-foreground">{room.total_rounds} rodadas</span> · {Math.min(MAX_CATEGORIES_PER_ROUND, room.categories.length)} categorias por rodada · {room.timer_enabled ? `${room.timer_seconds}s por rodada` : "sem cronômetro"} · avaliação automática</p>
 
       {isHost ? (
         <>
