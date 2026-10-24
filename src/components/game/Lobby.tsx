@@ -180,7 +180,7 @@ export function Lobby({
                     aria-pressed={room.total_rounds === n}
                     className={`h-12 rounded-lg text-base transition ${
                       room.total_rounds === n
-                        ? "bg-primary text-primary-foreground"
+                        ? "border-primary/50 bg-primary/12 text-primary ring-1 ring-primary/40 hover:bg-primary/15"
                         : "bg-secondary text-foreground"
                     }`}
                   >
@@ -211,9 +211,9 @@ export function Lobby({
                     disabled={updatingSettings}
                     onClick={() => void update({ timer_seconds: s })}
                     aria-pressed={room.timer_seconds === s}
-                    className={`h-11 rounded-2xl text-sm font-bold transition ${
+                    className={`h-11 rounded-xl text-sm font-bold transition ${
                       room.timer_seconds === s
-                        ? "bg-primary text-primary-foreground"
+                        ? "border-primary/50 bg-primary/12 text-primary ring-1 ring-primary/40 hover:bg-primary/15"
                         : "bg-secondary text-foreground"
                     }`}
                   >
@@ -243,9 +243,9 @@ export function Lobby({
                         disabled={updatingSettings}
                         onClick={() => void update({ stop_policy: opt.value })}
                         aria-pressed={room.stop_policy === opt.value}
-                        className={`h-12 rounded-2xl font-bold transition ${
+                        className={`h-12 rounded-xl font-bold transition ${
                           room.stop_policy === opt.value
-                            ? "bg-primary text-primary-foreground"
+                            ? "border-primary/50 bg-primary/12 text-primary ring-1 ring-primary/40 hover:bg-primary/15"
                             : "bg-secondary text-foreground"
                         }`}
                       >
@@ -304,12 +304,12 @@ export function Lobby({
                       const v = e.target.value.trim();
                       if (v && v !== c) editCategory(i, v);
                     }}
-                    className="h-12 rounded-2xl"
+                    className="h-12 rounded-xl"
                   />
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="size-12 shrink-0 rounded-2xl text-destructive"
+                    className="size-12 shrink-0 rounded-xl text-destructive"
                     onClick={() => removeCategory(i)}
                     aria-label={`Remover categoria ${c}`}
                     title={`Remover ${c}`}
@@ -329,9 +329,9 @@ export function Lobby({
                 onKeyDown={(e) => {
                   if (e.key === "Enter") addCategory();
                 }}
-                className="h-12 rounded-2xl"
+                className="h-12 rounded-xl"
               />
-              <Button disabled={updatingSettings || !newCategory.trim()} className="size-12 shrink-0 rounded-2xl" size="icon" aria-label="Adicionar categoria" title="Adicionar categoria" onClick={() => void addCategory()}>
+              <Button disabled={updatingSettings || !newCategory.trim()} className="size-12 shrink-0 rounded-xl" size="icon" aria-label="Adicionar categoria" title="Adicionar categoria" onClick={() => void addCategory()}>
                 <Plus className="size-5" />
               </Button>
             </div>
@@ -341,13 +341,13 @@ export function Lobby({
             onClick={onStart}
             disabled={starting || updatingSettings || players.length === 0}
             aria-busy={starting || updatingSettings}
-            className="h-14 w-full rounded-lg text-base font-bold"
+            className="h-14 w-full rounded-xl text-lg font-bold"
           >
             {starting ? "Começando..." : devText(devSettings.texts.startButton, "Começar partida")}
           </Button></div>
         </>
       ) : (
-        <p className="border-t border-border py-6 text-center text-sm text-muted-foreground">
+        <p role="status" className="game-section flex items-center justify-center gap-2 text-center text-sm text-muted-foreground"><span className="size-2 shrink-0 rounded-full bg-primary motion-safe:animate-pulse" aria-hidden="true" />
           Esperando o mestre começar a partida...
         </p>
       )}
