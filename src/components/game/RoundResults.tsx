@@ -154,7 +154,7 @@ export function RoundResults({
                 <Button
                   onClick={() => { vibrate(15); void markSeen(); }}
                   disabled={markingSeen}
-                  className="h-14 w-full rounded-2xl text-lg font-bold"
+                  className="h-14 w-full rounded-xl text-lg font-bold"
                 >
                   {markingSeen ? "Marcando..." : "Terminei"}
                 </Button>
@@ -166,7 +166,7 @@ export function RoundResults({
                 <Button
                   onClick={() => onNextRound()}
                   disabled={advancing || !everyoneReady}
-                  className="h-14 w-full rounded-2xl text-lg font-bold"
+                  className="h-14 w-full rounded-xl text-lg font-bold"
                 >
                   {advancing
                     ? "Aguarde..."
