@@ -251,19 +251,20 @@ export function RoundBoard({
 
   return (
     <div className="game-screen dock-clearance space-y-4">
-      <div className={`sticky top-0 z-20 flex items-center border-b border-border bg-background/95 pt-[calc(0.75rem+env(safe-area-inset-top))] backdrop-blur ${compactHeader ? "gap-3 px-0 pb-3" : "gap-4 px-0 pb-4"}`}>
-        <div className={`flex shrink-0 items-center justify-center bg-primary ${compactHeader ? "size-10 rounded-md" : "size-20 rounded-2xl"}`}>
-          <span className={`font-display text-primary-foreground ${compactHeader ? "text-2xl" : "text-5xl"}`}>{round.letter}</span>
+      <div className={`round-hud sticky top-0 z-20 -mx-4 flex items-center border-b border-border/70 px-4 pt-[calc(0.75rem+env(safe-area-inset-top))] backdrop-blur-md transition-[padding] duration-200 ${compactHeader ? "gap-3 pb-3" : "gap-4 pb-4"}`}>
+        <div className={`letter-tile flex shrink-0 items-center justify-center transition-[width,height,border-radius] duration-200 ${compactHeader ? "size-11 rounded-lg" : "size-20 rounded-2xl"}`} aria-label={`Letra ${round.letter}`}>
+          <span className={`font-display leading-none ${compactHeader ? "text-3xl" : "text-6xl"}`}>{round.letter}</span>
         </div>
-        <div className={`min-w-0 flex-1 ${compactHeader ? "flex items-center justify-between gap-2" : ""}`}>
-          <p className="text-sm text-muted-foreground">
-            Rodada {round.number} de {room.total_rounds}
+        <div className={`min-w-0 flex-1 ${compactHeader ? "flex items-center justify-between gap-2" : "space-y-1.5"}`}>
+          <p className="section-label">
+            Rodada <span className="tabular-nums text-foreground">{round.number}</span> de {room.total_rounds}
           </p>
           {secondsLeft !== null ? (
             <p
               role="timer"
               aria-label={`${secondsLeft} segundos restantes${secondsLeft <= 10 ? ", tempo acabando" : ""}`}
-              className={`font-display ${compactHeader ? "text-xl" : "text-4xl"} ${secondsLeft <= 10 ? "text-destructive" : "text-foreground"}`}
+              data-state={secondsLeft <= 10 ? "critical" : secondsLeft <= 30 ? "low" : "normal"}
+              className={`round-timer ${compactHeader ? "text-2xl" : "text-5xl"} text-foreground`}
             >
               {Math.floor(secondsLeft / 60)}:{String(secondsLeft % 60).padStart(2, "0")}
             </p>
@@ -280,21 +281,24 @@ export function RoundBoard({
         </div>
       )}
 
-      <div className="space-y-1">
-        <div className="text-right text-sm font-medium tabular-nums text-muted-foreground" aria-hidden="true">{filledCount}/{round.categories.length} preenchidas</div>
+      <div className="space-y-2">
+        <div className="flex items-center justify-between gap-3" aria-hidden="true">
+          <span className="section-label">Respostas</span>
+          <span className="text-sm font-bold tabular-nums text-foreground">{filledCount}<span className="text-muted-foreground">/{round.categories.length} preenchidas</span></span>
+        </div>
         <progress aria-label="Progresso das respostas" className="answer-progress h-1.5 w-full" value={filledCount} max={round.categories.length || 1} />
       </div>
 
       {round.status === "answering" && stopCountdown !== null && stopCountdown > 0 && (
-        <div className="animate-scale-in rounded-2xl border-2 border-destructive bg-destructive/15 p-4 text-center" role="status" aria-live="assertive">
+        <div className="animate-scale-in rounded-2xl border border-destructive/70 bg-destructive/12 p-4 text-center" role="status" aria-live="assertive">
           <ShieldAlert className="mx-auto size-7 text-destructive" />
           <p className="mt-1 font-display text-2xl text-destructive">✋ @{round.stopped_by ?? "alguém"} gritou STOP!</p>
-          <p className="text-sm font-bold text-foreground">Respostas bloqueiam em {stopCountdown}s</p>
+          <p className="text-sm font-bold text-foreground">Respostas bloqueiam em <span className="tabular-nums">{stopCountdown}</span>s</p>
         </div>
       )}
 
       {showEveryoneFinished && (
-        <div className="animate-scale-in rounded-2xl border border-success bg-success/15 p-4 text-center" role="status" aria-live="polite">
+        <div className="animate-scale-in rounded-2xl border border-success/60 bg-success/12 p-4 text-center" role="status" aria-live="polite">
           <Rocket className="mx-auto size-7 text-success" />
           <p className="mt-1 font-display text-2xl text-success">🚀 Todos terminaram!</p>
         </div>
@@ -304,23 +308,23 @@ export function RoundBoard({
         {players.map((p) => (
           <span
             key={p.id}
-            className={`game-chip flex items-center gap-1 rounded-lg px-3 py-1 text-sm ${
+            className={`game-chip flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm font-medium transition-colors ${
               finishedIds.includes(p.id)
-                ? "bg-success/20 text-success"
-                : "bg-secondary text-muted-foreground"
+                ? "border-success/40 bg-success/12 text-success"
+                : "border-border bg-card text-muted-foreground"
             }`}
           >
-            {finishedIds.includes(p.id) && <Check className="size-3" />}
+            {finishedIds.includes(p.id) && <Check className="size-3.5" />}
             {p.nickname}
             <PlayerPresence player={p} />
           </span>
         ))}
       </div>
 
-      <div className="space-y-3">
+      <div className="space-y-2.5">
         {round.categories.map((category, index) => (
-          <div key={category} className="game-field rounded-lg border border-border bg-card p-3">
-            <label htmlFor={`answer-field-${index}`} className="flex items-start gap-2 text-sm font-semibold text-foreground"><span className="shrink-0 text-xs tabular-nums text-muted-foreground">{String(index + 1).padStart(2, "0")}</span><span className="text-balance-safe">{category}</span></label>
+          <div key={category} className="game-field" data-filled={(values[category] ?? "").trim() ? "true" : "false"}>
+            <label htmlFor={`answer-field-${index}`} className="flex items-center gap-2.5 text-sm font-bold text-foreground"><span className="field-index" aria-hidden="true">{(values[category] ?? "").trim() ? <Check className="size-3.5" /> : String(index + 1).padStart(2, "0")}</span><span className="text-balance-safe">{category}</span></label>
             <Input
               id={`answer-field-${index}`}
               ref={(input) => { answerInputs.current[index] = input; if (index === 0) firstAnswerInput.current = input; }}
@@ -348,14 +352,14 @@ export function RoundBoard({
               data-form-type="other"
               data-lpignore="true"
               data-1p-ignore="true"
-              className="mt-2 h-12 rounded-lg text-base"
+              className="mt-2.5 h-12 rounded-lg text-base font-semibold"
             />
           </div>
         ))}
       </div>
 
-      {saveError && <div role="alert" className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-destructive p-3 text-sm"><p>Suas respostas continuam aqui, mas ainda não foram salvas.</p><Button variant="outline" disabled={sending || starting || round.status !== "answering"} onClick={() => void flush()}>Tentar salvar</Button></div>}
-      <div className={`mt-6 flex w-full flex-wrap gap-3 ${dev.buttonLayout === "reversed" ? "flex-row-reverse" : dev.buttonLayout === "stacked" ? "flex-col" : ""} border-t border-border pt-4 pb-[calc(2rem+env(safe-area-inset-bottom))]`}>
+      {saveError && <div role="alert" className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-destructive/70 bg-destructive/10 p-3 text-sm"><p>Suas respostas continuam aqui, mas ainda não foram salvas.</p><Button variant="outline" disabled={sending || starting || round.status !== "answering"} onClick={() => void flush()}>Tentar salvar</Button></div>}
+      <div className={`mt-6 flex w-full flex-wrap gap-3 ${dev.buttonLayout === "reversed" ? "flex-row-reverse" : dev.buttonLayout === "stacked" ? "flex-col" : ""} border-t border-border/70 pt-5 pb-[calc(2rem+env(safe-area-inset-bottom))]`}>
         {evaluating ? (
           <EvaluationLoading />
         ) : (
@@ -364,14 +368,16 @@ export function RoundBoard({
               variant="secondary"
               disabled={sending || starting}
               onClick={() => void markFinished()}
-              className="h-14 flex-1 rounded-lg text-base font-bold"
+              aria-busy={sending}
+              className={`h-16 flex-1 rounded-xl text-base font-bold ${mine?.finished ? "border-success/50 text-success" : ""}`}
             >
               {sending ? <Loader2 className="animate-spin" /> : mine?.finished ? <Check /> : null}{devText(dev.texts.finishButton, "Terminei")}
             </Button>
             <Button
               onClick={() => void handleStopClick()}
               disabled={!canStop || sending || starting || stopCountdown !== null}
-              className="h-14 flex-1 rounded-lg bg-accent font-display text-2xl text-accent-foreground hover:bg-accent/90"
+              aria-busy={sending}
+              className="stop-button h-16 flex-[1.4] rounded-xl text-3xl"
             >
               {sending ? <Loader2 className="animate-spin" /> : devText(dev.texts.stopButton, "STOP!")}
             </Button>

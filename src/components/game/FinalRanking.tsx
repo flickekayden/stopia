@@ -78,65 +78,70 @@ export function FinalRanking({
 
   return (
     <div className="game-screen dock-clearance space-y-4">
-      <div className="py-6 text-center">
-        <Trophy className="mx-auto size-12 text-gold" />
-        <h2 className="mt-4 text-3xl">Fim de jogo!</h2>
-        <p className="text-balance-safe text-muted-foreground">
-          {winners.length > 1 ? `Empate no 1º lugar · ${winners.map((p) => p.nickname).join(" e ")}` : ranking[0] ? `${ranking[0].nickname} levou a melhor` : "Sem vencedores"}
+      <div className="stage-glow -mx-4 px-4 py-6 text-center">
+        <span className="letter-tile mx-auto grid size-16 place-items-center rounded-2xl"><Trophy className="size-8" aria-hidden="true" /></span>
+        <h2 className="mt-4 text-3xl leading-tight">Fim de jogo!</h2>
+        <p className="mt-1 text-balance-safe text-muted-foreground">
+          {winners.length > 1 ? `Empate no 1º lugar · ${winners.map((p) => p.nickname).join(" e ")}` : ranking[0] ? <><span className="font-bold text-primary">{ranking[0].nickname}</span> levou a melhor</> : "Sem vencedores"}
         </p>
       </div>
 
       {loadingAnalysis && !analysis && (
-        <div role="status" className="flex items-center justify-center gap-2 rounded-lg bg-secondary p-4 text-sm">
-          <Loader2 className="size-5 animate-spin" /> A IA está preparando as zoeiras finais...
+        <div role="status" className="flex items-center justify-center gap-2 rounded-xl border border-border bg-card p-4 text-sm">
+          <Loader2 className="size-5 animate-spin text-primary" /> A IA está preparando as zoeiras finais...
         </div>
       )}
 
       {!analysis && analysisError && (
-        <div className="rounded-2xl border border-border bg-card p-4 text-center text-sm text-muted-foreground">
+        <div role="alert" className="rounded-xl border border-border bg-card p-4 text-center text-sm text-muted-foreground">
           {analysisError} O ranking abaixo continua valendo.
         </div>
       )}
 
-      {winners.length <= 1 && <div className="flex items-end justify-center gap-2 pt-4" aria-label="Pódio">
+      {winners.length <= 1 && <div className="flex items-end justify-center gap-2 pt-2" aria-label="Pódio">
         {[1, 0, 2].map((place) => {
           const p = ranking[place];
           if (!p) return null;
           const rank = getRank(p.score);
           return (
             <div key={p.id} className="min-w-0 flex-1 text-center">
-              <p className="mb-2 truncate text-sm font-bold w-full">{p.nickname}</p>
+              {rank === 1 && <Crown className="mx-auto mb-1 size-6 text-gold" aria-hidden="true" />}
+              <p className={`mb-2 w-full truncate font-bold ${rank === 1 ? "text-base text-foreground" : "text-sm text-muted-foreground"}`}>{p.nickname}</p>
               <div
-                className={`flex flex-col items-center justify-center rounded-t-lg border border-current ${
-                  rank === 1 ? "h-36 bg-gold/15 text-gold" : rank === 2 ? "h-28 bg-silver/15 text-silver" : "h-20 bg-bronze/15 text-bronze"
+                data-place={rank}
+                className={`podium-step flex flex-col items-center justify-center gap-0.5 ${
+                  rank === 1 ? "h-40 text-gold" : rank === 2 ? "h-28 text-silver" : "h-20 text-bronze"
                 }`}
               >
-                <Trophy className="size-5" aria-hidden="true" />
-                <strong className="font-display text-2xl">{p.score}</strong>
-                <span className="text-xs">{rank}º lugar</span>
+                <span className="font-display text-xl leading-none">{rank}º</span>
+                <strong className={`font-display tabular-nums leading-none text-foreground ${rank === 1 ? "text-4xl" : "text-2xl"}`}>{p.score}</strong>
+                <span className="text-[0.625rem] font-bold uppercase tracking-wider text-muted-foreground">pontos</span>
               </div>
             </div>
           );
         })}
       </div>}
 
-      <div className="space-y-3">
-        {ranking.map((p) => {
+      <div className="space-y-2">
+        {ranking.map((p, index) => {
           const rank = getRank(p.score);
           const texto = analysis?.analises.find((a) => a.jogador_id === p.id)?.texto;
           return (
             <div
               key={p.id}
-              className={`ranking-row border p-4 ${rank === 1 ? "border-gold bg-card" : "border-border bg-card"}`}
+              data-first={rank === 1 ? "true" : "false"}
+              style={{ "--enter-index": Math.min(index, 10) } as CSSProperties}
+              className="ranking-row p-4"
             >
-              <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
-                <p className="min-w-0 text-balance-safe text-lg font-bold">
-                  {rank}º {p.nickname}
+              <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3">
+                <span className="rank-badge" data-place={rank <= 3 ? rank : undefined} aria-label={`${rank}º lugar`}>{rank}</span>
+                <p className={`min-w-0 text-balance-safe text-lg font-bold ${p.id === playerId ? "text-primary" : ""}`}>
+                  {p.nickname}{p.id === playerId && <span className="ml-1.5 text-xs font-semibold text-muted-foreground">(você)</span>}
                 </p>
-                <span className="shrink-0 font-display text-2xl tabular-nums text-primary">{p.score}</span>
+                <span className="shrink-0 font-display text-2xl tabular-nums text-foreground">{p.score}</span>
               </div>
               {texto && (
-                <p className="mt-2 break-words text-sm italic text-muted-foreground text-balance-safe">
+                <p className="mt-3 break-words border-l-2 border-primary/40 pl-3 text-sm italic text-muted-foreground text-balance-safe">
                   “{texto}”
                 </p>
               )}
