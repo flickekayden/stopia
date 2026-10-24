@@ -281,21 +281,24 @@ export function RoundBoard({
         </div>
       )}
 
-      <div className="space-y-1">
-        <div className="text-right text-sm font-medium tabular-nums text-muted-foreground" aria-hidden="true">{filledCount}/{round.categories.length} preenchidas</div>
+      <div className="space-y-2">
+        <div className="flex items-center justify-between gap-3" aria-hidden="true">
+          <span className="section-label">Respostas</span>
+          <span className="text-sm font-bold tabular-nums text-foreground">{filledCount}<span className="text-muted-foreground">/{round.categories.length} preenchidas</span></span>
+        </div>
         <progress aria-label="Progresso das respostas" className="answer-progress h-1.5 w-full" value={filledCount} max={round.categories.length || 1} />
       </div>
 
       {round.status === "answering" && stopCountdown !== null && stopCountdown > 0 && (
-        <div className="animate-scale-in rounded-2xl border-2 border-destructive bg-destructive/15 p-4 text-center" role="status" aria-live="assertive">
+        <div className="animate-scale-in rounded-2xl border border-destructive/70 bg-destructive/12 p-4 text-center" role="status" aria-live="assertive">
           <ShieldAlert className="mx-auto size-7 text-destructive" />
           <p className="mt-1 font-display text-2xl text-destructive">✋ @{round.stopped_by ?? "alguém"} gritou STOP!</p>
-          <p className="text-sm font-bold text-foreground">Respostas bloqueiam em {stopCountdown}s</p>
+          <p className="text-sm font-bold text-foreground">Respostas bloqueiam em <span className="tabular-nums">{stopCountdown}</span>s</p>
         </div>
       )}
 
       {showEveryoneFinished && (
-        <div className="animate-scale-in rounded-2xl border border-success bg-success/15 p-4 text-center" role="status" aria-live="polite">
+        <div className="animate-scale-in rounded-2xl border border-success/60 bg-success/12 p-4 text-center" role="status" aria-live="polite">
           <Rocket className="mx-auto size-7 text-success" />
           <p className="mt-1 font-display text-2xl text-success">🚀 Todos terminaram!</p>
         </div>
@@ -305,23 +308,23 @@ export function RoundBoard({
         {players.map((p) => (
           <span
             key={p.id}
-            className={`game-chip flex items-center gap-1 rounded-lg px-3 py-1 text-sm ${
+            className={`game-chip flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm font-medium transition-colors ${
               finishedIds.includes(p.id)
-                ? "bg-success/20 text-success"
-                : "bg-secondary text-muted-foreground"
+                ? "border-success/40 bg-success/12 text-success"
+                : "border-border bg-card text-muted-foreground"
             }`}
           >
-            {finishedIds.includes(p.id) && <Check className="size-3" />}
+            {finishedIds.includes(p.id) && <Check className="size-3.5" />}
             {p.nickname}
             <PlayerPresence player={p} />
           </span>
         ))}
       </div>
 
-      <div className="space-y-3">
+      <div className="space-y-2.5">
         {round.categories.map((category, index) => (
-          <div key={category} className="game-field rounded-lg border border-border bg-card p-3">
-            <label htmlFor={`answer-field-${index}`} className="flex items-start gap-2 text-sm font-semibold text-foreground"><span className="shrink-0 text-xs tabular-nums text-muted-foreground">{String(index + 1).padStart(2, "0")}</span><span className="text-balance-safe">{category}</span></label>
+          <div key={category} className="game-field" data-filled={(values[category] ?? "").trim() ? "true" : "false"}>
+            <label htmlFor={`answer-field-${index}`} className="flex items-center gap-2.5 text-sm font-bold text-foreground"><span className="field-index" aria-hidden="true">{(values[category] ?? "").trim() ? <Check className="size-3.5" /> : String(index + 1).padStart(2, "0")}</span><span className="text-balance-safe">{category}</span></label>
             <Input
               id={`answer-field-${index}`}
               ref={(input) => { answerInputs.current[index] = input; if (index === 0) firstAnswerInput.current = input; }}
