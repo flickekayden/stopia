@@ -5,18 +5,18 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex min-h-12 items-center justify-center gap-2 whitespace-normal rounded-lg text-sm font-semibold leading-snug cursor-pointer touch-manipulation transition-[background-color,color,border-color,box-shadow,transform] duration-150 active:scale-[0.98] motion-reduce:transition-none motion-reduce:active:scale-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50 disabled:cursor-not-allowed [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+  "inline-flex min-h-12 items-center justify-center gap-2 whitespace-normal rounded-xl text-sm font-semibold leading-snug cursor-pointer touch-manipulation select-none transition-[background-color,color,border-color,box-shadow,transform,opacity] duration-150 ease-out active:scale-[0.97] motion-reduce:transition-none motion-reduce:active:scale-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-45 disabled:saturate-50 disabled:cursor-not-allowed aria-busy:cursor-progress [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/90",
-        destructive: "bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90",
+        default: "bg-primary text-primary-foreground shadow-brand hover:brightness-105 active:brightness-95",
+        destructive: "bg-destructive text-destructive-foreground hover:brightness-105 active:brightness-95",
         outline:
-          "border border-input bg-transparent hover:bg-secondary hover:text-foreground",
-        secondary: "bg-secondary text-secondary-foreground hover:bg-surface-hover",
+          "border border-input bg-card/40 hover:border-muted-foreground/60 hover:bg-secondary hover:text-foreground",
+        secondary: "border border-border/60 bg-secondary text-secondary-foreground hover:bg-surface-hover",
         ghost: "hover:bg-secondary hover:text-foreground",
         segment: "bg-transparent text-muted-foreground hover:bg-secondary hover:text-foreground",
-        selected: "bg-primary/10 text-primary ring-1 ring-primary/30",
+        selected: "bg-primary/12 text-primary ring-1 ring-primary/40",
         link: "text-primary underline-offset-4 hover:underline",
       },
       size: {
