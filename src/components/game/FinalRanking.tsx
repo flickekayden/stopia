@@ -1,5 +1,5 @@
-import { Loader2, Share2, Trophy } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { Crown, Loader2, Share2, Trophy } from "lucide-react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 
 import { toast } from "sonner";
 import { useSound } from "@/components/SoundProvider";
