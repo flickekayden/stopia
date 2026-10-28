@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as JogosRouteImport } from './routes/jogos'
+import { Route as FestaCodeRouteImport } from './routes/festa.$code'
 import { Route as SalaCodeRouteImport } from './routes/sala.$code'
 
 const IndexRoute = IndexRouteImport.update({
@@ -23,6 +24,11 @@ const JogosRoute = JogosRouteImport.update({
   path: '/jogos',
   getParentRoute: () => rootRouteImport,
 } as any)
+const FestaCodeRoute = FestaCodeRouteImport.update({
+  id: '/festa/$code',
+  path: '/festa/$code',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SalaCodeRoute = SalaCodeRouteImport.update({
   id: '/sala/$code',
   path: '/sala/$code',
@@ -32,30 +38,34 @@ const SalaCodeRoute = SalaCodeRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/jogos': typeof JogosRoute
+  '/festa/$code': typeof FestaCodeRoute
   '/sala/$code': typeof SalaCodeRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/jogos': typeof JogosRoute
+  '/festa/$code': typeof FestaCodeRoute
   '/sala/$code': typeof SalaCodeRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/jogos': typeof JogosRoute
+  '/festa/$code': typeof FestaCodeRoute
   '/sala/$code': typeof SalaCodeRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/jogos' | '/sala/$code'
+  fullPaths: '/' | '/jogos' | '/festa/$code' | '/sala/$code'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/jogos' | '/sala/$code'
-  id: '__root__' | '/' | '/jogos' | '/sala/$code'
+  to: '/' | '/jogos' | '/festa/$code' | '/sala/$code'
+  id: '__root__' | '/' | '/jogos' | '/festa/$code' | '/sala/$code'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   JogosRoute: typeof JogosRoute
+  FestaCodeRoute: typeof FestaCodeRoute
   SalaCodeRoute: typeof SalaCodeRoute
 }
 
@@ -75,6 +85,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof JogosRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/festa/$code': {
+      id: '/festa/$code'
+      path: '/festa/$code'
+      fullPath: '/festa/$code'
+      preLoaderRoute: typeof FestaCodeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/sala/$code': {
       id: '/sala/$code'
       path: '/sala/$code'
@@ -88,6 +105,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   JogosRoute: JogosRoute,
+  FestaCodeRoute: FestaCodeRoute,
   SalaCodeRoute: SalaCodeRoute,
 }
 export const routeTree = rootRouteImport
