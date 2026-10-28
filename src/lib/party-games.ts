@@ -323,7 +323,7 @@ export function readPartyAdmin(raw: unknown): PartyAdminConfig {
   for (const game of PARTY_GAME_IDS) {
     const value = source[game];
     if (!value || typeof value !== "object") continue;
-    const entry = value as Record<string, unknown>;
+    const entry = value as { seconds?: unknown; tone?: unknown; events?: unknown };
     const out: PartyGameAdmin = {};
     const seconds = entry.seconds && typeof entry.seconds === "object" ? (entry.seconds as Record<string, unknown>) : {};
     for (const phase of GAME_PHASES[game]) {

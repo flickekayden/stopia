@@ -30,7 +30,7 @@ export function FinalRanking({
   restarting: boolean;
   onPlayAgain: () => void;
   /** Present only for the group-room host when this Stop match was opened from a group room. */
-  onSwitchGame?: () => void;
+  onSwitchGame?: (() => void) | undefined;
   switching?: boolean;
   /** Linked to a group room and this player is not its host. */
   waitingForGroupHost?: boolean;

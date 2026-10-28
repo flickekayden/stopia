@@ -110,7 +110,7 @@ export async function loadPartyAdmin(): Promise<PartyAdminConfig> {
   return value;
 }
 
-export async function savePartyAdmin(input: { token?: string; game: PartyGameId; config: unknown }) {
+export async function savePartyAdmin(input: { token?: string | undefined; game: PartyGameId; config: unknown }) {
   const { isDeveloper } = await import("./dev-session.server");
   if (!(await isDeveloper(input.token))) throw new Error("Só o desenvolvedor pode salvar estas configurações.");
   const current = await loadPartyAdmin().catch(() => ({}) as PartyAdminConfig);
@@ -195,7 +195,7 @@ async function uniqueCode() {
 
 /* ---------------------------------- Rooms --------------------------------- */
 
-export async function createPartyRoom(input: { game?: PartyGameId; nickname: string; sessionId: string }) {
+export async function createPartyRoom(input: { game?: PartyGameId | undefined; nickname: string; sessionId: string }) {
   const code = await uniqueCode();
   const { data: room, error } = await db()
     .from("party_rooms")
