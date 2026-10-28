@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { Check, Crown, EyeOff, Eye, Gavel, Loader2, RefreshCw, SkipForward, Sparkles, Trophy, Users } from "lucide-react";
+import { Check, Clock, Crown, EyeOff, Eye, Gavel, LayoutGrid, Loader2, LogOut, RefreshCw, SkipForward, Sparkles, Trophy, Users } from "lucide-react";
 
 import { PartyIcon } from "@/components/party/PartyIcon";
 import { RulesList } from "@/components/party/RulesList";
@@ -9,11 +9,16 @@ import { Textarea } from "@/components/ui/textarea";
 import type { PartyPlayer, PartyPrivateView, PartyRoom } from "@/hooks/use-party-room";
 import { rankPlayers } from "@/lib/ranking";
 import {
+  LOBBY_GAMES,
+  lobbyGameMeta,
+  missingPlayers,
   PARTY_GAMES,
   PARTY_ROUND_OPTIONS,
   PARTY_SKIP_OPTIONS,
   PARTY_TEXT_MAX,
   PHASE_LABELS,
+  type LobbyGameId,
+  type LobbyGameMeta,
   type PartyEntry,
   type PartyGameId,
   type PartyPhaseId,
@@ -42,6 +47,9 @@ export type PartyActions = {
   start: () => Promise<boolean>;
   restart: () => Promise<boolean>;
   updateSettings: (settings: Partial<PartySettings>) => Promise<boolean>;
+  select: (game: LobbyGameId) => Promise<boolean>;
+  replay: () => Promise<boolean>;
+  toLobby: () => Promise<boolean>;
 };
 
 function useNow(active: boolean) {
@@ -60,99 +68,201 @@ function nick(players: PartyPlayer[], id: string | undefined) {
 
 /* --------------------------------- Lobby ---------------------------------- */
 
-export function PartyLobby({ ctx, actions }: { ctx: PartyCtx; actions: PartyActions }) {
-  const meta = PARTY_GAMES[ctx.game];
-  const enough = ctx.players.length >= meta.minPlayers;
+/** Group lobby: nothing about a specific game is required until the host picks one. */
+export type LobbyCtx = {
+  room: PartyRoom;
+  players: PartyPlayer[];
+  me: PartyPlayer;
+  isHost: boolean;
+  selected: LobbyGameId | null;
+  settings: PartySettings;
+  busy: string | null;
+};
+
+function PlayersPanel({ players, me }: { players: PartyPlayer[]; me: PartyPlayer }) {
+  return (
+    <section className="party-panel" aria-labelledby="lobby-players">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <h2 id="lobby-players" className="text-lg font-bold">Galera na sala</h2>
+        <span className="rounded-full bg-secondary px-2.5 py-0.5 text-sm font-bold tabular-nums" aria-label={`${players.length} jogadores na sala`}>{players.length}</span>
+      </div>
+      <ul className="space-y-1">
+        {players.map((p) => (
+          <li key={p.id} className="flex items-center gap-3 border-b border-border/50 py-2.5 last:border-0">
+            <span className="party-icon size-10 font-display text-lg" aria-hidden="true">{p.nickname.charAt(0).toUpperCase()}</span>
+            <span className="min-w-0 flex-1">
+              <span className="block font-semibold text-balance-safe">{p.nickname}{p.id === me.id && <span className="text-muted-foreground"> (você)</span>}</span>
+              {p.is_host && <span className="inline-flex items-center gap-1 text-xs font-bold party-accent"><Crown className="size-3.5" aria-hidden="true" /> Mestre da sala</span>}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function GameMetaLine({ game }: { game: LobbyGameMeta }) {
+  return (
+    <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-semibold text-muted-foreground">
+      <span className="inline-flex items-center gap-1"><Users className="size-3.5" aria-hidden="true" /> {game.minPlayers}+</span>
+      <span className="inline-flex items-center gap-1"><Clock className="size-3.5" aria-hidden="true" /> {game.duration}</span>
+    </span>
+  );
+}
+
+function GamePicker({ ctx, actions }: { ctx: LobbyCtx; actions: PartyActions }) {
+  return (
+    <section className="space-y-3" aria-labelledby="lobby-pick">
+      <h2 id="lobby-pick" className="text-lg font-bold">Escolha o jogo</h2>
+      <div className="grid grid-cols-2 gap-2">
+        {LOBBY_GAMES.map((game, index) => {
+          const active = ctx.selected === game.id;
+          return (
+            <button
+              key={game.id}
+              type="button"
+              data-game={game.id}
+              aria-pressed={active}
+              disabled={ctx.busy !== null}
+              onClick={() => { if (!active) void actions.select(game.id); }}
+              className={cn(
+                "party-card flex min-h-36 flex-col items-start gap-2 p-3 text-left transition-transform active:scale-[0.98] disabled:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                active && "ring-2 ring-[var(--game-accent)]",
+              )}
+              style={{ "--enter-index": index } as CSSProperties}
+            >
+              <span className="party-icon size-10"><PartyIcon name={game.icon} className="size-5" /></span>
+              <span className="text-balance-safe font-bold leading-tight">{game.name}</span>
+              <span className="mt-auto"><GameMetaLine game={game} /></span>
+              {active && <span className="inline-flex items-center gap-1 text-xs font-bold party-accent"><Check className="size-3.5" aria-hidden="true" /> Escolhido</span>}
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function PartySettingsPanel({ ctx, actions, game }: { ctx: LobbyCtx; actions: PartyActions; game: PartyGameId }) {
   const { settings } = ctx;
   const option = (active: boolean) => (active ? "selected" : "secondary") as "selected" | "secondary";
-
+  if (!ctx.isHost) {
+    return (
+      <p className="party-panel text-center text-sm text-muted-foreground">
+        {settings.rounds} rodadas · IA {settings.ai && game !== "infiltrado" ? "ligada" : "desligada"}
+        {game === "roleta" ? ` · intensidade ${settings.intensity === "media" ? "média" : settings.intensity === "caotica" ? "caótica" : "leve"} · ${settings.skips} pulo(s)` : ""}
+      </p>
+    );
+  }
   return (
-    <div className="dock-clearance space-y-4">
-      <section className="party-prompt space-y-3">
-        <div className="flex items-start gap-3">
-          <span className="party-icon size-12"><PartyIcon name={meta.icon} className="size-6" /></span>
-          <div className="min-w-0">
-            <h2 className="text-balance-safe text-xl font-bold leading-tight">{meta.name}</h2>
-            <p className="mt-1 text-sm text-muted-foreground">{meta.description}</p>
-          </div>
-        </div>
-        <RulesList game={ctx.game} />
-      </section>
-
-      <section className="party-panel">
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <h2 className="text-lg font-bold">Jogadores</h2>
-          <span className="rounded-full bg-secondary px-2.5 py-0.5 text-sm font-bold tabular-nums">{ctx.players.length}</span>
-        </div>
-        <ul className="space-y-1">
-          {ctx.players.map((p) => (
-            <li key={p.id} className="flex items-center gap-3 border-b border-border/50 py-2.5 last:border-0">
-              <span className="party-icon size-10 font-display text-lg" aria-hidden="true">{p.nickname.charAt(0).toUpperCase()}</span>
-              <span className="min-w-0 flex-1">
-                <span className="block font-semibold text-balance-safe">{p.nickname}{p.id === ctx.me.id && <span className="text-muted-foreground"> (você)</span>}</span>
-                {p.is_host && <span className="inline-flex items-center gap-1 text-xs font-bold party-accent"><Crown className="size-3.5" aria-hidden="true" /> Mestre da sala</span>}
-              </span>
-            </li>
+    <section className="party-panel space-y-5">
+      <h2 className="text-lg font-bold">Configuração</h2>
+      <div>
+        <p className="mb-2 text-sm font-semibold text-muted-foreground">Rodadas</p>
+        <div className="grid grid-cols-3 gap-2">
+          {PARTY_ROUND_OPTIONS.map((n) => (
+            <Button key={n} variant={option(settings.rounds === n)} aria-label={`${n} rodadas`} aria-pressed={settings.rounds === n} disabled={ctx.busy !== null} onClick={() => void actions.updateSettings({ rounds: n })}>{n}</Button>
           ))}
-        </ul>
-        {!enough && <p className="mt-3 text-sm text-muted-foreground">Faltam {meta.minPlayers - ctx.players.length} jogador(es) para começar. Compartilhe o código!</p>}
-      </section>
-
-      {ctx.isHost ? (
-        <section className="party-panel space-y-5">
-          <h2 className="text-lg font-bold">Configuração</h2>
+        </div>
+      </div>
+      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4">
+        <div className="min-w-0">
+          <p className="font-semibold">IA no jogo</p>
+          <p className="text-sm text-muted-foreground">{game === "infiltrado" ? "O Infiltrado usa só a lista do jogo." : "Gera conteúdos novos e comenta os resultados. Sem IA, usa a lista do jogo."}</p>
+        </div>
+        <Switch aria-label="IA no jogo" checked={settings.ai} disabled={ctx.busy !== null || game === "infiltrado"} onCheckedChange={(ai) => void actions.updateSettings({ ai })} />
+      </div>
+      {game === "roleta" && (
+        <>
           <div>
-            <p className="mb-2 text-sm font-semibold text-muted-foreground">Rodadas</p>
+            <p className="mb-2 text-sm font-semibold text-muted-foreground">Intensidade</p>
             <div className="grid grid-cols-3 gap-2">
-              {PARTY_ROUND_OPTIONS.map((n) => (
-                <Button key={n} variant={option(settings.rounds === n)} aria-label={`${n} rodadas`} aria-pressed={settings.rounds === n} disabled={ctx.busy !== null} onClick={() => void actions.updateSettings({ rounds: n })}>{n}</Button>
+              {(["leve", "media", "caotica"] as const).map((value) => (
+                <Button key={value} variant={option(settings.intensity === value)} aria-pressed={settings.intensity === value} disabled={ctx.busy !== null} onClick={() => void actions.updateSettings({ intensity: value })}>
+                  {value === "leve" ? "Leve" : value === "media" ? "Média" : "Caótica"}
+                </Button>
               ))}
             </div>
           </div>
-          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4">
-            <div className="min-w-0">
-              <p className="font-semibold">IA no jogo</p>
-              <p className="text-sm text-muted-foreground">{ctx.game === "infiltrado" ? "O Infiltrado usa só a lista do jogo." : "Gera conteúdos novos e comenta os resultados. Sem IA, usa a lista do jogo."}</p>
+          <div>
+            <p className="mb-2 text-sm font-semibold text-muted-foreground">Pulos de desafio por partida</p>
+            <div className="grid grid-cols-3 gap-2">
+              {PARTY_SKIP_OPTIONS.map((n) => (
+                <Button key={n} variant={option(settings.skips === n)} aria-label={`${n} pulos`} aria-pressed={settings.skips === n} disabled={ctx.busy !== null} onClick={() => void actions.updateSettings({ skips: n })}>{n}</Button>
+              ))}
             </div>
-            <Switch aria-label="IA no jogo" checked={settings.ai} disabled={ctx.busy !== null || ctx.game === "infiltrado"} onCheckedChange={(ai) => void actions.updateSettings({ ai })} />
           </div>
-          {ctx.game === "roleta" && (
-            <>
-              <div>
-                <p className="mb-2 text-sm font-semibold text-muted-foreground">Intensidade</p>
-                <div className="grid grid-cols-3 gap-2">
-                  {(["leve", "media", "caotica"] as const).map((value) => (
-                    <Button key={value} variant={option(settings.intensity === value)} aria-pressed={settings.intensity === value} disabled={ctx.busy !== null} onClick={() => void actions.updateSettings({ intensity: value })}>
-                      {value === "leve" ? "Leve" : value === "media" ? "Média" : "Caótica"}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <p className="mb-2 text-sm font-semibold text-muted-foreground">Pulos de desafio por partida</p>
-                <div className="grid grid-cols-3 gap-2">
-                  {PARTY_SKIP_OPTIONS.map((n) => (
-                    <Button key={n} variant={option(settings.skips === n)} aria-label={`${n} pulos`} aria-pressed={settings.skips === n} disabled={ctx.busy !== null} onClick={() => void actions.updateSettings({ skips: n })}>{n}</Button>
-                  ))}
-                </div>
-              </div>
-            </>
-          )}
-        </section>
-      ) : (
-        <p className="party-panel text-center text-sm text-muted-foreground">
-          {settings.rounds} rodadas · IA {settings.ai && ctx.game !== "infiltrado" ? "ligada" : "desligada"}
-          {ctx.game === "roleta" ? ` · intensidade ${settings.intensity === "media" ? "média" : settings.intensity === "caotica" ? "caótica" : "leve"} · ${settings.skips} pulo(s)` : ""}
-        </p>
+        </>
       )}
+    </section>
+  );
+}
 
-      <div className="mobile-bottom-bar fixed inset-x-0 bottom-0 mx-auto w-full max-w-md border-t border-border bg-background/95 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] backdrop-blur">
-        {ctx.isHost ? (
-          <Button className="party-accent-button h-14 w-full text-lg font-bold shadow-none" disabled={!enough || ctx.busy !== null} aria-busy={ctx.busy === "start"} onClick={() => void actions.start()}>
-            {ctx.busy === "start" ? <><Loader2 className="animate-spin" /> Preparando a rodada…</> : enough ? "Começar partida" : `Mínimo de ${meta.minPlayers} jogadores`}
-          </Button>
+function SelectedGame({ ctx, actions, selected }: { ctx: LobbyCtx; actions: PartyActions; selected: LobbyGameId }) {
+  const meta = lobbyGameMeta(selected);
+  return (
+    <div data-game={selected} className="space-y-4">
+      <section className="party-prompt space-y-3" aria-live="polite">
+        <div className="flex items-start gap-3">
+          <span className="party-icon size-12"><PartyIcon name={meta.icon} className="size-6" /></span>
+          <div className="min-w-0">
+            <p className="section-label party-accent">Jogo escolhido</p>
+            <h2 className="text-balance-safe text-xl font-bold leading-tight">{meta.name}</h2>
+            <p className="mt-1 text-sm text-muted-foreground">{selected === "stop" ? meta.short : PARTY_GAMES[selected].description}</p>
+          </div>
+        </div>
+        {selected === "stop" ? (
+          <p className="text-sm text-muted-foreground">Ao começar, todo mundo entra junto numa sala de Stop. Categorias, letras e tempo da rodada são ajustados lá pelo mestre, como sempre.</p>
         ) : (
-          <p role="status" className="flex h-14 items-center justify-center gap-2 text-sm text-muted-foreground"><span className="size-2 rounded-full bg-primary motion-safe:animate-pulse" aria-hidden="true" /> Esperando o mestre começar…</p>
+          <RulesList game={selected} />
+        )}
+      </section>
+      {selected !== "stop" && <PartySettingsPanel ctx={ctx} actions={actions} game={selected} />}
+    </div>
+  );
+}
+
+export function PartyLobby({ ctx, actions }: { ctx: LobbyCtx; actions: PartyActions }) {
+  const selected = ctx.selected;
+  const meta = selected ? lobbyGameMeta(selected) : null;
+  const missing = selected ? missingPlayers(selected, ctx.players.length) : 0;
+
+  return (
+    <div className="dock-clearance space-y-4">
+      <PlayersPanel players={ctx.players} me={ctx.me} />
+
+      {ctx.isHost ? (
+        <GamePicker ctx={ctx} actions={actions} />
+      ) : !selected ? (
+        <section className="party-prompt space-y-4 text-center" role="status">
+          <span className="party-icon mx-auto size-14 motion-safe:animate-pulse"><Sparkles className="size-7" aria-hidden="true" /></span>
+          <div className="space-y-1">
+            <h2 className="text-xl font-bold">Aguardando o Mestre escolher o jogo...</h2>
+            <p className="text-sm text-muted-foreground">Enquanto isso, veja o que a galera pode jogar:</p>
+          </div>
+          <ul className="grid grid-cols-2 gap-2 text-left">
+            {LOBBY_GAMES.map((game) => (
+              <li key={game.id} data-game={game.id} className="flex items-center gap-2 rounded-lg bg-secondary/60 p-2 text-sm font-semibold">
+                <PartyIcon name={game.icon} className="size-4 shrink-0 party-accent" />
+                <span className="min-w-0 text-balance-safe leading-tight">{game.name}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      {selected && <SelectedGame ctx={ctx} actions={actions} selected={selected} />}
+
+      <div data-game={selected ?? undefined} className="mobile-bottom-bar fixed inset-x-0 bottom-0 mx-auto w-full max-w-md border-t border-border bg-background/95 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] backdrop-blur">
+        {ctx.isHost ? (
+          <div className="space-y-2">
+            {selected && missing > 0 && <p role="status" className="text-center text-sm text-muted-foreground">Necessário mínimo de {meta!.minPlayers} jogadores. Compartilhe o código!</p>}
+            <Button className="party-accent-button h-14 w-full text-lg font-bold shadow-none" disabled={!selected || missing > 0 || ctx.busy !== null} aria-busy={ctx.busy === "start"} onClick={() => void actions.start()}>
+              {ctx.busy === "start" ? <><Loader2 className="animate-spin" /> Preparando…</> : !selected ? "Escolha um jogo" : `Iniciar ${meta!.name}`}
+            </Button>
+          </div>
+        ) : (
+          <p role="status" className="flex h-14 items-center justify-center gap-2 text-sm text-muted-foreground"><span className="size-2 rounded-full bg-primary motion-safe:animate-pulse" aria-hidden="true" /> {selected ? "Esperando o mestre começar…" : "Aguardando o Mestre escolher o jogo..."}</p>
         )}
       </div>
     </div>
@@ -711,12 +821,19 @@ export function PartyFinal({ ctx, actions, onHub }: { ctx: PartyCtx; actions: Pa
         ))}
       </ol>
       <div className="mobile-bottom-bar fixed inset-x-0 bottom-0 mx-auto w-full max-w-md space-y-2 border-t border-border bg-background/95 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] backdrop-blur">
-        {ctx.isHost && (
-          <Button className="party-accent-button h-14 w-full text-lg font-bold shadow-none" disabled={ctx.busy !== null} aria-busy={ctx.busy === "restart"} onClick={() => void actions.restart()}>
-            {ctx.busy === "restart" ? <Loader2 className="animate-spin" /> : <RefreshCw />} Jogar de novo
-          </Button>
+        {ctx.isHost ? (
+          <div className="grid grid-cols-2 gap-2">
+            <Button className="party-accent-button h-14 text-base font-bold shadow-none" disabled={ctx.busy !== null} aria-busy={ctx.busy === "replay"} onClick={() => void actions.replay()}>
+              {ctx.busy === "replay" ? <Loader2 className="animate-spin" /> : <RefreshCw />} Jogar Novamente
+            </Button>
+            <Button variant="secondary" className="h-14 text-base font-bold" disabled={ctx.busy !== null} aria-busy={ctx.busy === "lobby"} onClick={() => void actions.toLobby()}>
+              {ctx.busy === "lobby" ? <Loader2 className="animate-spin" /> : <LayoutGrid />} Trocar de Jogo
+            </Button>
+          </div>
+        ) : (
+          <p role="status" className="flex min-h-12 items-center justify-center gap-2 text-sm text-muted-foreground"><span className="size-2 rounded-full bg-primary motion-safe:animate-pulse" aria-hidden="true" /> Aguardando decisão do Mestre...</p>
         )}
-        <Button variant="secondary" className="h-12 w-full" onClick={onHub}><Users /> Central de Jogos</Button>
+        <Button variant="ghost" className="h-12 w-full" onClick={onHub}><LogOut /> Sair da sala</Button>
       </div>
     </div>
   );
