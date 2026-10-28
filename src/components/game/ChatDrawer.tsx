@@ -76,24 +76,27 @@ export function ChatDrawer({
   const { play } = useSound();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [text, setText] = useState("");
-  const [bubblePos, setBubblePos] = useState<{ x: number; y: number } | null>(null);
-  const dragRef = useRef<{ dx: number; dy: number; sx: number; sy: number; moved: boolean } | null>(null);
-  useEffect(() => {
-    try {
-      const p = JSON.parse(window.localStorage.getItem("stop-chat-bubble-pos") ?? "null");
-      if (p && typeof p.x === "number" && typeof p.y === "number") {
-        const left = Math.max(0, (window.innerWidth - 448) / 2);
-        setBubblePos({ x: Math.max(left + 4, Math.min(p.x, left + Math.min(window.innerWidth, 448) - 60)), y: Math.min(p.y, window.innerHeight - 60) });
-      }
-    } catch { /* ignore */ }
-  }, []);
   const [sending, setSending] = useState(false);
   const [historyError, setHistoryError] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(true);
   const sendInFlight = useRef(false);
   const [unread, setUnread] = useState(0);
-  const [roundSlot, setRoundSlot] = useState<HTMLElement | null>(null);
-  useEffect(() => { setRoundSlot(locked ? document.getElementById("round-chat-slot") : null); }, [locked]);
+  // The launcher always lives in the visible screen header; wait for lazily rendered headers to mount.
+  const [slot, setSlot] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    const find = () => {
+      const element = document.getElementById(slotId);
+      setSlot((current) => (current === element ? current : element));
+      return element;
+    };
+    if (find()) return;
+    const observer = new MutationObserver(() => { if (find()) observer.disconnect(); });
+    observer.observe(document.body, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  }, [slotId]);
+  useEffect(() => {
+    if (slot && !slot.isConnected) setSlot(null);
+  });
   const [lastIncoming, setLastIncoming] = useState<{ playerId: string; content: string } | null>(null);
   const [keyboardInset, setKeyboardInset] = useState(0);
   const openRef = useRef(open);
