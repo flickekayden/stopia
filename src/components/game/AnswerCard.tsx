@@ -132,7 +132,7 @@ export const AnswerCard = memo(function AnswerCard({
             type="button"
             variant="ghost"
             size="sm"
-            className="justify-start px-0 text-muted-foreground"
+            className="justify-start whitespace-nowrap px-0 text-muted-foreground"
             disabled={loading}
             onClick={(event) => {
               event.stopPropagation();
@@ -151,7 +151,7 @@ export const AnswerCard = memo(function AnswerCard({
               {explanation}
             </p>
           )}
-          {onQuote && <Button type="button" variant="ghost" size="sm" className="justify-start px-0 text-muted-foreground" onClick={(event) => { event.stopPropagation(); onQuote(data); }}><MessageCircle /> Reagir / comentar</Button>}
+          {onQuote && <Button type="button" variant="ghost" size="sm" className="justify-start whitespace-nowrap px-0 text-muted-foreground" onClick={(event) => { event.stopPropagation(); onQuote(data); }}><MessageCircle /> Reagir / comentar</Button>}
         </div>
       )}
       {onQuote && compact && (
