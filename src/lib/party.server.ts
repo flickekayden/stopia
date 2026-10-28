@@ -524,8 +524,9 @@ async function syncSubmitted(roomId: string) {
     const eligibleNow = (state.eligible ?? []).filter((id) => present.has(id));
     const submitted = (subs ?? []).map((s) => s.player_id).filter((id) => eligibleNow.includes(id));
     if (eligibleNow.every((id) => submitted.includes(id))) {
-      await advance(room);
-      return;
+      // A concurrent submit may have bumped the version first; retry with fresh state instead of stalling.
+      if (await advance(room)) return;
+      continue;
     }
     const same = JSON.stringify([...(state.submitted ?? [])].sort()) === JSON.stringify([...submitted].sort());
     if (same) return;
@@ -563,7 +564,15 @@ function targetVotes(subs: { player_id: string; payload: PartyMine }[]) {
   return votes;
 }
 
-async function advance(room: RoomRow) {
+/** Returns true when this call (or a concurrent one) moved the room past the given phase. */
+async function advance(room: RoomRow): Promise<boolean> {
+  const moved = await advanceOnce(room);
+  if (moved) return true;
+  const fresh = await loadRoom(room.id);
+  return fresh.phase !== room.phase || fresh.round_number !== room.round_number;
+}
+
+async function advanceOnce(room: RoomRow): Promise<boolean> {
   const game = gameOf(room);
   const phase = room.phase as PartyPhaseId;
   const state = readPublicState(room.public_state);
@@ -575,15 +584,15 @@ async function advance(room: RoomRow) {
   const subs = await submissionsFor(room, phase);
   const nickname = (id: string | undefined) => players.find((p) => p.id === id)?.nickname ?? "Alguém";
 
-  const toPhase = (next: PartyPhaseId, extra: PartyPublicState) =>
-    guardedUpdate(room, {
+  const toPhase = async (next: PartyPhaseId, extra: PartyPublicState) =>
+    Boolean(await guardedUpdate(room, {
       phase: next,
       phase_started_at: new Date().toISOString(),
       phase_ends_at: deadline(next),
       public_state: asJson({ ...state, ...extra, submitted: [] }),
-    });
+    }));
 
-  const reveal = async (results: Record<string, unknown>, deltas: Deltas, comment: (() => Promise<string>) | null) => {
+  const reveal = async (results: PartyResults, deltas: Deltas, comment: (() => Promise<string>) | null): Promise<boolean> => {
     const ai = comment && settings.ai ? { status: "pending" as const } : { status: "off" as const };
     const updated = await guardedUpdate(room, {
       phase: "reveal",
@@ -591,7 +600,8 @@ async function advance(room: RoomRow) {
       phase_ends_at: null,
       public_state: asJson({ ...state, submitted: [], results, deltas, scores: addScores(state.scores ?? {}, deltas), ai }),
     });
-    if (!updated || !comment || !settings.ai) return;
+    if (!updated) return false;
+    if (!comment || !settings.ai) return true;
     let aiState: PartyPublicState["ai"];
     try {
       const text = await comment();
@@ -600,6 +610,7 @@ async function advance(room: RoomRow) {
       aiState = { status: "failed" };
     }
     await guardedUpdate(updated, { public_state: asJson({ ...readPublicState(updated.public_state), ai: aiState }) });
+    return true;
   };
 
   const ai = () => import("./party-ai.server");
