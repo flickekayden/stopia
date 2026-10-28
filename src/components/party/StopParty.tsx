@@ -345,7 +345,11 @@ function StopBoard({ ctx, actions }: { ctx: PartyCtx; actions: PartyActions }) {
         </div>
         <div className="min-w-0 flex-1">
           <p className="section-label">Rodada <span className="tabular-nums text-foreground">{round}</span> de {ctx.settings.rounds}</p>
-          <p className="truncate text-xs font-semibold text-muted-foreground">{STOP_SCORING_LABELS[ctx.settings.scoring].name} · IA {STOP_INTENSITY_LABELS[ctx.settings.aiIntensity].name}</p>
+          {stopBy && !evaluating ? (
+            <p className="truncate text-xs font-bold text-destructive" role="status">✋ STOP de @{nick(ctx.players, stopBy)}</p>
+          ) : (
+            <p className="truncate text-xs font-semibold text-muted-foreground">{STOP_SCORING_LABELS[ctx.settings.scoring].name} · IA {STOP_INTENSITY_LABELS[ctx.settings.aiIntensity].name}</p>
+          )}
         </div>
         {secondsLeft !== null && !evaluating && (
           <p role="timer" aria-label={`${secondsLeft} segundos restantes`} data-state={secondsLeft <= 10 ? "critical" : secondsLeft <= 30 ? "low" : "normal"} className="round-timer text-3xl">
