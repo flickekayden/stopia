@@ -81,22 +81,18 @@ export function ChatDrawer({
   const [historyLoading, setHistoryLoading] = useState(true);
   const sendInFlight = useRef(false);
   const [unread, setUnread] = useState(0);
-  // The launcher always lives in the visible screen header; wait for lazily rendered headers to mount.
+  // The launcher always lives in the visible screen header; follow it as lazily rendered headers mount and unmount.
   const [slot, setSlot] = useState<HTMLElement | null>(null);
   useEffect(() => {
     const find = () => {
       const element = document.getElementById(slotId);
       setSlot((current) => (current === element ? current : element));
-      return element;
     };
-    if (find()) return;
-    const observer = new MutationObserver(() => { if (find()) observer.disconnect(); });
+    find();
+    const observer = new MutationObserver(find);
     observer.observe(document.body, { childList: true, subtree: true });
     return () => observer.disconnect();
   }, [slotId]);
-  useEffect(() => {
-    if (slot && !slot.isConnected) setSlot(null);
-  });
   const [lastIncoming, setLastIncoming] = useState<{ playerId: string; content: string } | null>(null);
   const [keyboardInset, setKeyboardInset] = useState(0);
   const openRef = useRef(open);
