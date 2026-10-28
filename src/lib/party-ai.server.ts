@@ -4,6 +4,19 @@
  * Every caller has a deterministic fallback, so AI failures never corrupt a match.
  */
 import { generateJsonGemini } from "./ai.server";
+import type { PartyTone } from "./party-games";
+
+const TONES: Record<PartyTone, string> = {
+  padrao: "",
+  leve: " Tom definido pelo administrador: leve e carinhoso, sem humilhar ninguém.",
+  acido: " Tom definido pelo administrador: ácido e bem sarcástico, mas sem ofender.",
+  teatral: " Tom definido pelo administrador: teatral, dramático e exagerado.",
+};
+
+/** Optional developer-chosen tone; it only changes style, never rules, votes or scores. */
+function toneLine(tone?: PartyTone) {
+  return tone ? TONES[tone] ?? "" : "";
+}
 
 const SAFETY = [
   "Conteúdo 100% fictício e de brincadeira entre amigos, em português do Brasil.",
@@ -24,10 +37,10 @@ function clean(value: unknown, max: number) {
   return typeof value === "string" ? value.replace(/\s+/g, " ").trim().slice(0, max) : "";
 }
 
-export async function aiTribunalCase(defendant: string, previous: string[]) {
+export async function aiTribunalCase(defendant: string, previous: string[], tone?: PartyTone) {
   const result = await withTimeout(
     generateJsonGemini<{ titulo: string; acusacao: string }>({
-      instructions: `Você cria casos para o jogo "Tribunal dos Amigos": uma acusação fictícia, absurda e cotidiana contra um amigo. ${SAFETY} A acusação tem no máximo 25 palavras e cita o réu pelo apelido.`,
+      instructions: `Você cria casos para o jogo "Tribunal dos Amigos": uma acusação fictícia, absurda e cotidiana contra um amigo. ${SAFETY} A acusação tem no máximo 25 palavras e cita o réu pelo apelido.${toneLine(tone)}`,
       input: JSON.stringify({ reu: defendant, evitar_parecidos_com: previous.slice(-10) }),
       schemaName: "tribunal_case",
       schema: { type: "object", additionalProperties: false, required: ["titulo", "acusacao"], properties: { titulo: { type: "string" }, acusacao: { type: "string" } } },
@@ -48,9 +61,9 @@ export async function aiTribunalVerdict(input: {
   veredito: "culpado" | "inocente";
   votos_culpado: number;
   votos_inocente: number;
-}) {
+}, tone?: PartyTone) {
   const result = await generateJsonGemini<{ sentenca: string }>({
-    instructions: `Você é o Juiz do "Tribunal dos Amigos", sarcástico e teatral. O júri já decidiu o veredito; você NÃO pode mudá-lo, apenas anunciá-lo com uma sentença cômica e uma "pena" fictícia e inofensiva. ${SAFETY} Máximo de 45 palavras.`,
+    instructions: `Você é o Juiz do "Tribunal dos Amigos", sarcástico e teatral. O júri já decidiu o veredito; você NÃO pode mudá-lo, apenas anunciá-lo com uma sentença cômica e uma "pena" fictícia e inofensiva. ${SAFETY} Máximo de 45 palavras.${toneLine(tone)}`,
     input: JSON.stringify(input),
     schemaName: "tribunal_verdict",
     schema: { type: "object", additionalProperties: false, required: ["sentenca"], properties: { sentenca: { type: "string" } } },
@@ -58,10 +71,10 @@ export async function aiTribunalVerdict(input: {
   return clean(result.sentenca, 400);
 }
 
-export async function aiAutorPrompt(previous: string[]) {
+export async function aiAutorPrompt(previous: string[], tone?: PartyTone) {
   const result = await withTimeout(
     generateJsonGemini<{ pergunta: string }>({
-      instructions: `Você cria perguntas para o jogo "Quem Escreveu Essa Desgraça?": perguntas abertas e engraçadas que rendem respostas criativas e curtas. ${SAFETY} Máximo de 20 palavras.`,
+      instructions: `Você cria perguntas para o jogo "Quem Escreveu Essa Desgraça?": perguntas abertas e engraçadas que rendem respostas criativas e curtas. ${SAFETY} Máximo de 20 palavras.${toneLine(tone)}`,
       input: JSON.stringify({ evitar_parecidas_com: previous.slice(-10) }),
       schemaName: "autor_prompt",
       schema: { type: "object", additionalProperties: false, required: ["pergunta"], properties: { pergunta: { type: "string" } } },
@@ -73,9 +86,9 @@ export async function aiAutorPrompt(previous: string[]) {
   return text;
 }
 
-export async function aiAutorComment(input: { pergunta: string; respostas: { texto: string; autor: string; quantos_adivinharam_o_autor: number }[] }) {
+export async function aiAutorComment(input: { pergunta: string; respostas: { texto: string; autor: string; quantos_adivinharam_o_autor: number }[] }, tone?: PartyTone) {
   const result = await generateJsonGemini<{ comentario: string }>({
-    instructions: `Você é o apresentador debochado do jogo "Quem Escreveu Essa Desgraça?". Comente a rodada em tom de zoeira leve, elegendo a resposta mais "desgraçada". Não altere pontos. ${SAFETY} Máximo de 45 palavras.`,
+    instructions: `Você é o apresentador debochado do jogo "Quem Escreveu Essa Desgraça?". Comente a rodada em tom de zoeira leve, elegendo a resposta mais "desgraçada". Não altere pontos. ${SAFETY} Máximo de 45 palavras.${toneLine(tone)}`,
     input: JSON.stringify(input),
     schemaName: "autor_comment",
     schema: { type: "object", additionalProperties: false, required: ["comentario"], properties: { comentario: { type: "string" } } },
@@ -83,10 +96,10 @@ export async function aiAutorComment(input: { pergunta: string; respostas: { tex
   return clean(result.comentario, 400);
 }
 
-export async function aiDebateTopic(previous: string[]) {
+export async function aiDebateTopic(previous: string[], tone?: PartyTone) {
   const result = await withTimeout(
     generateJsonGemini<{ tema: string; lado_a: string; lado_b: string }>({
-      instructions: `Você cria dilemas para o jogo "Debate Impossível": um tema absurdo e dois lados opostos, ambos defensáveis de forma cômica. ${SAFETY} Tema com até 8 palavras; cada lado com até 12 palavras.`,
+      instructions: `Você cria dilemas para o jogo "Debate Impossível": um tema absurdo e dois lados opostos, ambos defensáveis de forma cômica. ${SAFETY} Tema com até 8 palavras; cada lado com até 12 palavras.${toneLine(tone)}`,
       input: JSON.stringify({ evitar_parecidos_com: previous.slice(-10) }),
       schemaName: "debate_topic",
       schema: { type: "object", additionalProperties: false, required: ["tema", "lado_a", "lado_b"], properties: { tema: { type: "string" }, lado_a: { type: "string" }, lado_b: { type: "string" } } },
@@ -100,9 +113,9 @@ export async function aiDebateTopic(previous: string[]) {
   return { title, sideA, sideB };
 }
 
-export async function aiDebateComment(input: { tema: string; lado_a: string; lado_b: string; argumentos: { lado: string; autor: string; texto: string; votos: number }[] }) {
+export async function aiDebateComment(input: { tema: string; lado_a: string; lado_b: string; argumentos: { lado: string; autor: string; texto: string; votos: number }[] }, tone?: PartyTone) {
   const result = await generateJsonGemini<{ comentario: string }>({
-    instructions: `Você é o mediador irônico do "Debate Impossível". Comente o debate destacando o argumento mais cara de pau. A votação já definiu o resultado; não mude pontos. ${SAFETY} Máximo de 45 palavras.`,
+    instructions: `Você é o mediador irônico do "Debate Impossível". Comente o debate destacando o argumento mais cara de pau. A votação já definiu o resultado; não mude pontos. ${SAFETY} Máximo de 45 palavras.${toneLine(tone)}`,
     input: JSON.stringify(input),
     schemaName: "debate_comment",
     schema: { type: "object", additionalProperties: false, required: ["comentario"], properties: { comentario: { type: "string" } } },
@@ -110,11 +123,11 @@ export async function aiDebateComment(input: { tema: string; lado_a: string; lad
   return clean(result.comentario, 400);
 }
 
-export async function aiRoletaChallenge(intensity: "leve" | "media" | "caotica", previous: string[]) {
+export async function aiRoletaChallenge(intensity: "leve" | "media" | "caotica", previous: string[], tone?: PartyTone) {
   const tone = intensity === "leve" ? "bem leve e fofo" : intensity === "media" ? "engraçado e criativo" : "caótico e absurdo, porém inofensivo";
   const result = await withTimeout(
     generateJsonGemini<{ titulo: string; desafio: string }>({
-      instructions: `Você cria desafios para a "Roleta do Caos". O desafio é cumprido POR ESCRITO no celular, em uma resposta curta. Tom: ${tone}. ${SAFETY} Nunca peça informações pessoais, fotos, contato com terceiros ou ações físicas. Título com até 4 palavras; desafio com até 25 palavras.`,
+      instructions: `Você cria desafios para a "Roleta do Caos". O desafio é cumprido POR ESCRITO no celular, em uma resposta curta. Tom: ${tone}. ${SAFETY} Nunca peça informações pessoais, fotos, contato com terceiros ou ações físicas. Título com até 4 palavras; desafio com até 25 palavras.${toneLine(tone)}`,
       input: JSON.stringify({ evitar_parecidos_com: previous.slice(-10) }),
       schemaName: "roleta_challenge",
       schema: { type: "object", additionalProperties: false, required: ["titulo", "desafio"], properties: { titulo: { type: "string" }, desafio: { type: "string" } } },
