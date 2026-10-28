@@ -57,7 +57,10 @@ function Home() {
   const navigate = useNavigate();
   const { play } = useSound();
   const router = useRouter();
-  const { rooms, developerUnlocked } = Route.useLoaderData();
+  // Loader data can be briefly missing during hot reloads or a failed room-list request; show an empty list instead of crashing.
+  const loaded = Route.useLoaderData() as Awaited<ReturnType<typeof listRooms>> | undefined;
+  const rooms = loaded?.rooms ?? [];
+  const developerUnlocked = loaded?.developerUnlocked ?? false;
   const create = useServerFn(createRoom);
   const join = useServerFn(joinRoom);
   const unlock = useServerFn(unlockDeveloper);
