@@ -505,14 +505,14 @@ function RoomPage() {
           isHost={isHost}
           onStop={handleStop}
         />
-        locked={chatLocked}
-        slotId={onRoundBoard ? "round-chat-slot" : "room-chat-slot"}
+      )}
       </Suspense>
       <ChatDrawer
         roomId={room.id}
         playerId={me.id}
         players={players}
         locked={chatLocked}
+        slotId={onRoundBoard ? "round-chat-slot" : "room-chat-slot"}
         voiceControls={currentRound?.status === "results" && room.status === "playing"}
         open={chatOpen}
         quote={chatQuote}
