@@ -99,3 +99,9 @@
 - [x] Sem sobreposição: sair, chat, admin e som no topo
 - [x] Chat fixo no cabeçalho em todas as telas
 - [x] Revisar telas no celular (largura, rodapé, placar)
+
+## Stop nativo na sala da galera
+- [x] Stop roda dentro de /festa/$code, sem sala separada
+- [x] Mestre define pontuação, intensidade da IA, rodadas, tempo e categorias
+- [x] Pontuação e sarcasmo saem do painel de desenvolvedor
+- [x] Testes e partida real com dois jogadores (3 rodadas, STOP, pódio, Trocar de Jogo)

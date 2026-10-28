@@ -1,4 +1,5 @@
-/** Browser-safe catalogue and shared types for the party mini-games (Stop stays in its own modules). */
+/** Browser-safe catalogue and shared types for the group-room games (Stop included as a native group game). */
+import { DEFAULT_CATEGORIES } from "./game";
 
 export type PartyGameId = "tribunal" | "autor" | "infiltrado" | "debate" | "roleta";
 
@@ -14,6 +15,7 @@ export type PartyPhaseId =
   | "vote"
   | "guess"
   | "last_guess"
+  | "evaluating"
   | "reveal"
   | "final";
 
@@ -109,26 +111,115 @@ export const PARTY_GAMES: Record<PartyGameId, PartyGameMeta> = {
   },
 };
 
+/* Stop inside the group room: the host sets these official match rules in the lobby. */
+export type StopScoring = "fixed" | "free";
+export type StopIntensity = "leve" | "padrao" | "acida";
+export const STOP_SCORINGS: readonly StopScoring[] = ["fixed", "free"];
+export const STOP_INTENSITIES: readonly StopIntensity[] = ["leve", "padrao", "acida"];
+export const STOP_SCORING_LABELS: Record<StopScoring, { name: string; detail: string }> = {
+  fixed: { name: "Clássico", detail: "0 a 20 em passos de 5" },
+  free: { name: "Livre & Criativo", detail: "0 a 20 contínuo" },
+};
+export const STOP_INTENSITY_LABELS: Record<StopIntensity, { name: string; detail: string }> = {
+  leve: { name: "Leve", detail: "Amigável" },
+  padrao: { name: "Equilibrada", detail: "Zoeira" },
+  acida: { name: "Sem Piedade", detail: "Ácida" },
+};
+/** Sarcasm level (1–10) the Stop judge receives for each intensity. */
+export const STOP_INTENSITY_SARCASM: Record<StopIntensity, number> = { leve: 2, padrao: 6, acida: 10 };
+export const STOP_SECONDS_OPTIONS = [60, 90, 120, 180] as const;
+export const STOP_SECONDS_MIN = 60;
+export const STOP_SECONDS_MAX = 180;
+export const STOP_CATEGORY_MAX_LENGTH = 160;
+export const STOP_CATEGORY_LIMIT = 250;
+export const STOP_ANSWER_MAX = 80;
+
 export type PartySettings = {
   rounds: number;
   ai: boolean;
   intensity: "leve" | "media" | "caotica";
   skips: number;
+  /** Stop only. */
+  stopSeconds: number;
+  scoring: StopScoring;
+  aiIntensity: StopIntensity;
+  categories: string[];
 };
 
-export const DEFAULT_PARTY_SETTINGS: PartySettings = { rounds: 5, ai: true, intensity: "media", skips: 1 };
+export const DEFAULT_PARTY_SETTINGS: PartySettings = {
+  rounds: 5,
+  ai: true,
+  intensity: "media",
+  skips: 1,
+  stopSeconds: 90,
+  scoring: "fixed",
+  aiIntensity: "padrao",
+  categories: [...DEFAULT_CATEGORIES],
+};
 export const PARTY_ROUND_OPTIONS = [3, 5, 8] as const;
 export const PARTY_SKIP_OPTIONS = [0, 1, 3] as const;
 export const PARTY_TEXT_MAX = 220;
 
+/** Trimmed, de-duplicated (case-insensitive) category list; falls back to the defaults when empty. */
+export function readStopCategories(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [...DEFAULT_CATEGORIES];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const item of raw) {
+    if (typeof item !== "string") continue;
+    const value = item.replace(/\s+/g, " ").trim().slice(0, STOP_CATEGORY_MAX_LENGTH);
+    const key = value.toLocaleLowerCase("pt-BR");
+    if (!value || seen.has(key)) continue;
+    seen.add(key);
+    out.push(value);
+    if (out.length >= STOP_CATEGORY_LIMIT) break;
+  }
+  return out.length > 0 ? out : [...DEFAULT_CATEGORIES];
+}
+
 export function readPartySettings(raw: unknown): PartySettings {
   const value = (raw && typeof raw === "object" ? raw : {}) as Partial<PartySettings>;
+  const seconds = Number(value.stopSeconds);
   return {
     rounds: PARTY_ROUND_OPTIONS.includes(value.rounds as 3) ? (value.rounds as number) : DEFAULT_PARTY_SETTINGS.rounds,
     ai: typeof value.ai === "boolean" ? value.ai : DEFAULT_PARTY_SETTINGS.ai,
     intensity: value.intensity === "leve" || value.intensity === "caotica" || value.intensity === "media" ? value.intensity : DEFAULT_PARTY_SETTINGS.intensity,
     skips: PARTY_SKIP_OPTIONS.includes(value.skips as 0) ? (value.skips as number) : DEFAULT_PARTY_SETTINGS.skips,
+    stopSeconds: Number.isFinite(seconds) && value.stopSeconds !== null && value.stopSeconds !== undefined
+      ? Math.min(STOP_SECONDS_MAX, Math.max(STOP_SECONDS_MIN, Math.round(seconds)))
+      : DEFAULT_PARTY_SETTINGS.stopSeconds,
+    scoring: STOP_SCORINGS.includes(value.scoring as StopScoring) ? (value.scoring as StopScoring) : DEFAULT_PARTY_SETTINGS.scoring,
+    aiIntensity: STOP_INTENSITIES.includes(value.aiIntensity as StopIntensity) ? (value.aiIntensity as StopIntensity) : DEFAULT_PARTY_SETTINGS.aiIntensity,
+    categories: readStopCategories(value.categories),
   };
+}
+
+/** Keeps only this round's categories, trimmed and capped; anything else a client sends is dropped. */
+export function sanitizeStopAnswers(raw: unknown, categories: readonly string[]): Record<string, string> {
+  const source = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  const out: Record<string, string> = {};
+  for (const category of categories) {
+    const value = source[category];
+    out[category] = typeof value === "string" ? value.replace(/\s+/g, " ").trim().slice(0, STOP_ANSWER_MAX) : "";
+  }
+  return out;
+}
+
+/** STOP! is only allowed once every category of the round has an answer. */
+export function stopAnswersComplete(answers: Record<string, string>, categories: readonly string[]) {
+  return categories.length > 0 && categories.every((category) => (answers[category] ?? "").trim().length > 0);
+}
+
+export type StopJudgedAnswer = { categoria: string; jogador_id: string; resposta: string; pontos: number; comentario: string };
+
+/** Round points per player: the sum of the judge's points across categories. */
+export function stopRoundDeltas(results: readonly StopJudgedAnswer[]) {
+  const deltas: Record<string, number> = {};
+  for (const row of results) {
+    if (!row.pontos) continue;
+    deltas[row.jogador_id] = (deltas[row.jogador_id] ?? 0) + row.pontos;
+  }
+  return deltas;
 }
 
 export type PartyPrompt = {
@@ -164,6 +255,8 @@ export type PartyResults = {
   sideTotals?: { A: number; B: number };
   winnerSide?: "A" | "B" | null;
   multiplier?: number;
+  /** Stop: the judge's result for every player x category of the round. */
+  stop?: StopJudgedAnswer[];
 };
 
 /** What the server reveals to one specific, session-validated player. */
@@ -175,7 +268,7 @@ export type PartyPrivateViewData = {
 };
 
 /** Shape of one player's stored submission for a phase. */
-export type PartyMine = { text?: string; target?: string; verdict?: string; guesses?: Record<string, string> };
+export type PartyMine = { text?: string; target?: string; verdict?: string; guesses?: Record<string, string>; answers?: Record<string, string>; done?: boolean };
 
 /** Everything here is readable by every client in realtime: never put secrets in it. */
 export type PartyPublicState = {
@@ -191,8 +284,19 @@ export type PartyPublicState = {
   scores?: Record<string, number>;
   ai?: PartyAiState;
   skipsLeft?: number;
-  /** Code of the Stop room the group is playing right now (public: Stop codes are shareable). */
+  /** Stop round: letter and categories are public; answers stay in party_submissions until the judge runs. */
+  stop?: StopRoundState;
+  /** DEPRECATED: Stop used to run in a separate linked room; kept so old links still read. */
   stopCode?: string;
+};
+
+export type StopRoundState = {
+  letter: string;
+  categories: string[];
+  /** Server-issued start (after the 3-second countdown). */
+  startsAt: string;
+  stopBy?: string;
+  stopAt?: string;
 };
 
 export function readPublicState(raw: unknown): PartyPublicState {
@@ -209,6 +313,7 @@ export const PHASE_LABELS: Record<PartyPhaseId, string> = {
   vote: "Votação",
   guess: "Quem escreveu?",
   last_guess: "Última chance do infiltrado",
+  evaluating: "A IA está julgando",
   reveal: "Resultado",
   final: "Fim de jogo",
 };
@@ -264,6 +369,13 @@ export const STOP_LOBBY_META: LobbyGameMeta = {
   duration: "≈ 15 min",
   icon: "stop",
 };
+
+export const STOP_RULES = [
+  "Cada rodada sorteia uma letra (sem repetir na partida) e até 8 categorias, priorizando as que ainda não saíram.",
+  "Escreva uma resposta com a letra para cada categoria antes do tempo acabar.",
+  "Quem preencher tudo pode gritar STOP!: as respostas de todo mundo travam em 3 segundos.",
+  "O juiz de IA avalia na pontuação e na intensidade escolhidas pelo mestre, e os pontos vão para o placar da sala.",
+];
 
 const DURATIONS: Record<PartyGameId, string> = {
   tribunal: "≈ 15 min",

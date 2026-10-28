@@ -27,6 +27,10 @@ export const updatePartySettings = createServerFn({ method: "POST" })
           ai: z.boolean().optional(),
           intensity: z.enum(["leve", "media", "caotica"]).optional(),
           skips: z.number().int().optional(),
+          stopSeconds: z.number().int().optional(),
+          scoring: z.enum(["fixed", "free"]).optional(),
+          aiIntensity: z.enum(["leve", "padrao", "acida"]).optional(),
+          categories: z.array(z.string().max(160)).min(1).max(250).optional(),
         }),
       })
       .parse(input),
@@ -78,9 +82,9 @@ export const replayPartyGame = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => z.object(session).parse(input))
   .handler(async ({ data }) => (await server()).replayPartyGame(data));
 
-export const linkPartyStop = createServerFn({ method: "POST" })
-  .inputValidator((input: unknown) => z.object({ ...session, stopCode: z.string().trim().length(4), stopPlayerId: z.string().uuid() }).parse(input))
-  .handler(async ({ data }) => (await server()).linkPartyStop(data));
+export const stopPartyRound = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => z.object({ ...session, round: z.number().int().min(1), answers: z.record(z.string(), z.string().max(400)) }).parse(input))
+  .handler(async ({ data }) => (await server()).stopPartyRound(data));
 
 /** Per-game developer settings (timings, AI tone, chaos events); not secret, read by the admin panel. */
 export const getPartyAdmin = createServerFn({ method: "GET" }).handler(async () => (await server()).loadPartyAdmin());

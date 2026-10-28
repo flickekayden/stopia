@@ -8,7 +8,8 @@ import { createHash, randomUUID } from "node:crypto";
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import type { Json, Tables } from "@/integrations/supabase/types";
-import { generateRoomCode } from "./game";
+import { MAX_CATEGORIES_PER_ROUND, generateRoomCode, pickCategories, pickLetter } from "./game";
+import { ROUND_COUNTDOWN_MS } from "./round-pacing";
 import {
   addScores,
   assignSides,
@@ -27,6 +28,11 @@ import {
 import {
   FIRST_PHASE,
   PARTY_GAMES,
+  STOP_INTENSITY_SARCASM,
+  lobbyGameMeta,
+  sanitizeStopAnswers,
+  stopAnswersComplete,
+  stopRoundDeltas,
   PARTY_GAME_IDS,
   PARTY_TEXT_MAX,
   PHASE_SECONDS,
@@ -46,6 +52,7 @@ import {
   type PartyResults,
   type PartyPublicState,
   type PartySettings,
+  type StopRoundState,
 } from "./party-games";
 import {
   AUTOR_PROMPTS,
@@ -71,13 +78,23 @@ type RoundPrivate = {
   votes?: Record<string, string>;
   /** Secret per-round salt so anonymous entry ids cannot be derived from public player ids. */
   salt?: string;
+  stop?: { letter: string; categories: string[] };
 };
 
-type RoomPrivate = { used?: Partial<Record<PartyGameId | "roleta_leve" | "roleta_media" | "roleta_caotica", number[]>>; history?: string[] };
+type RoomPrivate = {
+  used?: Partial<Record<PartyGameId | "roleta_leve" | "roleta_media" | "roleta_caotica", number[]>>;
+  history?: string[];
+  /** Stop: letters drawn in the current match and when each category was last played (LRU rotation). */
+  letters?: string[];
+  categoryUsage?: Record<string, number>;
+};
 
 const MAX_PLAYERS = 12;
 const SUBMIT_GRACE_MS = 2_000;
 const TEXT_PHASES: PartyPhaseId[] = ["defense", "write", "clues", "argue", "respond", "last_guess"];
+/** Stop: STOP! locks everyone's answers after this delay; the judge gets this long before anyone may retry. */
+const STOP_LOCK_MS = 3_000;
+const STOP_EVAL_MS = 90_000;
 
 const db = () => supabaseAdmin;
 
@@ -151,12 +168,6 @@ export async function deletePartyRoomAdmin(input: { token?: string | undefined; 
   const { error } = await db().from("party_rooms").delete().eq("id", input.roomId);
   if (error) throw new Error("Não foi possível apagar a sala.");
   return { ok: true as const };
-}
-
-/** Same derivation Stop uses for its stored session ids, so a linked Stop room can be verified. */
-function stopSessionHash(sessionId: string) {
-  const hex = createHash("sha256").update(sessionId).digest("hex").slice(0, 32);
-  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
 async function loadRoom(roomId: string) {
@@ -288,7 +299,7 @@ export async function leavePartyRoom(input: { roomId: string; playerId: string; 
     await db().from("party_players").update({ is_host: true }).eq("id", remaining[0]!.id);
   }
   const room = await loadRoom(input.roomId);
-  if (room.status === "playing" && isPartyGame(room.game)) await syncSubmitted(room.id);
+  if (room.status === "playing" && (isPartyGame(room.game) || room.game === "stop")) await syncSubmitted(room.id);
   return { ok: true };
 }
 
@@ -336,35 +347,6 @@ export async function returnPartyToLobby(input: { roomId: string; playerId: stri
   return { ok: true };
 }
 
-/**
- * Links a Stop room the host just created to this group room. Stop keeps its own tables,
- * rules and AI; the group room only publishes the Stop code so every member can follow.
- */
-export async function linkPartyStop(input: { roomId: string; playerId: string; sessionId: string; stopCode: string; stopPlayerId: string }) {
-  const host = await requireHost(input.roomId, input.playerId, input.sessionId);
-  const room = await loadRoom(input.roomId);
-  if (room.status !== "lobby" || room.game !== "stop") throw new Error("Escolha o Stop no lobby antes de começar.");
-  const players = await loadPlayers(room.id);
-  const missing = missingPlayers("stop", players.length);
-  if (missing > 0) throw new Error(`Este jogo precisa de pelo menos ${players.length + missing} jogadores.`);
-  const code = input.stopCode.trim().toUpperCase();
-  const { data: stopRoom } = await db().from("rooms").select("id, status, host_player_id").eq("code", code).maybeSingle();
-  if (!stopRoom || stopRoom.status !== "lobby" || stopRoom.host_player_id !== input.stopPlayerId) throw new Error("Não foi possível abrir a sala do Stop.");
-  const { data: stopHost } = await db().from("players").select("id, nickname").eq("id", input.stopPlayerId).eq("room_id", stopRoom.id).eq("session_id", stopSessionHash(input.sessionId)).maybeSingle();
-  if (!stopHost || stopHost.nickname.toLocaleLowerCase("pt-BR") !== host.nickname.toLocaleLowerCase("pt-BR")) throw new Error("Não foi possível abrir a sala do Stop.");
-  await clearRoundData(room.id);
-  const updated = await guardedUpdate(room, {
-    status: "playing",
-    phase: "stop",
-    round_number: 0,
-    phase_started_at: new Date().toISOString(),
-    phase_ends_at: null,
-    public_state: asJson({ scores: {}, stopCode: code }),
-  });
-  if (!updated) throw new Error("A sala mudou ao mesmo tempo. Tente de novo.");
-  return { ok: true, stopCode: code };
-}
-
 /** "Jogar novamente": same game, fresh scores, straight into round one. */
 export async function replayPartyGame(input: { roomId: string; playerId: string; sessionId: string }) {
   await restartPartyRoom(input);
@@ -385,17 +367,18 @@ export async function startPartyGame(input: { roomId: string; playerId: string; 
   await requireHost(input.roomId, input.playerId, input.sessionId);
   const room = await loadRoom(input.roomId);
   if (room.status === "playing") return { ok: true };
-  if (!isPartyGame(room.game)) throw new Error(room.game === "stop" ? "O Stop abre na sala própria dele." : "Escolha um jogo primeiro.");
+  if (!isPartyGame(room.game) && room.game !== "stop") throw new Error("Escolha um jogo primeiro.");
   const game = room.game;
   const players = await loadPlayers(room.id);
-  const min = PARTY_GAMES[game].minPlayers;
+  const min = lobbyGameMeta(game).minPlayers;
   if (players.length < min) throw new Error(`Este jogo precisa de pelo menos ${min} jogadores.`);
   await Promise.all([
     db().from("party_submissions").delete().eq("room_id", room.id),
     db().from("party_private").delete().eq("room_id", room.id).gt("round_number", 0),
   ]);
   const scores = Object.fromEntries(players.map((p) => [p.id, 0]));
-  await startRound(room, players, 1, scores, readPartySettings(room.settings).skips);
+  if (game === "stop") await startStopRound(room, players, 1, scores);
+  else await startRound(room, players, 1, scores, readPartySettings(room.settings).skips);
   return { ok: true };
 }
 
@@ -552,9 +535,10 @@ export async function nextPartyRound(input: { roomId: string; playerId: string; 
     return { ok: true };
   }
   const players = await loadPlayers(room.id);
-  const min = PARTY_GAMES[gameOf(room)].minPlayers;
+  const min = room.game === "stop" ? lobbyGameMeta("stop").minPlayers : PARTY_GAMES[gameOf(room)].minPlayers;
   if (players.length < min) throw new Error(`Faltam jogadores: este jogo precisa de pelo menos ${min}.`);
-  await startRound(room, players, room.round_number + 1, state.scores ?? {}, state.skipsLeft);
+  if (room.game === "stop") await startStopRound(room, players, room.round_number + 1, state.scores ?? {});
+  else await startRound(room, players, room.round_number + 1, state.scores ?? {}, state.skipsLeft);
   return { ok: true };
 }
 
@@ -617,7 +601,11 @@ export async function submitPartyAction(input: { roomId: string; playerId: strin
   const entryAuthors = (state.entries ?? []).map((entry) => entry.playerId).filter((id): id is string => Boolean(id));
 
   let payload: Record<string, unknown>;
-  if (TEXT_PHASES.includes(phase)) {
+  if (room.game === "stop") {
+    if (phase !== "write" || !state.stop) throw new Error("Esta etapa não recebe respostas.");
+    const raw = input.payload as { answers?: unknown; done?: unknown };
+    payload = { answers: sanitizeStopAnswers(raw?.answers, state.stop.categories), done: raw?.done === true };
+  } else if (TEXT_PHASES.includes(phase)) {
     payload = textPayload(input.payload);
   } else if (phase === "vote" && game === "tribunal") {
     const verdict = (input.payload as { verdict?: unknown })?.verdict;
@@ -660,12 +648,14 @@ async function syncSubmitted(roomId: string) {
     if (room.status !== "playing" || !PHASE_SECONDS[room.phase as PartyPhaseId]) return;
     const state = readPublicState(room.public_state);
     const [{ data: subs }, players] = await Promise.all([
-      db().from("party_submissions").select("player_id").eq("room_id", room.id).eq("round_number", room.round_number).eq("phase", room.phase),
+      db().from("party_submissions").select("player_id, payload").eq("room_id", room.id).eq("round_number", room.round_number).eq("phase", room.phase),
       loadPlayers(room.id),
     ]);
     const present = new Set(players.map((p) => p.id));
     const eligibleNow = (state.eligible ?? []).filter((id) => present.has(id));
-    const submitted = (subs ?? []).map((s) => s.player_id).filter((id) => eligibleNow.includes(id));
+    // Stop drafts are saved continuously: only "Terminei"/STOP counts as finished.
+    const finished = room.game === "stop" ? (subs ?? []).filter((s) => (s.payload as PartyMine | null)?.done === true) : (subs ?? []);
+    const submitted = finished.map((s) => s.player_id).filter((id) => eligibleNow.includes(id));
     if (eligibleNow.every((id) => submitted.includes(id))) {
       // A concurrent submit may have bumped the version first; retry with fresh state instead of stalling.
       if (await advance(room)) return;
@@ -716,6 +706,7 @@ async function advance(room: RoomRow): Promise<boolean> {
 }
 
 async function advanceOnce(room: RoomRow): Promise<boolean> {
+  if (room.game === "stop") return advanceStop(room);
   if (!isPartyGame(room.game)) return false;
   const game = gameOf(room);
   const phase = room.phase as PartyPhaseId;
@@ -871,6 +862,133 @@ async function advanceOnce(room: RoomRow): Promise<boolean> {
   const multiplier = state.prompt?.event?.multiplier ?? 1;
   const result = scoreRoleta(votes, authors, multiplier);
   return reveal({ votes, counts: result.counts, multiplier }, result.deltas, null);
+}
+
+/* ----------------------------------- Stop ---------------------------------- */
+
+/** Draws the letter (no repeats within a match) and up to eight least-recently-played categories. */
+async function startStopRound(room: RoomRow, players: PlayerRow[], round: number, scores: Record<string, number>) {
+  const settings = readPartySettings(room.settings);
+  const roomPrivate = await readPrivate<RoomPrivate>(room.id, 0);
+  const letters = round === 1 ? [] : [...(roomPrivate.letters ?? [])];
+  const usage = { ...(roomPrivate.categoryUsage ?? {}) };
+  const letter = pickLetter(letters, []);
+  const categories = pickCategories(settings.categories, usage, Math.min(MAX_CATEGORIES_PER_ROUND, settings.categories.length));
+  const candidate: RoundPrivate = { playerIds: players.map((p) => p.id), salt: randomUUID(), stop: { letter, categories } };
+  // First writer of the round wins; every racer then reads back the same letter and categories.
+  await db().from("party_private").upsert({ room_id: room.id, round_number: round, data: asJson(candidate) }, { onConflict: "room_id,round_number", ignoreDuplicates: true });
+  const stored = await readPrivate<RoundPrivate>(room.id, round);
+  const drawn = stored.stop ?? candidate.stop!;
+  if (stored.salt === candidate.salt) {
+    const now = Date.now();
+    for (const category of drawn.categories) usage[category] = now;
+    await writePrivate(room.id, 0, { ...roomPrivate, letters: [...letters, drawn.letter], categoryUsage: usage } satisfies RoomPrivate);
+  }
+  const startsAt = Date.now() + ROUND_COUNTDOWN_MS;
+  const stop: StopRoundState = { letter: drawn.letter, categories: drawn.categories, startsAt: new Date(startsAt).toISOString() };
+  const state: PartyPublicState = { stop, eligible: stored.playerIds ?? players.map((p) => p.id), submitted: [], scores };
+  return guardedUpdate(room, {
+    status: "playing",
+    round_number: round,
+    phase: "write",
+    phase_started_at: stop.startsAt,
+    phase_ends_at: new Date(startsAt + settings.stopSeconds * 1000).toISOString(),
+    public_state: asJson(state),
+  });
+}
+
+/** STOP!: a player who filled every category locks everyone's answers in three seconds. */
+export async function stopPartyRound(input: { roomId: string; playerId: string; sessionId: string; round: number; answers: unknown }) {
+  const player = await requireSession(input.roomId, input.playerId, input.sessionId);
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    const room = await loadRoom(input.roomId);
+    const state = readPublicState(room.public_state);
+    if (room.game !== "stop" || room.status !== "playing" || room.phase !== "write" || room.round_number !== input.round || !state.stop) {
+      throw new Error("Essa rodada já foi encerrada.");
+    }
+    if (!(state.eligible ?? []).includes(player.id)) throw new Error("Você entra na próxima rodada.");
+    if (Date.now() < Date.parse(state.stop.startsAt)) throw new Error("Aguarde a contagem para começar.");
+    if (state.stop.stopBy) return { ok: true };
+    const answers = sanitizeStopAnswers(input.answers, state.stop.categories);
+    if (!stopAnswersComplete(answers, state.stop.categories)) throw new Error("Preencha todas as categorias para gritar STOP!");
+    await db()
+      .from("party_submissions")
+      .upsert({ room_id: room.id, round_number: room.round_number, phase: "write", player_id: player.id, payload: asJson({ answers, done: true }) }, { onConflict: "room_id,round_number,phase,player_id" });
+    const lockAt = Date.now() + STOP_LOCK_MS;
+    const endsAt = room.phase_ends_at ? Math.min(Date.parse(room.phase_ends_at), lockAt) : lockAt;
+    const updated = await guardedUpdate(room, {
+      phase_ends_at: new Date(endsAt).toISOString(),
+      public_state: asJson({ ...state, stop: { ...state.stop, stopBy: player.id, stopAt: new Date().toISOString() } }),
+    });
+    if (updated) return { ok: true };
+  }
+  throw new Error("A rodada mudou ao mesmo tempo. Tente de novo.");
+}
+
+async function advanceStop(room: RoomRow): Promise<boolean> {
+  const state = readPublicState(room.public_state);
+  if (!state.stop) return false;
+  if (room.phase === "write") {
+    const claimed = await guardedUpdate(room, {
+      phase: "evaluating",
+      phase_started_at: new Date().toISOString(),
+      phase_ends_at: new Date(Date.now() + STOP_EVAL_MS).toISOString(),
+      public_state: asJson({ ...state, submitted: [], ai: { status: "pending" } }),
+    });
+    if (!claimed) return false;
+    await judgeStop(claimed);
+    return true;
+  }
+  if (room.phase === "evaluating") {
+    // Retry only after a failure or when a previous judge request died past its deadline.
+    const running = state.ai?.status === "pending" && room.phase_ends_at !== null && Date.now() < Date.parse(room.phase_ends_at);
+    if (running) return false;
+    const claimed = await guardedUpdate(room, {
+      phase_ends_at: new Date(Date.now() + STOP_EVAL_MS).toISOString(),
+      public_state: asJson({ ...state, ai: { status: "pending" } }),
+    });
+    if (!claimed) return false;
+    await judgeStop(claimed);
+    return true;
+  }
+  return false;
+}
+
+/** Runs Stop's unchanged AI judge with the host's scoring mode and intensity, then reveals and scores. */
+async function judgeStop(room: RoomRow) {
+  const state = readPublicState(room.public_state);
+  const stop = state.stop!;
+  const settings = readPartySettings(room.settings);
+  const [players, subs, saved] = await Promise.all([
+    loadPlayers(room.id),
+    submissionsFor(room, "write"),
+    db().from("app_settings").select("value").eq("key", "ai").maybeSingle(),
+  ]);
+  const eligible = new Set(state.eligible ?? []);
+  const judged = players.filter((p) => eligible.has(p.id));
+  const list = judged.map((p) => {
+    const answers = sanitizeStopAnswers(subs.find((s) => s.player_id === p.id)?.payload.answers, stop.categories);
+    return { jogador_id: p.id, apelido: p.nickname, respostas: answers };
+  });
+  const judge = await import("./stop-judge.server");
+  try {
+    const { evaluation } = await judge.judgeRound({
+      letter: stop.letter,
+      categories: stop.categories,
+      players: list,
+      dev: { ...judge.readSavedJudge(saved.data?.value), sarcasm: STOP_INTENSITY_SARCASM[settings.aiIntensity], scoringMode: settings.scoring },
+    });
+    const deltas = stopRoundDeltas(evaluation.resultados);
+    await guardedUpdate(room, {
+      phase: "reveal",
+      phase_started_at: new Date().toISOString(),
+      phase_ends_at: null,
+      public_state: asJson({ ...state, submitted: [], results: { stop: evaluation.resultados }, deltas, scores: addScores(state.scores ?? {}, deltas), ai: { status: "off" } }),
+    });
+  } catch (err) {
+    const text = err instanceof Error ? err.message : "A IA não respondeu.";
+    await guardedUpdate(room, { phase_ends_at: null, public_state: asJson({ ...state, ai: { status: "failed", text } }) });
+  }
 }
 
 /* ------------------------------- Private view ------------------------------ */

@@ -12,7 +12,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
@@ -329,18 +328,19 @@ function AiTab({ s, patch }: { s: DevSettings; patch: (fn: (p: DevSettings) => D
   return (
     <div className="space-y-5">
       <section className="space-y-2">
-        <Label>Personalidade rápida</Label>
+        <Label>Personagem do juiz</Label>
+        <p className="text-xs text-muted-foreground">Pontuação e intensidade da IA agora são regras da partida, escolhidas pelo mestre de cada sala.</p>
         <div className="grid gap-2">
           {AI_PRESETS.map((p) => {
-            const active = ai.persona === p.persona && ai.sarcasm === p.sarcasm;
+            const active = ai.persona === p.persona;
             return (
               <Button
                 key={p.id}
                 variant={active ? "default" : "outline"}
                 className="justify-start"
-                onClick={() => setAi({ persona: p.persona, sarcasm: p.sarcasm })}
+                onClick={() => setAi({ persona: p.persona })}
               >
-                {p.label}
+                {p.id === "max" ? "😈 Juiz padrão (sem personagem)" : p.label}
               </Button>
             );
           })}
@@ -355,25 +355,6 @@ function AiTab({ s, patch }: { s: DevSettings; patch: (fn: (p: DevSettings) => D
             {GEMINI_MODELS.map((m) => (
               <SelectItem key={m} value={m}>{m}</SelectItem>
             ))}
-          </SelectContent>
-        </Select>
-      </section>
-
-      <section className="space-y-2">
-        <Label>Sarcasmo: {ai.sarcasm}/10</Label>
-        <Slider min={1} max={10} step={1} value={[ai.sarcasm]} onValueChange={([v]) => setAi({ sarcasm: v ?? 8 })} />
-      </section>
-
-      <section className="space-y-2">
-        <Label>Pontuação</Label>
-        <Select
-          value={s.scoringMode}
-          onValueChange={(v) => patch((p) => ({ ...p, scoringMode: v as DevSettings["scoringMode"] }))}
-        >
-          <SelectTrigger><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="fixed">Fixa (0, 5, 10, 15, 20)</SelectItem>
-            <SelectItem value="free">Livre pela IA (0 a 20)</SelectItem>
           </SelectContent>
         </Select>
       </section>
