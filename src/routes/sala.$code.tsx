@@ -403,8 +403,8 @@ function RoomPage() {
   return (
     <main className="mx-auto w-full max-w-md px-4">
       {/* Title, chat and exit stay pinned at the top outside the round (the round has its own pinned header). */}
-      <div className={`room-topbar -mx-4 grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2 pb-2 pl-4 pt-[calc(0.75rem+env(safe-area-inset-top))] top-actions-clear ${onRoundBoard ? "" : "sticky top-0 z-20 backdrop-blur-md"}`}>
-        <div className="min-w-0"><h1 className="font-display text-2xl text-primary">STOP!</h1><Button variant="ghost" title="Copiar link da sala" aria-label={`Copiar link da sala ${room.code}`} className="max-w-full justify-start gap-1.5 px-0 text-xs text-muted-foreground" onClick={async () => {
+      <div className={`room-topbar -mx-4 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 pb-2 pl-4 pt-[calc(0.75rem+env(safe-area-inset-top))] top-actions-clear ${onRoundBoard ? "" : "sticky top-0 z-20 backdrop-blur-md"}`}>
+        <div className="flex min-w-0 items-center gap-2"><h1 className="shrink-0 font-display text-2xl text-primary">STOP!</h1><Button variant="ghost" title="Copiar link da sala" aria-label={`Copiar link da sala ${room.code}`} className="min-w-0 justify-start gap-1.5 px-1 text-xs text-muted-foreground" onClick={async () => {
           try {
             await navigator.clipboard.writeText(`${window.location.origin}/sala/${room.code}`);
             vibrate(15);
