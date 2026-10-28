@@ -1,4 +1,4 @@
-export const RESULTS_VIEW_MS = 45_000;
+export const RESULTS_VIEW_MS = 120_000;
 export const RESULTS_FORCE_MS = 10_000;
 export const RESULTS_INACTIVE_MS = 15_000;
 
