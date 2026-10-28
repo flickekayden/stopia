@@ -121,3 +121,15 @@ export async function judgeRound(params: { letter: string; categories: string[];
   const evaluation: Evaluation = { resultados };
   return { evaluation, latencyMs };
 }
+
+const SAVED_MODELS = ["gemini-3.6-flash", "gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.5-flash-lite"];
+
+/** Developer-saved technical judge tools (custom prompt, model, persona). Tone and scoring come from the room host. */
+export function readSavedJudge(raw: unknown): JudgeConfig {
+  const value = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  const out: JudgeConfig = {};
+  if (typeof value["prompt"] === "string" && value["prompt"].length <= 8000) out.prompt = value["prompt"];
+  if (typeof value["model"] === "string" && SAVED_MODELS.includes(value["model"])) out.model = value["model"];
+  if (typeof value["persona"] === "string" && value["persona"].length <= 600) out.persona = value["persona"];
+  return out;
+}
