@@ -79,8 +79,8 @@
 
 ## Central de Jogos (5 novos minijogos)
 - [x] Audit Stop boundaries; isolate party tables, private data and AI prompts from Stop
-- [ ] Games hub with six cards and code entry; Stop card keeps the original flow
-- [ ] Shared party engine: rooms, sessions, phases, deadlines, version-guarded advances, scoring
-- [ ] Tribunal dos Amigos, Quem Escreveu Essa Desgraça?, Roleta do Caos
-- [ ] Infiltrado (server-only secret word/role) and Debate Impossível
-- [ ] Regression tests for party scoring + Stop tests; real multiplayer verification
+- [x] Games hub with six cards and code entry; Stop card keeps the original flow
+- [x] Shared party engine: rooms, sessions, phases, deadlines, version-guarded advances, scoring
+- [x] Tribunal dos Amigos, Quem Escreveu Essa Desgraça?, Roleta do Caos
+- [x] Infiltrado (server-only secret word/role) and Debate Impossível
+- [x] Regression tests for party scoring + Stop tests; real multiplayer verification

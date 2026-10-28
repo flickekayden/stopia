@@ -32,3 +32,7 @@
 - Final rankings use a browser-safe competition-rank helper so equal totals share a place without changing stored scoring rules.
 - Answer saves are serialized per round and late hydration preserves locally edited fields so slow acknowledgements cannot overwrite newer input.
 - Non-AI game actions verify the existing hashed player session in addition to host membership; direct table policies remain a separately audited security boundary.
+- Party mini-games (Central de Jogos) live in separate party_* tables, `party.server.ts` and `/festa/$code`, never in Stop's rooms/rounds modules, so Stop rules and its AI judge stay untouched.
+- Party secrets (infiltrado word/role, anonymous authorship, votes before reveal) live only in party_private/party_submissions with no client grants; party_rooms.public_state is realtime-readable and must never hold them; per-player data comes from the session-validated private view.
+- Party phase transitions use version-guarded updates and recompute submissions from the table, so concurrent submits and deadline advances resolve to exactly one transition; scores are accumulated inside public_state for atomic writes.
+- Party AI prompts are isolated in `party-ai.server.ts`, reuse only the existing Gemini provider helper, and always have a built-in fallback; voting, scoring and phase control never depend on AI.
