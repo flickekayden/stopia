@@ -145,6 +145,35 @@ export type PartyEntry = { id: string; playerId?: string; text: string };
 
 export type PartyAiState = { status: "pending" | "done" | "failed" | "off"; text?: string };
 
+/** Revealed round outcome; written only after the phase that hides it has closed. */
+export type PartyResults = {
+  notice?: string;
+  counts?: Record<string, number>;
+  votes?: Record<string, string>;
+  verdict?: "culpado" | "inocente";
+  guilty?: number;
+  innocent?: number;
+  entries?: { id: string; text: string; authorId: string; correct: string[]; fooled: number }[];
+  infiltradoId?: string;
+  word?: string;
+  category?: string;
+  accusedId?: string | null;
+  guess?: string | null;
+  guessCorrect?: boolean | null;
+  outcome?: "escapou" | "adivinhou" | "grupo";
+  sideTotals?: { A: number; B: number };
+  winnerSide?: "A" | "B" | null;
+  multiplier?: number;
+};
+
+/** What the server reveals to one specific, session-validated player. */
+export type PartyPrivateViewData = {
+  role: "infiltrado" | "cidadao" | "espectador" | null;
+  word: string | null;
+  myEntryId: string | null;
+  mine: Record<string, unknown> | null;
+};
+
 /** Everything here is readable by every client in realtime: never put secrets in it. */
 export type PartyPublicState = {
   prompt?: PartyPrompt;
@@ -154,7 +183,7 @@ export type PartyPublicState = {
   submitted?: string[];
   entries?: PartyEntry[];
   accusedId?: string;
-  results?: Record<string, unknown>;
+  results?: PartyResults;
   deltas?: Record<string, number>;
   scores?: Record<string, number>;
   ai?: PartyAiState;

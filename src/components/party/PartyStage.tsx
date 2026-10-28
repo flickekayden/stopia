@@ -559,12 +559,12 @@ function Deltas({ ctx }: { ctx: PartyCtx }) {
 }
 
 function RevealBody({ ctx }: { ctx: PartyCtx }) {
-  const results = (ctx.state.results ?? {}) as Record<string, unknown>;
-  const counts = (results.counts ?? {}) as Record<string, number>;
-  const notice = typeof results.notice === "string" ? results.notice : null;
+  const results = ctx.state.results ?? {};
+  const counts = results.counts ?? {};
+  const notice = results.notice ?? null;
 
   if (ctx.game === "tribunal") {
-    const verdict = results.verdict as string;
+    const verdict = results.verdict;
     return (
       <div className="space-y-3">
         <section className="party-prompt text-center">
@@ -579,7 +579,7 @@ function RevealBody({ ctx }: { ctx: PartyCtx }) {
   }
 
   if (ctx.game === "autor") {
-    const entries = (results.entries ?? []) as { id: string; text: string; authorId: string; correct: string[]; fooled: number }[];
+    const entries = results.entries ?? [];
     return (
       <div className="space-y-3">
         {notice && <p className="party-panel text-sm text-muted-foreground">{notice}</p>}
@@ -598,13 +598,13 @@ function RevealBody({ ctx }: { ctx: PartyCtx }) {
   }
 
   if (ctx.game === "infiltrado") {
-    const outcome = results.outcome as string;
+    const outcome = results.outcome;
     const headline = outcome === "escapou" ? "O infiltrado escapou!" : outcome === "adivinhou" ? "Pego, mas adivinhou a palavra!" : "O grupo pegou o infiltrado!";
     return (
       <div className="space-y-3">
         <section className="party-prompt space-y-1 text-center">
           <p className="font-display text-3xl party-accent">{headline}</p>
-          <p>O infiltrado era <strong>{nick(ctx.players, results.infiltradoId as string)}</strong>.</p>
+          <p>O infiltrado era <strong>{nick(ctx.players, results.infiltradoId)}</strong>.</p>
           <p>A palavra era <strong className="font-display text-2xl">{String(results.word ?? "")}</strong> ({String(results.category ?? "")}).</p>
           {typeof results.guess === "string" && results.guess && <p className="text-sm text-muted-foreground">Palpite do infiltrado: “{results.guess}” {results.guessCorrect ? "✓" : "✗"}</p>}
         </section>
@@ -621,7 +621,7 @@ function RevealBody({ ctx }: { ctx: PartyCtx }) {
 
   const entries = [...(ctx.state.entries ?? [])].sort((a, b) => (counts[b.playerId ?? ""] ?? 0) - (counts[a.playerId ?? ""] ?? 0));
   const multiplier = Number(results.multiplier ?? 1);
-  const sideTotals = results.sideTotals as { A: number; B: number } | undefined;
+  const sideTotals = results.sideTotals;
   return (
     <div className="space-y-3">
       {notice && <p className="party-panel text-sm text-muted-foreground">{notice}</p>}

@@ -4,10 +4,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
 import { getPartyPrivateView } from "@/lib/party.functions";
+import type { PartyPrivateViewData } from "@/lib/party-games";
 
 export type PartyRoom = Tables<"party_rooms">;
 export type PartyPlayer = Tables<"party_players">;
-export type PartyPrivateView = Awaited<ReturnType<typeof getPartyPrivateView>>;
+export type PartyPrivateView = PartyPrivateViewData;
 
 /** Public room rows over realtime; per-player secrets only through the session-validated server view. */
 export function usePartyRoom(code: string, identity: { playerId: string; sessionId: string } | null) {
@@ -89,7 +90,7 @@ export function usePartyRoom(code: string, identity: { playerId: string; session
     }
     let cancelled = false;
     fetchPrivate({ data: { roomId, playerId, sessionId } })
-      .then((view) => { if (!cancelled) setPrivateView(view); })
+      .then((view) => { if (!cancelled) setPrivateView(view as PartyPrivateViewData); })
       .catch(() => { if (!cancelled) setPrivateView(null); });
     return () => { cancelled = true; };
   }, [privateKey, roomId, playerId, sessionId, isMember, fetchPrivate]);

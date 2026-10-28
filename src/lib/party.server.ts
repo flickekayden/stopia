@@ -35,7 +35,9 @@ import {
   type PartyEntry,
   type PartyGameId,
   type PartyPhaseId,
+  type PartyPrivateViewData,
   type PartyPrompt,
+  type PartyResults,
   type PartyPublicState,
   type PartySettings,
 } from "./party-games";
@@ -715,16 +717,16 @@ async function advance(room: RoomRow) {
 
 /* ------------------------------- Private view ------------------------------ */
 
-export async function getPartyPrivateView(input: { roomId: string; playerId: string; sessionId: string }) {
+export async function getPartyPrivateView(input: { roomId: string; playerId: string; sessionId: string }): Promise<PartyPrivateViewData> {
   const player = await requireSession(input.roomId, input.playerId, input.sessionId);
   const room = await loadRoom(input.roomId);
-  const empty = { role: null as null | "infiltrado" | "cidadao" | "espectador", word: null as string | null, myEntryId: null as string | null, mine: null as Record<string, unknown> | null };
+  const empty: PartyPrivateViewData = { role: null, word: null, myEntryId: null, mine: null };
   if (room.status !== "playing" || room.round_number < 1) return empty;
   const [roundPrivate, { data: mine }] = await Promise.all([
     readPrivate<RoundPrivate>(room.id, room.round_number),
     db().from("party_submissions").select("payload").eq("room_id", room.id).eq("round_number", room.round_number).eq("phase", room.phase).eq("player_id", player.id).maybeSingle(),
   ]);
-  const view = { ...empty, mine: (mine?.payload ?? null) as Record<string, unknown> | null };
+  const view: PartyPrivateViewData = { ...empty, mine: (mine?.payload ?? null) as Record<string, unknown> | null };
   const game = gameOf(room);
   if (game === "infiltrado" && room.phase !== "reveal") {
     if (!(roundPrivate.playerIds ?? []).includes(player.id)) view.role = "espectador";
