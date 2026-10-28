@@ -61,6 +61,8 @@ type RoundPrivate = {
   playerIds?: string[];
   entries?: { id: string; authorId: string }[];
   votes?: Record<string, string>;
+  /** Secret per-round salt so anonymous entry ids cannot be derived from public player ids. */
+  salt?: string;
 };
 
 type RoomPrivate = { used?: Partial<Record<PartyGameId | "roleta_leve" | "roleta_media" | "roleta_caotica", number[]>>; history?: string[] };
@@ -275,7 +277,7 @@ async function buildPrompt(room: RoomRow, players: PlayerRow[], round: number, s
   const used = { ...(roomPrivate.used ?? {}) };
   const history = [...(roomPrivate.history ?? [])];
   const ai = settings.ai;
-  const data: RoundPrivate = { playerIds: players.map((p) => p.id) };
+  const data: RoundPrivate = { playerIds: players.map((p) => p.id), salt: randomUUID() };
 
   const remember = (key: keyof NonNullable<RoomPrivate["used"]>, index: number) => {
     used[key] = [...(used[key] ?? []), index];
@@ -626,7 +628,12 @@ async function advance(room: RoomRow) {
   if (game === "autor") {
     if (phase === "write") {
       const written = textEntries(subs, present);
-      const shuffled = shuffle(written).map((entry) => ({ id: randomUUID().slice(0, 8), authorId: entry.playerId!, text: entry.text }));
+      // Ids are stable for concurrent advancers but unguessable without the secret round salt.
+      const shuffled = shuffle(written).map((entry) => ({
+        id: createHash("sha256").update(`${roundPrivate.salt ?? room.id}:${entry.playerId}`).digest("hex").slice(0, 12),
+        authorId: entry.playerId!,
+        text: entry.text,
+      }));
       await writePrivate(room.id, room.round_number, { ...roundPrivate, entries: shuffled.map(({ id, authorId }) => ({ id, authorId })) });
       if (shuffled.length < 2) {
         return reveal({ entries: shuffled.map((e) => ({ id: e.id, text: e.text, authorId: e.authorId, correct: [], fooled: 0 })), notice: "Poucas respostas para adivinhar nesta rodada." }, {}, null);
