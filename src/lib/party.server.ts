@@ -121,6 +121,38 @@ export async function savePartyAdmin(input: { token?: string | undefined; game: 
   return { ok: true as const, config: next };
 }
 
+/* Developer room management: list and delete group rooms (players, secrets and submissions cascade). */
+async function requireDeveloper(token?: string | undefined) {
+  const { isDeveloper } = await import("./dev-session.server");
+  if (!(await isDeveloper(token))) throw new Error("Acesso de desenvolvedor necessário.");
+}
+
+export async function listPartyRoomsAdmin(input: { token?: string | undefined }) {
+  await requireDeveloper(input.token);
+  const { data, error } = await db()
+    .from("party_rooms")
+    .select("id, code, game, status, created_at, updated_at, party_players(count)")
+    .order("updated_at", { ascending: false })
+    .limit(60);
+  if (error) throw new Error("Não foi possível carregar as salas da galera.");
+  return (data ?? []).map((room) => ({
+    id: room.id,
+    code: room.code,
+    game: room.game,
+    status: room.status,
+    createdAt: room.created_at,
+    updatedAt: room.updated_at,
+    playerCount: (room.party_players as unknown as Array<{ count: number }>)[0]?.count ?? 0,
+  }));
+}
+
+export async function deletePartyRoomAdmin(input: { token?: string | undefined; roomId: string }) {
+  await requireDeveloper(input.token);
+  const { error } = await db().from("party_rooms").delete().eq("id", input.roomId);
+  if (error) throw new Error("Não foi possível apagar a sala.");
+  return { ok: true as const };
+}
+
 /** Same derivation Stop uses for its stored session ids, so a linked Stop room can be verified. */
 function stopSessionHash(sessionId: string) {
   const hex = createHash("sha256").update(sessionId).digest("hex").slice(0, 32);

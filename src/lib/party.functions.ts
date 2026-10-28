@@ -100,3 +100,11 @@ export const savePartyAdmin = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data }) => (await server()).savePartyAdmin(data));
+
+export const listPartyRoomsAdmin = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => z.object({ token: z.string().max(200).optional() }).parse(input))
+  .handler(async ({ data }) => (await server()).listPartyRoomsAdmin(data));
+
+export const deletePartyRoomAdmin = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => z.object({ token: z.string().max(200).optional(), roomId: z.string().uuid() }).parse(input))
+  .handler(async ({ data }) => (await server()).deletePartyRoomAdmin(data));

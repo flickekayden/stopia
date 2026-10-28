@@ -1,11 +1,12 @@
 import { useRouterState } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { FlaskConical, Loader2, RefreshCw, RotateCcw, Save, Settings } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { AnswerCard, type AnswerCardData } from "@/components/game/AnswerCard";
 import { PartyAdminPanel } from "@/components/party/PartyAdminPanel";
+import { PartyRoomsAdmin } from "@/components/party/PartyRoomsAdmin";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -76,6 +77,12 @@ export function DevPanel() {
   const [saving, setSaving] = useState(false);
   const save = useServerFn(saveAiSettings);
   const context = useActiveContext();
+  // Headers reserve room for this button next to the sound toggle while it is on screen.
+  useEffect(() => {
+    if (!isDev) return;
+    document.documentElement.dataset["devTools"] = "on";
+    return () => { delete document.documentElement.dataset["devTools"]; };
+  }, [isDev]);
   if (!isDev) return null;
 
   const patch = (fn: (p: DevSettings) => DevSettings) => updateDevSettings(fn);
@@ -130,7 +137,7 @@ export function DevPanel() {
                   ))}
                 </div>
               </section>
-
+              <PartyRoomsAdmin />
             </div>
           ) : (
           <Tabs defaultValue="visual" className="px-4 pb-6">

@@ -260,7 +260,7 @@ function PartyRoomPage() {
     <main data-game={dataGame} className="game-screen mx-auto w-full max-w-md px-4 pt-[calc(0.75rem+env(safe-area-inset-top))]">
       {error && <p role="alert" className="mb-3 rounded-lg border border-destructive/60 p-3 text-sm">{error}</p>}
       {room.status !== "playing" || room.phase === "reveal" || game === "stop" ? (
-        <header className="mb-4 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-border/60 pb-3 pr-16">
+        <header className="mb-4 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-border/60 pb-3 top-actions-clear">
           <div className="min-w-0">
             <p className="section-label party-accent truncate">{label}</p>
             <Button variant="ghost" className="justify-start gap-1.5 px-0 font-display text-2xl" aria-label={`Copiar link da sala ${room.code}`} onClick={async () => {

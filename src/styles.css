@@ -143,6 +143,8 @@
   }
 }
 
+/* Clip sideways overflow so phones never zoom the page out (hidden labels inside scrollers used to widen it). */
+html, body { overflow-x: clip; }
 .mobile-app-frame {
   position: relative;
   width: min(100%, 28rem);
@@ -150,12 +152,17 @@
   margin-inline: auto;
   background: var(--background);
   overscroll-behavior-y: none;
+  overflow-x: clip;
 }
+.scoreboard { position: relative; }
+/* Space kept free in headers for the fixed sound (and developer) buttons in the top-right corner. */
+:root { --top-actions-space: 4rem; }
+:root[data-dev-tools] { --top-actions-space: 7.25rem; }
+.top-actions-clear { padding-right: var(--top-actions-space); }
 .mobile-app-frame main { min-width: 0; }
 .mobile-bottom-bar { z-index: 30; box-shadow: var(--shadow-dock); max-height: calc(100dvh - 4rem - var(--keyboard-inset, 0px)); overflow-y: auto; overscroll-behavior: contain; }
 .dock-clearance { padding-bottom: calc(var(--active-dock-height, 10rem) + 5rem); }
 html { scroll-padding-top: 6rem; scroll-padding-bottom: calc(var(--active-dock-height, 0px) + 1rem); }
-.chat-launcher { bottom: calc(var(--active-dock-height, 5rem) + 1rem + var(--keyboard-inset, 0px)); }
 .results-clearance { padding-bottom: calc(var(--active-dock-height, 10rem) + 3rem + env(safe-area-inset-bottom)); }
 .evaluation-phrase { animation: evaluation-enter 250ms ease-out; }
 .evaluation-progress { animation: evaluation-travel 1.8s ease-in-out infinite alternate; }
@@ -173,7 +180,6 @@ html { scroll-padding-top: 6rem; scroll-padding-bottom: calc(var(--active-dock-h
   .mobile-bottom-bar { position: relative !important; bottom: auto !important; max-height: none; margin-top: 1rem; }
   .dock-clearance { padding-bottom: calc(1rem + env(safe-area-inset-bottom)); }
   .mobile-app-frame main { padding-top: calc(0.75rem + env(safe-area-inset-top)); }
-  .chat-launcher { bottom: calc(1rem + env(safe-area-inset-bottom)); }
   .mobile-sheet { max-height: calc(100dvh - env(safe-area-inset-top) - var(--keyboard-inset, 0px)); }
 }
 .mobile-app-frame [role="button"] { min-width: 48px; }
@@ -224,7 +230,7 @@ html { scroll-padding-top: 6rem; scroll-padding-bottom: calc(var(--active-dock-h
 .preset-list > button:hover { background: var(--surface-hover); }
 
 /* Round */
-.round-hud { background: color-mix(in oklch, var(--background) 92%, transparent); }
+.round-hud, .room-topbar { background: color-mix(in oklch, var(--background) 92%, transparent); }
 .letter-tile { background: var(--primary); color: var(--primary-foreground); box-shadow: var(--shadow-brand), inset 0 -3px 0 color-mix(in oklch, var(--device-surround) 18%, transparent); }
 .round-timer { font-family: var(--font-display); font-variant-numeric: tabular-nums; line-height: 1; }
 .round-timer[data-state="low"] { color: var(--primary); }
