@@ -15,22 +15,20 @@
 - Voice reactions use private Storage uploads through session-hash-validated server functions and room-scoped realtime metadata; signed playback links are issued only to current-round players because the workspace blocks public buckets.
 - Push-to-talk recording, playback queues and device mute are owned by the reusable voice hook mounted only in round results, so microphones and audio are released when leaving results.
 - Results reuse round ends_at as a server-issued viewing deadline and shared pacing constants; startNextRound validates the host session, expected round and readiness/override before advancing or ending to keep multiplayer transitions authoritative without changing the schema.
-- Global settings synchronization and theme application live in SettingsRuntime; the developer editor is lazy-loaded only for unlocked devices to keep its UI dependencies out of initial loading.
+- SettingsRuntime owns global settings sync, theme application and useDockLayout (action-bar clearance; short viewports keep bars in flow); the developer editor is lazy-loaded only for unlocked devices.
 - Room snapshots read only the latest round; player updates and answer changes apply room-scoped realtime rows directly, with coalesced snapshot refreshes and a trailing refresh for in-flight events to avoid request storms without losing transitions.
-- Room chat uses lightweight plain-text bubbles and design-system input controls rather than AI Markdown/attachment engines; append realtime messages and cap history at the newest 100 entries to bound work and memory.
+- Room chat uses plain-text bubbles (no AI Markdown engines), appends realtime messages and caps history at 100 to bound work.
 - Results and final rankings are lazy-loaded; unchanged answer cards stay memoized so countdown ticks do not repaint them.
 - Independent server reads and score writes run in parallel with at most six outbound requests per batch to respect the deployed runtime budget.
 - All routes share a smartphone-width shell, and portal sheets/fixed controls use the same width and safe-area offsets so desktop preserves mobile ergonomics.
 - The installation worker is network-only for navigations and never caches game/session data so multiplayer state remains authoritative.
 - Device haptics and installation prompts run only in effects or user handlers with capability checks so SSR and unsupported browsers stay safe.
-- UI hierarchy uses unframed game-section bands, shared segmented Button variants and global semantic surface/focus tokens; keep presentation changes separate from multiplayer state and developer overrides.
-- Visual refresh uses game-screen-scoped typography and layout classes with shared control variants so developer overrides and multiplayer logic remain independent of presentation.
-- SettingsRuntime mounts useDockLayout to measure the active action bar and share scroll/chat clearance; short viewports keep bars in document flow so content remains reachable without changing game state.
+- Presentation uses game-screen-scoped classes, unframed game-section bands, shared Button variants and semantic tokens, kept separate from multiplayer state and developer overrides.
 - Round starts use a future server-issued started_at and matching ends_at; shared timing helpers gate inputs and STOP without a schema change or device-local countdown origin.
 - ChatDrawer owns one chat subscription and portals its compact launcher into the header slot of the screen on view (pinned room top bar, or the round HUD during answers) so message state survives phase transitions and nothing floats over content.
 - Fixed top-right controls (sound, developer gear) are reserved through the `--top-actions-space` variable (`top-actions-clear`); the page clips sideways overflow so hidden labels inside horizontal scrollers never make phones zoom out.
 - Developer room management for group rooms goes through dev-token/session-verified server functions in `party.server.ts`; deletes rely on table cascades so secrets and submissions go with the room.
-- Round answers use only the device's native keyboard with in-flow finish/STOP actions; the sticky round HUD compacts on answer focus, open keyboard or scroll (with hysteresis) and reserves space for the global sound control so typing never triggers header jumps or overlaps.
+- Round answers use only the native keyboard with in-flow finish/STOP actions; the sticky round HUD compacts on focus, keyboard or scroll (with hysteresis) so typing never makes the header jump.
 - Final rankings use a browser-safe competition-rank helper so equal totals share a place without changing stored scoring rules.
 - Answer saves are serialized per round and late hydration preserves locally edited fields so slow acknowledgements cannot overwrite newer input.
 - Non-AI game actions verify the existing hashed player session in addition to host membership; direct table policies remain a separately audited security boundary.
