@@ -27,7 +27,9 @@
 - Visual refresh uses game-screen-scoped typography and layout classes with shared control variants so developer overrides and multiplayer logic remain independent of presentation.
 - SettingsRuntime mounts useDockLayout to measure the active action bar and share scroll/chat clearance; short viewports keep bars in document flow so content remains reachable without changing game state.
 - Round starts use a future server-issued started_at and matching ends_at; shared timing helpers gate inputs and STOP without a schema change or device-local countdown origin.
-- ChatDrawer owns one chat subscription and portals its compact launcher into the active round header so message state survives phase transitions without floating over inputs.
+- ChatDrawer owns one chat subscription and portals its compact launcher into the header slot of the screen on view (pinned room top bar, or the round HUD during answers) so message state survives phase transitions and nothing floats over content.
+- Fixed top-right controls (sound, developer gear) are reserved through the `--top-actions-space` variable (`top-actions-clear`); the page clips sideways overflow so hidden labels inside horizontal scrollers never make phones zoom out.
+- Developer room management for group rooms goes through dev-token/session-verified server functions in `party.server.ts`; deletes rely on table cascades so secrets and submissions go with the room.
 - Round answers use only the device's native keyboard with in-flow finish/STOP actions; the sticky round HUD compacts on answer focus, open keyboard or scroll (with hysteresis) and reserves space for the global sound control so typing never triggers header jumps or overlaps.
 - Final rankings use a browser-safe competition-rank helper so equal totals share a place without changing stored scoring rules.
 - Answer saves are serialized per round and late hydration preserves locally edited fields so slow acknowledgements cannot overwrite newer input.
