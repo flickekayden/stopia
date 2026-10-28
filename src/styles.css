@@ -143,6 +143,8 @@
   }
 }
 
+/* Clip sideways overflow so phones never zoom the page out (hidden labels inside scrollers used to widen it). */
+html, body { overflow-x: clip; }
 .mobile-app-frame {
   position: relative;
   width: min(100%, 28rem);
@@ -150,12 +152,17 @@
   margin-inline: auto;
   background: var(--background);
   overscroll-behavior-y: none;
+  overflow-x: clip;
 }
+.scoreboard { position: relative; }
+/* Space kept free in headers for the fixed sound (and developer) buttons in the top-right corner. */
+:root { --top-actions-space: 4rem; }
+:root[data-dev-tools] { --top-actions-space: 7.25rem; }
+.top-actions-clear { padding-right: var(--top-actions-space); }
 .mobile-app-frame main { min-width: 0; }
 .mobile-bottom-bar { z-index: 30; box-shadow: var(--shadow-dock); max-height: calc(100dvh - 4rem - var(--keyboard-inset, 0px)); overflow-y: auto; overscroll-behavior: contain; }
 .dock-clearance { padding-bottom: calc(var(--active-dock-height, 10rem) + 5rem); }
 html { scroll-padding-top: 6rem; scroll-padding-bottom: calc(var(--active-dock-height, 0px) + 1rem); }
-.chat-launcher { bottom: calc(var(--active-dock-height, 5rem) + 1rem + var(--keyboard-inset, 0px)); }
 .results-clearance { padding-bottom: calc(var(--active-dock-height, 10rem) + 3rem + env(safe-area-inset-bottom)); }
 .evaluation-phrase { animation: evaluation-enter 250ms ease-out; }
 .evaluation-progress { animation: evaluation-travel 1.8s ease-in-out infinite alternate; }
