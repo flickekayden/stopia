@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { Check, Clock, Crown, EyeOff, Eye, Gavel, LayoutGrid, Loader2, LogOut, RefreshCw, SkipForward, Sparkles, Trophy, Users } from "lucide-react";
+import { Check, Clock, Copy, Crown, EyeOff, Eye, Gavel, LayoutGrid, Loader2, LogOut, RefreshCw, Share2, SkipForward, Sparkles, Trophy, Users } from "lucide-react";
+import { toast } from "sonner";
 
 import { PartyIcon } from "@/components/party/PartyIcon";
 import { RulesList } from "@/components/party/RulesList";
@@ -222,6 +223,63 @@ function SelectedGame({ ctx, actions, selected }: { ctx: LobbyCtx; actions: Part
   );
 }
 
+/** Big room code with the full invite link: copy it or open the phone's share sheet. */
+function RoomShareCard({ code }: { code: string }) {
+  const [url, setUrl] = useState(`/festa/${code}`);
+  const [copied, setCopied] = useState(false);
+  const [canShare, setCanShare] = useState(false);
+  useEffect(() => {
+    setUrl(`${window.location.origin}/festa/${code}`);
+    setCanShare(typeof navigator.share === "function");
+  }, [code]);
+  useEffect(() => {
+    if (!copied) return;
+    const timer = window.setTimeout(() => setCopied(false), 2_000);
+    return () => window.clearTimeout(timer);
+  }, [copied]);
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(url);
+      vibrate(15);
+      setCopied(true);
+      toast.success("Link da sala copiado!", { duration: 1_500 });
+    } catch {
+      toast.error("Não foi possível copiar o link.");
+    }
+  }
+
+  async function share() {
+    try {
+      await navigator.share({ title: "Sala da Galera", text: `Bora jogar! Entra na sala ${code}:`, url });
+      vibrate(15);
+    } catch (err) {
+      if (!(err instanceof DOMException && err.name === "AbortError")) void copy();
+    }
+  }
+
+  return (
+    <section className="room-ticket px-5 pb-5 pt-6 text-center" aria-label="Link da sala da galera">
+      <p className="section-label">Código da sala</p>
+      <p className="lobby-code mt-2 text-primary">{code}</p>
+      <p className="mt-1 text-sm text-muted-foreground">Mande o link: quem abrir já cai nesta sala</p>
+      <button type="button" onClick={() => void copy()} className="mt-4 w-full truncate rounded-lg border border-dashed border-border bg-background/60 px-3 py-3 font-mono text-sm text-foreground" aria-label={`Copiar link ${url}`}>
+        {url.replace(/^https?:\/\//, "")}
+      </button>
+      <div className={cn("mt-3 grid gap-2", canShare ? "grid-cols-2" : "grid-cols-1")}>
+        <Button onClick={() => void copy()} variant={copied ? "selected" : "outline"} className="h-12 font-semibold">
+          {copied ? <Check className="size-5" /> : <Copy className="size-5" />} {copied ? "Copiado" : "Copiar link"}
+        </Button>
+        {canShare && (
+          <Button onClick={() => void share()} variant="outline" className="h-12 font-semibold">
+            <Share2 className="size-5" /> Compartilhar
+          </Button>
+        )}
+      </div>
+    </section>
+  );
+}
+
 export function PartyLobby({ ctx, actions }: { ctx: LobbyCtx; actions: PartyActions }) {
   const selected = ctx.selected;
   const meta = selected ? lobbyGameMeta(selected) : null;
@@ -229,6 +287,7 @@ export function PartyLobby({ ctx, actions }: { ctx: LobbyCtx; actions: PartyActi
 
   return (
     <div className="dock-clearance space-y-4">
+      <RoomShareCard code={ctx.room.code} />
       <PlayersPanel players={ctx.players} me={ctx.me} />
 
       {ctx.isHost ? (
