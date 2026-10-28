@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as JogosRouteImport } from './routes/jogos'
+import { Route as StopRouteImport } from './routes/stop'
 import { Route as FestaCodeRouteImport } from './routes/festa.$code'
 import { Route as SalaCodeRouteImport } from './routes/sala.$code'
 
@@ -22,6 +23,11 @@ const IndexRoute = IndexRouteImport.update({
 const JogosRoute = JogosRouteImport.update({
   id: '/jogos',
   path: '/jogos',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StopRoute = StopRouteImport.update({
+  id: '/stop',
+  path: '/stop',
   getParentRoute: () => rootRouteImport,
 } as any)
 const FestaCodeRoute = FestaCodeRouteImport.update({
@@ -38,12 +44,14 @@ const SalaCodeRoute = SalaCodeRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/jogos': typeof JogosRoute
+  '/stop': typeof StopRoute
   '/festa/$code': typeof FestaCodeRoute
   '/sala/$code': typeof SalaCodeRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/jogos': typeof JogosRoute
+  '/stop': typeof StopRoute
   '/festa/$code': typeof FestaCodeRoute
   '/sala/$code': typeof SalaCodeRoute
 }
@@ -51,20 +59,22 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/jogos': typeof JogosRoute
+  '/stop': typeof StopRoute
   '/festa/$code': typeof FestaCodeRoute
   '/sala/$code': typeof SalaCodeRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/jogos' | '/festa/$code' | '/sala/$code'
+  fullPaths: '/' | '/jogos' | '/stop' | '/festa/$code' | '/sala/$code'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/jogos' | '/festa/$code' | '/sala/$code'
-  id: '__root__' | '/' | '/jogos' | '/festa/$code' | '/sala/$code'
+  to: '/' | '/jogos' | '/stop' | '/festa/$code' | '/sala/$code'
+  id: '__root__' | '/' | '/jogos' | '/stop' | '/festa/$code' | '/sala/$code'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   JogosRoute: typeof JogosRoute
+  StopRoute: typeof StopRoute
   FestaCodeRoute: typeof FestaCodeRoute
   SalaCodeRoute: typeof SalaCodeRoute
 }
@@ -83,6 +93,13 @@ declare module '@tanstack/react-router' {
       path: '/jogos'
       fullPath: '/jogos'
       preLoaderRoute: typeof JogosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/stop': {
+      id: '/stop'
+      path: '/stop'
+      fullPath: '/stop'
+      preLoaderRoute: typeof StopRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/festa/$code': {
@@ -105,6 +122,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   JogosRoute: JogosRoute,
+  StopRoute: StopRoute,
   FestaCodeRoute: FestaCodeRoute,
   SalaCodeRoute: SalaCodeRoute,
 }

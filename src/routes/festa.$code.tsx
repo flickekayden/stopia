@@ -153,7 +153,7 @@ function PartyRoomPage() {
     } finally {
       removePlayer(code);
       setBusy(null);
-      navigate({ to: "/jogos" });
+      navigate({ to: "/" });
     }
   }
 
@@ -166,7 +166,7 @@ function PartyRoomPage() {
       <main className="mx-auto flex min-h-[100dvh] w-full max-w-md flex-col items-center justify-center gap-4 px-5 text-center">
         <h1 className="font-display text-3xl">Sala não encontrada</h1>
         <p className="text-muted-foreground">Confira o código ou crie uma sala nova na Central de Jogos.</p>
-        <Button asChild><Link to="/jogos">Ir para a Central de Jogos</Link></Button>
+        <Button asChild><Link to="/">Ir para a Central de Jogos</Link></Button>
       </main>
     );
   }
@@ -186,7 +186,7 @@ function PartyRoomPage() {
             {busy === "join" ? <Loader2 className="animate-spin" /> : null} Entrar na sala
           </Button>
         </form>
-        <Button asChild variant="ghost"><Link to="/jogos"><ArrowLeft /> Central de Jogos</Link></Button>
+        <Button asChild variant="ghost"><Link to="/"><ArrowLeft /> Central de Jogos</Link></Button>
       </main>
     );
   }

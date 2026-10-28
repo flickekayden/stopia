@@ -34,3 +34,4 @@
 - Non-AI game actions verify the existing hashed player session in addition to host membership; direct table policies remain a separately audited security boundary.
 - Party mini-games use separate party_* tables, `party.server.ts` and `/festa/$code`, never Stop's modules; secrets (infiltrado word/role, anonymous authors, pre-reveal votes) stay in party_private/party_submissions without client grants, never in realtime-readable public_state.
 - Party transitions are version-guarded, recompute submissions from the table and keep scores inside public_state, so concurrent advances resolve once; party AI prompts stay isolated in `party-ai.server.ts` with built-in fallbacks and never control voting or scoring.
+- The games hub is the home route `/`; the Stop entry lives at `/stop` and `/jogos` permanently redirects to `/` to keep old links.

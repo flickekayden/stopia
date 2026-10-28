@@ -1,379 +1,194 @@
-import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
-import { ArrowRight, ChevronDown, DoorOpen, Gamepad2, Loader2, LockKeyhole, Plus, Trash2, Users } from "lucide-react";
+import { ArrowRight, BookOpen, Loader2, Users } from "lucide-react";
 import { toast } from "sonner";
 
-import { Button } from "@/components/ui/button";
+import { PartyIcon } from "@/components/party/PartyIcon";
+import { RulesList } from "@/components/party/RulesList";
 import { useSound } from "@/components/SoundProvider";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { InstallApp } from "@/components/InstallApp";
-import { createRoom, joinRoom } from "@/lib/game.functions";
-import { devText, setDevKey, setDevToken, useEffectiveDevSettings } from "@/lib/dev-settings";
-import { deleteRoom, listRooms, unlockDeveloper } from "@/lib/room-admin.functions";
+import { createPartyRoom, joinPartyRoom } from "@/lib/party.functions";
+import { PARTY_GAMES, PARTY_GAME_IDS, type PartyGameId } from "@/lib/party-games";
 import { getLastNickname, getOrCreateSessionId, savePlayer } from "@/lib/session";
 
 export const Route = createFileRoute("/")({
-  loader: () => listRooms(),
   head: () => ({
     meta: [
-      { title: "STOP! Adedonha online com os amigos" },
-      {
-        name: "description",
-        content:
-          "Crie uma sala, chame a galera e jogue Stop (Adedonha) no celular. A IA avalia as respostas e ainda tira sarro de todo mundo.",
-      },
-      { property: "og:title", content: "STOP! Adedonha online com os amigos" },
-      {
-        property: "og:description",
-        content: "Crie uma sala em segundos e jogue Adedonha no celular com avaliação por IA.",
-      },
+      { title: "Central de Jogos do Stopia — jogos para jogar com os amigos" },
+      { name: "description", content: "Stop, Tribunal dos Amigos, Quem Escreveu Essa Desgraça?, Infiltrado, Debate Impossível e Roleta do Caos: seis jogos em grupo no celular." },
+      { property: "og:title", content: "Central de Jogos do Stopia" },
+      { property: "og:description", content: "Seis jogos para grupos de amigos, direto no celular e sem cadastro." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
   }),
-  component: Home,
+  component: GamesHub,
 });
 
-function Home() {
+function GamesHub() {
   const navigate = useNavigate();
   const { play } = useSound();
-  const router = useRouter();
-  const { rooms, developerUnlocked } = Route.useLoaderData();
-  const create = useServerFn(createRoom);
-  const join = useServerFn(joinRoom);
-  const unlock = useServerFn(unlockDeveloper);
-  const removeRoom = useServerFn(deleteRoom);
+  const create = useServerFn(createPartyRoom);
+  const join = useServerFn(joinPartyRoom);
   const [nickname, setNickname] = useState("");
-  const [entryMode, setEntryMode] = useState<"create" | "join">("create");
-  const [roomsOpen, setRoomsOpen] = useState(false);
   const [code, setCode] = useState("");
-  const [loading, setLoading] = useState<"create" | "join" | null>(null);
-  const [passwordOpen, setPasswordOpen] = useState(false);
-  const [password, setPassword] = useState("");
-  const [unlocking, setUnlocking] = useState(false);
-  const [roomToDelete, setRoomToDelete] = useState<{ id: string; code: string } | null>(null);
-  const [deleting, setDeleting] = useState(false);
-  const [entryError, setEntryError] = useState<string | null>(null);
+  const [busy, setBusy] = useState<PartyGameId | "join" | null>(null);
+  const [rulesFor, setRulesFor] = useState<PartyGameId | null>(null);
+  const [nicknameError, setNicknameError] = useState(false);
 
   useEffect(() => {
     getOrCreateSessionId();
     setNickname(getLastNickname());
   }, []);
-  useEffect(() => {
-    if (developerUnlocked) setDevKey(true);
-  }, [developerUnlocked]);
-  const devSettings = useEffectiveDevSettings();
 
-  async function handleCreate() {
-    if (!nickname.trim()) {
-      setEntryError("Informe seu apelido para continuar.");
-      play("error");
-      toast.error("Coloca um apelido primeiro");
-      return;
-    }
-    setLoading("create");
-    setEntryError(null);
+  function requireNickname() {
+    if (nickname.trim()) return true;
+    setNicknameError(true);
+    play("error");
+    toast.error("Coloca um apelido primeiro");
+    document.getElementById("hub-apelido")?.focus();
+    return false;
+  }
+
+  async function handleCreate(game: PartyGameId) {
+    if (!requireNickname() || busy) return;
+    setBusy(game);
     try {
       const sessionId = getOrCreateSessionId();
-      const res = await create({ data: { nickname: nickname.trim(), sessionId } });
+      const res = await create({ data: { game, nickname: nickname.trim(), sessionId } });
       play("create");
       savePlayer(res.code, res.playerId, nickname.trim(), sessionId);
-      navigate({ to: "/sala/$code", params: { code: res.code } });
-    } catch (e) {
+      navigate({ to: "/festa/$code", params: { code: res.code } });
+    } catch (error) {
       play("error");
-      toast.error(e instanceof Error ? e.message : "Deu ruim ao criar a sala");
+      toast.error(error instanceof Error ? error.message : "Não foi possível criar a sala");
     } finally {
-      setLoading(null);
+      setBusy(null);
     }
   }
 
-  async function handleJoin() {
-    if (!nickname.trim()) {
-      setEntryError("Informe seu apelido para continuar.");
+  async function handleJoin(event: React.FormEvent) {
+    event.preventDefault();
+    if (!requireNickname() || busy) return;
+    if (code.trim().length !== 4) {
       play("error");
-      toast.error("Coloca um apelido primeiro");
+      toast.error("O código da sala tem 4 caracteres");
       return;
     }
-    if (code.trim().length < 4) {
-      setEntryError("O código da sala deve ter 4 caracteres.");
-      play("error");
-      toast.error("Digite o código da sala");
-      return;
-    }
-    setLoading("join");
-    setEntryError(null);
+    setBusy("join");
     try {
       const sessionId = getOrCreateSessionId();
       const res = await join({ data: { code: code.trim(), nickname: nickname.trim(), sessionId } });
-      savePlayer(res.code, res.playerId, nickname.trim(), sessionId);
-      navigate({ to: "/sala/$code", params: { code: res.code } });
-    } catch (e) {
-      play("error");
-      toast.error(e instanceof Error ? e.message : "Não consegui entrar na sala");
-    } finally {
-      setLoading(null);
-    }
-  }
-
-  async function handleUnlock(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setUnlocking(true);
-    try {
-      const result = await unlock({ data: { password } });
-      if (!result.ok) {
-        play("error");
-        toast.error("Senha incorreta");
+      if (res.kind === "stop") {
+        navigate({ to: "/sala/$code", params: { code: res.code } });
         return;
       }
-      setPassword("");
-      setPasswordOpen(false);
-      if (result.token) setDevToken(result.token);
-      setDevKey(true);
-      await router.invalidate();
-      toast.success("Modo desenvolvedor liberado");
+      savePlayer(res.code, res.playerId, nickname.trim(), sessionId);
+      navigate({ to: "/festa/$code", params: { code: res.code } });
     } catch (error) {
       play("error");
-      toast.error(error instanceof Error ? error.message : "Não foi possível validar a senha");
+      toast.error(error instanceof Error ? error.message : "Não foi possível entrar na sala");
     } finally {
-      setUnlocking(false);
+      setBusy(null);
     }
   }
 
-  async function handleDeleteRoom() {
-    if (!roomToDelete) return;
-    setDeleting(true);
-    try {
-      await removeRoom({ data: { roomId: roomToDelete.id } });
-      toast.success(`Sala ${roomToDelete.code} apagada`);
-      setRoomToDelete(null);
-      await router.invalidate();
-    } catch (error) {
-      play("error");
-      toast.error(error instanceof Error ? error.message : "Não foi possível apagar a sala");
-    } finally {
-      setDeleting(false);
-    }
-  }
-
-  function chooseRoom(roomCode: string) {
-    setEntryMode("join");
-    setCode(roomCode);
-    window.requestAnimationFrame(() => document.getElementById("codigo")?.focus());
-  }
+  const rules = rulesFor ? PARTY_GAMES[rulesFor] : null;
 
   return (
-    <main className="home-screen game-screen dock-clearance mx-auto flex min-h-[100dvh] w-full max-w-md flex-col gap-7 px-5 pt-[calc(2rem+env(safe-area-inset-top))]">
-      <header className="text-left">
-        <div className="inline-block">
-          <h1 className="text-balance-safe font-display text-7xl leading-none text-primary">{devText(devSettings.texts.appTitle, "STOP!")}</h1>
-          <span className="mt-3 block h-1 w-14 rounded-full bg-primary" aria-hidden="true" />
-        </div>
-        <p className="mt-4 max-w-80 text-base leading-relaxed text-muted-foreground">
-          Adedonha online com os amigos. Sem cadastro, só apelido e vergonha na cara.
-        </p>
+    <main className="game-screen mx-auto flex min-h-[100dvh] w-full max-w-md flex-col gap-6 px-5 pb-[calc(2rem+env(safe-area-inset-bottom))] pt-[calc(1.25rem+env(safe-area-inset-top))]">
+      <header className="space-y-3 pr-14 pt-2">
+        <h1 className="font-display text-5xl leading-none text-primary">Central de Jogos</h1>
+        <p className="text-base text-muted-foreground">Seis jogos para a galera, no celular e sem cadastro. Escolha um e chame os amigos.</p>
       </header>
 
-      <Link to="/jogos" className="party-card flex min-h-16 items-center gap-3 p-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" data-game="roleta">
-        <span className="party-icon size-11"><Gamepad2 className="size-5" aria-hidden="true" /></span>
-        <span className="min-w-0 flex-1">
-          <span className="block font-bold">Central de Jogos</span>
-          <span className="block text-sm text-muted-foreground">Mais 5 jogos para a galera: Tribunal, Infiltrado, Roleta…</span>
-        </span>
-        <ArrowRight className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
-      </Link>
-
-      <section className="space-y-3">
-        <label className="section-label block" htmlFor="apelido">
-          Seu apelido
-        </label>
+      <section className="space-y-2">
+        <label htmlFor="hub-apelido" className="section-label block">Seu apelido</label>
         <Input
-          id="apelido"
+          id="hub-apelido"
           value={nickname}
           maxLength={20}
-          aria-describedby="nickname-count entry-error"
-          aria-invalid={!!entryError && !nickname.trim()}
-          placeholder="Ex.: Juninho"
           autoComplete="nickname"
-          enterKeyHint={entryMode === "create" ? "go" : "next"}
-          onKeyDown={(event) => { if (event.key === "Enter" && !event.nativeEvent.isComposing && !loading) { if (entryMode === "create") void handleCreate(); else document.getElementById("codigo")?.focus(); } }}
-          onChange={(e) => setNickname(e.target.value)}
+          placeholder="Ex.: Juninho"
+          aria-invalid={nicknameError && !nickname.trim()}
+          onChange={(event) => { setNickname(event.target.value); setNicknameError(false); }}
           className="h-14 text-lg"
         />
-        <p id="nickname-count" className="text-right text-xs tabular-nums text-muted-foreground">{nickname.length}/20 caracteres</p>
-        {entryError && <p id="entry-error" role="alert" className="text-sm text-destructive">{entryError}</p>}
-        <div className="entry-tabs grid grid-cols-2" role="group" aria-label="Entrada na sala">
-          <Button variant={entryMode === "create" ? "selected" : "segment"} aria-pressed={entryMode === "create"} onClick={() => setEntryMode("create")} className="whitespace-nowrap"><Plus /> Nova sala</Button>
-          <Button variant={entryMode === "join" ? "selected" : "segment"} aria-pressed={entryMode === "join"} onClick={() => setEntryMode("join")} className="whitespace-nowrap"><DoorOpen /> Tenho código</Button>
-        </div>
       </section>
 
-      {entryMode === "join" && <section className="space-y-3">
-        <label className="section-label block" htmlFor="codigo">
-          Entrar com código
-        </label>
-        <Input
-          id="codigo"
-          value={code}
-          maxLength={4}
-          aria-describedby={entryError ? "entry-error" : undefined}
-          aria-invalid={!!entryError && code.trim().length < 4}
-          autoCapitalize="characters"
-          autoComplete="off"
-          autoCorrect="off"
-          spellCheck={false}
-          enterKeyHint="go"
-          onKeyDown={(event) => { if (event.key === "Enter" && !event.nativeEvent.isComposing && !loading) void handleJoin(); }}
-          placeholder="ABCD"
-          onChange={(e) => setCode(e.target.value.toUpperCase())}
-          className="h-16 text-center font-display text-3xl tracking-[0.3em]"
-        />
-      </section>}
-
-      <section className="game-section space-y-3" aria-labelledby="salas-title">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <Button variant="ghost" onClick={() => setRoomsOpen((v) => !v)} aria-expanded={roomsOpen} className="justify-start px-0"><h2 id="salas-title" className="text-lg font-bold">Salas criadas</h2><ChevronDown className={`transition-transform ${roomsOpen ? "rotate-180" : ""}`} /></Button>
-            <p className="text-sm text-muted-foreground">
-              {rooms.length === 0 ? "Nenhuma sala por aqui." : `${rooms.length} sala${rooms.length === 1 ? "" : "s"}`}
-            </p>
+      <section className="space-y-3" aria-label="Jogos disponíveis">
+        <article data-game="stop" className="party-card p-4" style={{ "--enter-index": 0 } as React.CSSProperties}>
+          <div className="flex items-start gap-3">
+            <span className="party-icon size-12"><PartyIcon name="stop" className="size-6" /></span>
+            <div className="min-w-0 flex-1">
+              <h2 className="text-lg font-bold leading-tight">Stop</h2>
+              <p className="mt-1 text-sm text-muted-foreground">O clássico Adedonha com o juiz de IA sarcástico de sempre.</p>
+            </div>
           </div>
-          {!developerUnlocked && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              aria-label="Acesso de desenvolvedor"
-              title="Acesso de desenvolvedor"
-              onClick={() => setPasswordOpen(true)}
-            >
-              <LockKeyhole />
-            </Button>
-          )}
-        </div>
+          <Button asChild className="mt-4 h-12 w-full"><Link to="/stop">Jogar Stop <ArrowRight /></Link></Button>
+        </article>
 
-        {roomsOpen && <div className="space-y-2">
-          {rooms.map((room) => {
-            const waiting = room.status === "lobby";
-            const finished = room.status === "ended" || room.status === "finished";
-            return (
-              <article key={room.id} className="player-row flex min-h-20 items-center gap-3 rounded-xl border border-border/70 bg-background p-3">
+        {PARTY_GAME_IDS.map((id, index) => {
+          const game = PARTY_GAMES[id];
+          return (
+            <article key={id} data-game={id} className="party-card p-4" style={{ "--enter-index": index + 1 } as React.CSSProperties}>
+              <div className="flex items-start gap-3">
+                <span className="party-icon size-12"><PartyIcon name={game.icon} className="size-6" /></span>
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <strong className="font-display text-xl tracking-wider">{room.code}</strong>
-                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${waiting ? "bg-primary/12 text-primary" : "bg-muted text-muted-foreground"}`}>
-                      {waiting ? "Aguardando" : finished ? "Encerrada" : `Rodada ${room.currentRound}/${room.totalRounds}`}
-                    </span>
-                  </div>
-                  <div className="mt-1 flex items-center gap-1 text-sm text-muted-foreground">
-                    <Users className="size-4" aria-hidden="true" />
-                    {room.playerCount} jogador{room.playerCount === 1 ? "" : "es"}
-                  </div>
+                  <h2 className="text-balance-safe text-lg font-bold leading-tight">{game.name}</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">{game.short}</p>
+                  <p className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-muted-foreground"><Users className="size-3.5" aria-hidden="true" /> {game.minPlayers}+ jogadores</p>
                 </div>
-                {waiting && (
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="icon"
-                    aria-label={`Usar código da sala ${room.code}`}
-                    title="Entrar nesta sala"
-                    onClick={() => chooseRoom(room.code)}
-                  >
-                    <DoorOpen />
-                  </Button>
-                )}
-                {developerUnlocked && (
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    size="icon"
-                    aria-label={`Apagar sala ${room.code}`}
-                    title="Apagar sala"
-                    onClick={() => setRoomToDelete({ id: room.id, code: room.code })}
-                  >
-                    <Trash2 />
-                  </Button>
-                )}
-              </article>
-            );
-          })}
-        </div>}
+              </div>
+              <div className="mt-4 grid grid-cols-[auto_minmax(0,1fr)] gap-2">
+                <Button variant="secondary" onClick={() => setRulesFor(id)} aria-label={`Como jogar ${game.name}`}><BookOpen /> Regras</Button>
+                <Button className="party-accent-button shadow-none" disabled={busy !== null} aria-busy={busy === id} onClick={() => void handleCreate(id)}>
+                  {busy === id ? <Loader2 className="animate-spin" /> : null}
+                  {busy === id ? "Criando sala…" : "Criar sala"}
+                </Button>
+              </div>
+            </article>
+          );
+        })}
       </section>
 
-      <div className="mobile-bottom-bar fixed inset-x-0 bottom-[var(--keyboard-inset,0px)] mx-auto w-full max-w-md space-y-3 border-t border-border bg-background/95 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] backdrop-blur">
-        <Button onClick={entryMode === "create" ? handleCreate : handleJoin} disabled={loading !== null} aria-busy={loading !== null} className="h-14 w-full text-lg font-bold">
-          {loading ? <Loader2 className="animate-spin" /> : entryMode === "create" ? <Plus /> : <ArrowRight />}
-          {loading === "create" ? "Criando..." : loading === "join" ? "Entrando..." : entryMode === "create" ? "Criar sala" : "Entrar na sala"}
-        </Button>
-        <InstallApp />
-      </div>
+      <form onSubmit={handleJoin} className="party-panel space-y-3" aria-labelledby="hub-join-title">
+        <h2 id="hub-join-title" className="text-lg font-bold">Tem um código?</h2>
+        <p className="text-sm text-muted-foreground">Funciona para qualquer jogo da central, inclusive o Stop.</p>
+        <div className="flex gap-2">
+          <Input
+            value={code}
+            maxLength={4}
+            aria-label="Código da sala"
+            autoCapitalize="characters"
+            autoComplete="off"
+            spellCheck={false}
+            placeholder="ABCD"
+            onChange={(event) => setCode(event.target.value.toUpperCase())}
+            className="h-14 min-w-0 flex-1 text-center font-display text-2xl tracking-[0.3em]"
+          />
+          <Button type="submit" className="h-14 px-5" disabled={busy !== null} aria-busy={busy === "join"}>
+            {busy === "join" ? <Loader2 className="animate-spin" /> : <ArrowRight />} Entrar
+          </Button>
+        </div>
+      </form>
 
-      <Dialog open={passwordOpen} onOpenChange={setPasswordOpen}>
-        <DialogContent className="w-[calc(100%_-_2rem)] rounded-2xl border-border bg-card">
-          <form onSubmit={handleUnlock} className="space-y-4">
-            <DialogHeader>
-              <DialogTitle>Acesso de desenvolvedor</DialogTitle>
-              <DialogDescription>Digite a senha para liberar a exclusão de salas.</DialogDescription>
-            </DialogHeader>
-            <Input
-              type="password"
-              value={password}
-              autoComplete="current-password"
-              autoFocus
-              placeholder="Senha"
-              aria-label="Senha de desenvolvedor"
-              onChange={(event) => setPassword(event.target.value)}
-            />
-            <DialogFooter>
-              <Button type="submit" disabled={unlocking || !password}>
-                {unlocking ? "Validando..." : "Entrar"}
-              </Button>
-            </DialogFooter>
-          </form>
+      <Dialog open={rules !== null} onOpenChange={(open) => !open && setRulesFor(null)}>
+        <DialogContent className="max-h-[85dvh] w-[calc(100%_-_2rem)] overflow-y-auto rounded-2xl border-border bg-card" data-game={rules?.id}>
+          {rules && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="party-accent">{rules.name}</DialogTitle>
+                <DialogDescription>{rules.description}</DialogDescription>
+              </DialogHeader>
+              <RulesList game={rules.id} />
+            </>
+          )}
         </DialogContent>
       </Dialog>
-
-      <AlertDialog open={roomToDelete !== null} onOpenChange={(open) => !open && setRoomToDelete(null)}>
-        <AlertDialogContent className="w-[calc(100%_-_2rem)] rounded-2xl border-border bg-card">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Apagar sala {roomToDelete?.code}?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Jogadores, respostas e todas as rodadas dessa sala serão apagados definitivamente.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              disabled={deleting}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={(event) => {
-                event.preventDefault();
-                void handleDeleteRoom();
-              }}
-            >
-              {deleting ? "Apagando..." : "Apagar sala"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </main>
   );
 }
