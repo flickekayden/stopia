@@ -220,7 +220,7 @@ export type Database = {
         Insert: {
           code: string
           created_at?: string
-          game: string
+          game?: string
           id?: string
           phase?: string
           phase_ends_at?: string | null
