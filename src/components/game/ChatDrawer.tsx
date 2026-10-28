@@ -51,7 +51,7 @@ export function ChatDrawer({
   playerId,
   players,
   locked,
-  voiceControls = false,
+  slotId,
   open,
   quote,
   onOpenChange,
@@ -62,6 +62,8 @@ export function ChatDrawer({
   playerId: string;
   players: Player[];
   locked: boolean;
+  /** Id of the header element the chat button is placed in. */
+  slotId: string;
   voiceControls?: boolean;
   open: boolean;
   quote: AnswerCardData | null;
