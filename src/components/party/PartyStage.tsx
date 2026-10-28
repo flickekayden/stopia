@@ -4,6 +4,7 @@ import { toast } from "sonner";
 
 import { PartyIcon } from "@/components/party/PartyIcon";
 import { RulesList } from "@/components/party/RulesList";
+import { StopLobbySettings, StopRules } from "@/components/party/StopParty";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
@@ -34,7 +35,7 @@ export type PartyCtx = {
   players: PartyPlayer[];
   me: PartyPlayer;
   isHost: boolean;
-  game: PartyGameId;
+  game: LobbyGameId;
   state: PartyPublicState;
   settings: PartySettings;
   view: PartyPrivateView | null;
@@ -52,6 +53,10 @@ export type PartyActions = {
   select: (game: LobbyGameId) => Promise<boolean>;
   replay: () => Promise<boolean>;
   toLobby: () => Promise<boolean>;
+  /** Stop: silently saves answers (draft or "Terminei"); false when the save failed. */
+  stopSave: (answers: Record<string, string>, done: boolean) => Promise<boolean>;
+  /** Stop: shouts STOP! with the player's complete answers. */
+  stopNow: (answers: Record<string, string>) => Promise<boolean>;
 };
 
 function useNow(active: boolean) {
@@ -213,13 +218,9 @@ function SelectedGame({ ctx, actions, selected }: { ctx: LobbyCtx; actions: Part
             <p className="mt-1 text-sm text-muted-foreground">{selected === "stop" ? meta.short : PARTY_GAMES[selected].description}</p>
           </div>
         </div>
-        {selected === "stop" ? (
-          <p className="text-sm text-muted-foreground">Ao começar, todo mundo entra junto numa sala de Stop. Categorias, letras e tempo da rodada são ajustados lá pelo mestre, como sempre.</p>
-        ) : (
-          <RulesList game={selected} />
-        )}
+        {selected === "stop" ? <StopRules /> : <RulesList game={selected} />}
       </section>
-      {selected !== "stop" && <PartySettingsPanel ctx={ctx} actions={actions} game={selected} />}
+      {selected === "stop" ? <StopLobbySettings ctx={ctx} actions={actions} /> : <PartySettingsPanel ctx={ctx} actions={actions} game={selected} />}
     </div>
   );
 }
@@ -337,7 +338,7 @@ function PhaseHeader({ ctx, now }: { ctx: PartyCtx; now: number }) {
   const seconds = endsAt ? Math.max(0, Math.ceil((endsAt - now) / 1000)) : null;
   return (
     <div className="round-hud sticky top-0 z-20 -mx-4 flex items-center gap-3 border-b border-border/70 pb-3 pl-4 pr-[calc(var(--top-actions-space)+0.5rem)] pt-[calc(0.75rem+env(safe-area-inset-top))] backdrop-blur-md">
-      <span className="party-icon size-11"><PartyIcon name={PARTY_GAMES[ctx.game].icon} className="size-5" /></span>
+      <span className="party-icon size-11"><PartyIcon name={lobbyGameMeta(ctx.game).icon} className="size-5" /></span>
       <div className="min-w-0 flex-1">
         <p className="section-label">Rodada <span className="tabular-nums text-foreground">{ctx.room.round_number}</span> de {ctx.settings.rounds}</p>
         <p className="text-balance-safe font-bold leading-tight">{PHASE_LABELS[phase]}</p>
@@ -823,7 +824,7 @@ function PartyReveal({ ctx, actions }: { ctx: PartyCtx; actions: PartyActions })
   return (
     <div className="dock-clearance space-y-4">
       <div className="flex items-center gap-3 pt-2">
-        <span className="party-icon size-12"><PartyIcon name={PARTY_GAMES[ctx.game].icon} className="size-6" /></span>
+        <span className="party-icon size-12"><PartyIcon name={lobbyGameMeta(ctx.game).icon} className="size-6" /></span>
         <div className="min-w-0">
           <p className="section-label">Rodada {ctx.room.round_number} de {ctx.settings.rounds}</p>
           <h2 className="text-2xl leading-tight">Resultado da rodada</h2>
@@ -857,7 +858,7 @@ export function PartyFinal({ ctx, actions, onHub }: { ctx: PartyCtx; actions: Pa
       <header className="stage-glow space-y-2 pt-2 text-center">
         <span className="party-icon mx-auto size-16"><Trophy className="size-8" aria-hidden="true" /></span>
         <h2 className="font-display text-4xl">Fim de jogo!</h2>
-        <p className="text-muted-foreground">{winners.length > 1 ? `Empate no topo: ${winners.map((w) => w.player.nickname).join(", ")}` : `${winners[0]?.player.nickname ?? "Ninguém"} venceu ${PARTY_GAMES[ctx.game].name}!`}</p>
+        <p className="text-muted-foreground">{winners.length > 1 ? `Empate no topo: ${winners.map((w) => w.player.nickname).join(", ")}` : `${winners[0]?.player.nickname ?? "Ninguém"} venceu ${lobbyGameMeta(ctx.game).name}!`}</p>
       </header>
       {winners.length === 1 && ranked.length >= 2 && (
         <div className="grid grid-cols-3 items-end gap-2" aria-hidden="true">

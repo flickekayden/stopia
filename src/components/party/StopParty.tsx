@@ -7,8 +7,7 @@ import { CategoryPresets } from "@/components/game/CategoryPresets";
 import { EvaluationLoading } from "@/components/game/EvaluationLoading";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import type { PartyActions, PartyCtx } from "@/components/party/PartyStage";
-import type { LobbyCtx } from "@/components/party/PartyStage";
+import type { LobbyCtx, PartyActions, PartyCtx } from "@/components/party/PartyStage";
 import { MAX_CATEGORIES_PER_ROUND } from "@/lib/game";
 import { vibrate } from "@/lib/haptics";
 import {
