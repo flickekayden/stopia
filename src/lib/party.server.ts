@@ -864,6 +864,133 @@ async function advanceOnce(room: RoomRow): Promise<boolean> {
   return reveal({ votes, counts: result.counts, multiplier }, result.deltas, null);
 }
 
+/* ----------------------------------- Stop ---------------------------------- */
+
+/** Draws the letter (no repeats within a match) and up to eight least-recently-played categories. */
+async function startStopRound(room: RoomRow, players: PlayerRow[], round: number, scores: Record<string, number>) {
+  const settings = readPartySettings(room.settings);
+  const roomPrivate = await readPrivate<RoomPrivate>(room.id, 0);
+  const letters = round === 1 ? [] : [...(roomPrivate.letters ?? [])];
+  const usage = { ...(roomPrivate.categoryUsage ?? {}) };
+  const letter = pickLetter(letters, []);
+  const categories = pickCategories(settings.categories, usage, Math.min(MAX_CATEGORIES_PER_ROUND, settings.categories.length));
+  const candidate: RoundPrivate = { playerIds: players.map((p) => p.id), salt: randomUUID(), stop: { letter, categories } };
+  // First writer of the round wins; every racer then reads back the same letter and categories.
+  await db().from("party_private").upsert({ room_id: room.id, round_number: round, data: asJson(candidate) }, { onConflict: "room_id,round_number", ignoreDuplicates: true });
+  const stored = await readPrivate<RoundPrivate>(room.id, round);
+  const drawn = stored.stop ?? candidate.stop!;
+  if (stored.salt === candidate.salt) {
+    const now = Date.now();
+    for (const category of drawn.categories) usage[category] = now;
+    await writePrivate(room.id, 0, { ...roomPrivate, letters: [...letters, drawn.letter], categoryUsage: usage } satisfies RoomPrivate);
+  }
+  const startsAt = Date.now() + ROUND_COUNTDOWN_MS;
+  const stop: StopRoundState = { letter: drawn.letter, categories: drawn.categories, startsAt: new Date(startsAt).toISOString() };
+  const state: PartyPublicState = { stop, eligible: stored.playerIds ?? players.map((p) => p.id), submitted: [], scores };
+  return guardedUpdate(room, {
+    status: "playing",
+    round_number: round,
+    phase: "write",
+    phase_started_at: stop.startsAt,
+    phase_ends_at: new Date(startsAt + settings.stopSeconds * 1000).toISOString(),
+    public_state: asJson(state),
+  });
+}
+
+/** STOP!: a player who filled every category locks everyone's answers in three seconds. */
+export async function stopPartyRound(input: { roomId: string; playerId: string; sessionId: string; round: number; answers: unknown }) {
+  const player = await requireSession(input.roomId, input.playerId, input.sessionId);
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    const room = await loadRoom(input.roomId);
+    const state = readPublicState(room.public_state);
+    if (room.game !== "stop" || room.status !== "playing" || room.phase !== "write" || room.round_number !== input.round || !state.stop) {
+      throw new Error("Essa rodada já foi encerrada.");
+    }
+    if (!(state.eligible ?? []).includes(player.id)) throw new Error("Você entra na próxima rodada.");
+    if (Date.now() < Date.parse(state.stop.startsAt)) throw new Error("Aguarde a contagem para começar.");
+    if (state.stop.stopBy) return { ok: true };
+    const answers = sanitizeStopAnswers(input.answers, state.stop.categories);
+    if (!stopAnswersComplete(answers, state.stop.categories)) throw new Error("Preencha todas as categorias para gritar STOP!");
+    await db()
+      .from("party_submissions")
+      .upsert({ room_id: room.id, round_number: room.round_number, phase: "write", player_id: player.id, payload: asJson({ answers, done: true }) }, { onConflict: "room_id,round_number,phase,player_id" });
+    const lockAt = Date.now() + STOP_LOCK_MS;
+    const endsAt = room.phase_ends_at ? Math.min(Date.parse(room.phase_ends_at), lockAt) : lockAt;
+    const updated = await guardedUpdate(room, {
+      phase_ends_at: new Date(endsAt).toISOString(),
+      public_state: asJson({ ...state, stop: { ...state.stop, stopBy: player.id, stopAt: new Date().toISOString() } }),
+    });
+    if (updated) return { ok: true };
+  }
+  throw new Error("A rodada mudou ao mesmo tempo. Tente de novo.");
+}
+
+async function advanceStop(room: RoomRow): Promise<boolean> {
+  const state = readPublicState(room.public_state);
+  if (!state.stop) return false;
+  if (room.phase === "write") {
+    const claimed = await guardedUpdate(room, {
+      phase: "evaluating",
+      phase_started_at: new Date().toISOString(),
+      phase_ends_at: new Date(Date.now() + STOP_EVAL_MS).toISOString(),
+      public_state: asJson({ ...state, submitted: [], ai: { status: "pending" } }),
+    });
+    if (!claimed) return false;
+    await judgeStop(claimed);
+    return true;
+  }
+  if (room.phase === "evaluating") {
+    // Retry only after a failure or when a previous judge request died past its deadline.
+    const running = state.ai?.status === "pending" && room.phase_ends_at !== null && Date.now() < Date.parse(room.phase_ends_at);
+    if (running) return false;
+    const claimed = await guardedUpdate(room, {
+      phase_ends_at: new Date(Date.now() + STOP_EVAL_MS).toISOString(),
+      public_state: asJson({ ...state, ai: { status: "pending" } }),
+    });
+    if (!claimed) return false;
+    await judgeStop(claimed);
+    return true;
+  }
+  return false;
+}
+
+/** Runs Stop's unchanged AI judge with the host's scoring mode and intensity, then reveals and scores. */
+async function judgeStop(room: RoomRow) {
+  const state = readPublicState(room.public_state);
+  const stop = state.stop!;
+  const settings = readPartySettings(room.settings);
+  const [players, subs, saved] = await Promise.all([
+    loadPlayers(room.id),
+    submissionsFor(room, "write"),
+    db().from("app_settings").select("value").eq("key", "ai").maybeSingle(),
+  ]);
+  const eligible = new Set(state.eligible ?? []);
+  const judged = players.filter((p) => eligible.has(p.id));
+  const list = judged.map((p) => {
+    const answers = sanitizeStopAnswers(subs.find((s) => s.player_id === p.id)?.payload.answers, stop.categories);
+    return { jogador_id: p.id, apelido: p.nickname, respostas: answers };
+  });
+  const judge = await import("./stop-judge.server");
+  try {
+    const { evaluation } = await judge.judgeRound({
+      letter: stop.letter,
+      categories: stop.categories,
+      players: list,
+      dev: { ...judge.readSavedJudge(saved.data?.value), sarcasm: STOP_INTENSITY_SARCASM[settings.aiIntensity], scoringMode: settings.scoring },
+    });
+    const deltas = stopRoundDeltas(evaluation.resultados);
+    await guardedUpdate(room, {
+      phase: "reveal",
+      phase_started_at: new Date().toISOString(),
+      phase_ends_at: null,
+      public_state: asJson({ ...state, submitted: [], results: { stop: evaluation.resultados }, deltas, scores: addScores(state.scores ?? {}, deltas), ai: { status: "off" } }),
+    });
+  } catch (err) {
+    const text = err instanceof Error ? err.message : "A IA não respondeu.";
+    await guardedUpdate(room, { phase_ends_at: null, public_state: asJson({ ...state, ai: { status: "failed", text } }) });
+  }
+}
+
 /* ------------------------------- Private view ------------------------------ */
 
 export async function getPartyPrivateView(input: { roomId: string; playerId: string; sessionId: string }): Promise<PartyPrivateViewData> {
