@@ -221,39 +221,11 @@ export function ChatDrawer({
       <Button
         type="button"
         size="icon"
-        aria-label={locked ? `Abrir chat${unread ? ` (${unread} não lidas)` : ""}` : "Abrir chat (arraste para mover)"}
-        onPointerDown={(e) => {
-          if (locked) return;
-          const el = e.currentTarget;
-          const r = el.getBoundingClientRect();
-          dragRef.current = { dx: e.clientX - r.left, dy: e.clientY - r.top, sx: e.clientX, sy: e.clientY, moved: false };
-          el.setPointerCapture(e.pointerId);
-        }}
-        onPointerMove={(e) => {
-          if (locked) return;
-          const d = dragRef.current;
-          if (!d) return;
-          if (!d.moved && Math.hypot(e.clientX - d.sx, e.clientY - d.sy) < 8) return;
-          d.moved = true;
-          const size = 56;
-          setBubblePos({
-            x: Math.min(Math.max(Math.max(0, (window.innerWidth - 448) / 2) + 4, e.clientX - d.dx), Math.max(0, (window.innerWidth - 448) / 2) + Math.min(window.innerWidth, 448) - size - 4),
-            y: Math.min(Math.max(4, e.clientY - d.dy), window.innerHeight - size - 4),
-          });
-        }}
-        onPointerUp={() => {
-          const d = dragRef.current;
-          dragRef.current = null;
-          if (d?.moved) {
-            setBubblePos((p) => {
-              if (p) window.localStorage.setItem("stop-chat-bubble-pos", JSON.stringify(p));
-              return p;
-            });
-          } else onOpenChange(true);
-        }}
-        style={locked ? undefined : bubblePos ? { left: bubblePos.x, top: bubblePos.y, right: "auto", bottom: "auto", touchAction: "none" } : { touchAction: "none" }}
-        variant={locked ? "ghost" : "default"}
-        className={locked ? "relative size-12 rounded-lg text-muted-foreground" : "chat-launcher fixed right-[max(1rem,calc((100vw-28rem)/2+1rem))] z-40 size-14 rounded-full shadow-lg touch-none"}
+        variant="ghost"
+        aria-label={`Abrir chat${unread ? ` (${unread} não lidas)` : ""}`}
+        title="Chat da sala"
+        onClick={() => onOpenChange(true)}
+        className="relative size-12 rounded-lg text-muted-foreground"
       >
         <MessageCircle className="size-6" />
         {unread > 0 && !open && (
@@ -262,11 +234,11 @@ export function ChatDrawer({
               {unread > 99 ? "99+" : unread}
             </span>
             {lastIncoming && !locked && (
-              <span className="absolute right-[4.5rem] top-1/2 w-52 max-w-[calc(100vw-6.5rem)] -translate-y-1/2 animate-in fade-in slide-in-from-right-2 rounded-2xl border border-border bg-popover px-3 py-2 text-left text-popover-foreground shadow-lg">
+              <span className="absolute right-0 top-full z-30 mt-2 w-56 max-w-[calc(100vw-2rem)] animate-in fade-in slide-in-from-top-1 rounded-2xl border border-border bg-popover px-3 py-2 text-left text-popover-foreground shadow-lg">
                 <span className="block truncate text-xs font-bold text-muted-foreground">
                   @{playersById.get(lastIncoming.playerId)?.nickname ?? "Jogador"}
                 </span>
-                <span className="block break-words text-sm leading-snug">
+                <span className="block whitespace-normal break-words text-sm font-normal leading-snug">
                   {lastIncoming.content || "📩 Citou uma resposta"}
                 </span>
               </span>
@@ -277,7 +249,7 @@ export function ChatDrawer({
   );
   return (
     <>
-      {locked ? roundSlot && createPortal(launcher, roundSlot) : launcher}
+      {slot && createPortal(launcher, slot)}
       <Drawer open={open} onOpenChange={onOpenChange} shouldScaleBackground={false}>
         <DrawerContent
           className="h-[70dvh] max-h-[calc(100dvh-1rem)]"
