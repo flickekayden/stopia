@@ -360,6 +360,7 @@ input, select, textarea { font-size: max(16px, 1em); }
   --game-debate: oklch(0.76 0.13 220);
   --game-roleta: oklch(0.79 0.17 145);
 }
+.game-screen, .mobile-sheet { --game-accent: var(--primary); }
 [data-game] { --game-accent: var(--primary); }
 [data-game="tribunal"] { --game-accent: var(--game-tribunal); }
 [data-game="autor"] { --game-accent: var(--game-autor); }
