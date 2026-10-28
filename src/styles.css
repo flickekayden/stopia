@@ -230,7 +230,7 @@ html { scroll-padding-top: 6rem; scroll-padding-bottom: calc(var(--active-dock-h
 .preset-list > button:hover { background: var(--surface-hover); }
 
 /* Round */
-.round-hud { background: color-mix(in oklch, var(--background) 92%, transparent); }
+.round-hud, .room-topbar { background: color-mix(in oklch, var(--background) 92%, transparent); }
 .letter-tile { background: var(--primary); color: var(--primary-foreground); box-shadow: var(--shadow-brand), inset 0 -3px 0 color-mix(in oklch, var(--device-surround) 18%, transparent); }
 .round-timer { font-family: var(--font-display); font-variant-numeric: tabular-nums; line-height: 1; }
 .round-timer[data-state="low"] { color: var(--primary); }

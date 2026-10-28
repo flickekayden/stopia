@@ -505,7 +505,8 @@ function RoomPage() {
           isHost={isHost}
           onStop={handleStop}
         />
-      )}
+        locked={chatLocked}
+        slotId={onRoundBoard ? "round-chat-slot" : "room-chat-slot"}
       </Suspense>
       <ChatDrawer
         roomId={room.id}
