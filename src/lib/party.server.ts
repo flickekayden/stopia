@@ -667,7 +667,7 @@ async function advanceOnce(room: RoomRow): Promise<boolean> {
     return reveal({ entries: revealed }, result.deltas, async () =>
       (await ai()).aiAutorComment({
         pergunta: state.prompt?.text ?? "",
-        respostas: revealed.map((entry) => ({ texto: entry.text, autor: nickname(entry.authorId), acertos: entry.correct.length })),
+        respostas: revealed.map((entry) => ({ texto: entry.text, autor: nickname(entry.authorId), quantos_adivinharam_o_autor: entry.correct.length })),
       }),
     );
   }

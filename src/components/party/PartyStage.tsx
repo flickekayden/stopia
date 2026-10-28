@@ -105,7 +105,7 @@ export function PartyLobby({ ctx, actions }: { ctx: PartyCtx; actions: PartyActi
             <p className="mb-2 text-sm font-semibold text-muted-foreground">Rodadas</p>
             <div className="grid grid-cols-3 gap-2">
               {PARTY_ROUND_OPTIONS.map((n) => (
-                <Button key={n} variant={option(settings.rounds === n)} aria-pressed={settings.rounds === n} disabled={ctx.busy !== null} onClick={() => void actions.updateSettings({ rounds: n })}>{n}</Button>
+                <Button key={n} variant={option(settings.rounds === n)} aria-label={`${n} rodadas`} aria-pressed={settings.rounds === n} disabled={ctx.busy !== null} onClick={() => void actions.updateSettings({ rounds: n })}>{n}</Button>
               ))}
             </div>
           </div>
@@ -132,7 +132,7 @@ export function PartyLobby({ ctx, actions }: { ctx: PartyCtx; actions: PartyActi
                 <p className="mb-2 text-sm font-semibold text-muted-foreground">Pulos de desafio por partida</p>
                 <div className="grid grid-cols-3 gap-2">
                   {PARTY_SKIP_OPTIONS.map((n) => (
-                    <Button key={n} variant={option(settings.skips === n)} aria-pressed={settings.skips === n} disabled={ctx.busy !== null} onClick={() => void actions.updateSettings({ skips: n })}>{n}</Button>
+                    <Button key={n} variant={option(settings.skips === n)} aria-label={`${n} pulos`} aria-pressed={settings.skips === n} disabled={ctx.busy !== null} onClick={() => void actions.updateSettings({ skips: n })}>{n}</Button>
                   ))}
                 </div>
               </div>

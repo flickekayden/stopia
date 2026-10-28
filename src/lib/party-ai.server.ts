@@ -73,7 +73,7 @@ export async function aiAutorPrompt(previous: string[]) {
   return text;
 }
 
-export async function aiAutorComment(input: { pergunta: string; respostas: { texto: string; autor: string; acertos: number }[] }) {
+export async function aiAutorComment(input: { pergunta: string; respostas: { texto: string; autor: string; quantos_adivinharam_o_autor: number }[] }) {
   const result = await generateJsonGemini<{ comentario: string }>({
     instructions: `Você é o apresentador debochado do jogo "Quem Escreveu Essa Desgraça?". Comente a rodada em tom de zoeira leve, elegendo a resposta mais "desgraçada". Não altere pontos. ${SAFETY} Máximo de 45 palavras.`,
     input: JSON.stringify(input),
