@@ -156,10 +156,6 @@ function PartyRoomPage() {
     try {
       const sessionId = getOrCreateSessionId();
       const res = await joinFn({ data: { code, nickname: nickname.trim(), sessionId } });
-      if (res.kind === "stop") {
-        navigate({ to: "/sala/$code", params: { code: res.code } });
-        return;
-      }
       savePlayer(res.code, res.playerId, nickname.trim(), sessionId);
       setIdentity({ playerId: res.playerId, sessionId });
       play("playerJoin");

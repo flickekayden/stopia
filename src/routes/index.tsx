@@ -1,18 +1,20 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
 import { ArrowRight, BookOpen, Clock, Loader2, Users } from "lucide-react";
 import { toast } from "sonner";
 
+import { InstallApp } from "@/components/InstallApp";
 import { PartyIcon } from "@/components/party/PartyIcon";
 import { RulesList } from "@/components/party/RulesList";
+import { StopRules } from "@/components/party/StopParty";
 import { useSound } from "@/components/SoundProvider";
 import { ThemePicker } from "@/components/ThemePicker";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { createPartyRoom, joinPartyRoom } from "@/lib/party.functions";
-import { LOBBY_GAMES, PARTY_GAMES, type PartyGameId } from "@/lib/party-games";
+import { LOBBY_GAMES, PARTY_GAMES, STOP_LOBBY_META, type LobbyGameId } from "@/lib/party-games";
 import { getLastNickname, getOrCreateSessionId, savePlayer } from "@/lib/session";
 
 export const Route = createFileRoute("/")({
@@ -37,7 +39,7 @@ function GamesHub() {
   const [nickname, setNickname] = useState("");
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState<"create" | "join" | null>(null);
-  const [rulesFor, setRulesFor] = useState<PartyGameId | null>(null);
+  const [rulesFor, setRulesFor] = useState<LobbyGameId | null>(null);
   const [nicknameError, setNicknameError] = useState(false);
 
   useEffect(() => {
@@ -83,10 +85,6 @@ function GamesHub() {
     try {
       const sessionId = getOrCreateSessionId();
       const res = await join({ data: { code: code.trim(), nickname: nickname.trim(), sessionId } });
-      if (res.kind === "stop") {
-        navigate({ to: "/sala/$code", params: { code: res.code } });
-        return;
-      }
       savePlayer(res.code, res.playerId, nickname.trim(), sessionId);
       navigate({ to: "/festa/$code", params: { code: res.code } });
     } catch (error) {
@@ -97,7 +95,7 @@ function GamesHub() {
     }
   }
 
-  const rules = rulesFor ? PARTY_GAMES[rulesFor] : null;
+  const rules = rulesFor && rulesFor !== "stop" ? PARTY_GAMES[rulesFor] : null;
 
   return (
     <main className="game-screen mx-auto flex min-h-[100dvh] w-full max-w-md flex-col gap-6 px-5 pb-[calc(2rem+env(safe-area-inset-bottom))] pt-[calc(1.25rem+env(safe-area-inset-top))]">
@@ -143,7 +141,7 @@ function GamesHub() {
               {busy === "join" ? <Loader2 className="animate-spin" /> : <ArrowRight />} Entrar
             </Button>
           </div>
-          <p className="text-xs text-muted-foreground">Funciona para salas da galera e salas antigas de Stop.</p>
+          <p className="text-xs text-muted-foreground">Todos os jogos, incluindo o Stop, acontecem nesta sala.</p>
         </form>
       </section>
 
@@ -164,18 +162,23 @@ function GamesHub() {
                 </p>
               </div>
             </div>
-            {game.id === "stop" ? (
-              <Button asChild variant="secondary" className="mt-4 h-12 w-full"><Link to="/stop">Salas abertas de Stop <ArrowRight /></Link></Button>
-            ) : (
-              <Button variant="secondary" className="mt-4 h-12 w-full" onClick={() => setRulesFor(game.id as PartyGameId)} aria-label={`Como jogar ${game.name}`}><BookOpen /> Regras</Button>
-            )}
+            <Button variant="secondary" className="mt-4 h-12 w-full" onClick={() => setRulesFor(game.id)} aria-label={`Como jogar ${game.name}`}><BookOpen /> Regras</Button>
           </article>
         ))}
       </section>
 
-      <Dialog open={rules !== null} onOpenChange={(open) => !open && setRulesFor(null)}>
-        <DialogContent className="max-h-[85dvh] w-[calc(100%_-_2rem)] overflow-y-auto rounded-2xl border-border bg-card" data-game={rules?.id}>
-          {rules && (
+      <Dialog open={rulesFor !== null} onOpenChange={(open) => !open && setRulesFor(null)}>
+        <DialogContent className="max-h-[85dvh] w-[calc(100%_-_2rem)] overflow-y-auto rounded-2xl border-border bg-card" data-game={rulesFor ?? undefined}>
+          {rulesFor === "stop" ? (
+            <>
+              <DialogHeader>
+                <DialogTitle className="party-accent">{STOP_LOBBY_META.name}</DialogTitle>
+                <DialogDescription>{STOP_LOBBY_META.short} Jogado dentro da sala da galera: o mestre escolhe pontuação, intensidade da IA, rodadas, tempo e categorias.</DialogDescription>
+              </DialogHeader>
+              <StopRules />
+              <p className="text-xs text-muted-foreground">Mínimo de {STOP_LOBBY_META.minPlayers} jogadores · tudo é escrito no app.</p>
+            </>
+          ) : rules && (
             <>
               <DialogHeader>
                 <DialogTitle className="party-accent">{rules.name}</DialogTitle>
@@ -186,6 +189,9 @@ function GamesHub() {
           )}
         </DialogContent>
       </Dialog>
+
+      <InstallApp />
     </main>
+
   );
 }
