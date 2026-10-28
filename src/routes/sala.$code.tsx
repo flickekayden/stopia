@@ -397,11 +397,13 @@ function RoomPage() {
     );
   }
 
+  const finished = room.status === "ended" || room.status === "finished";
+  const onRoundBoard = !finished && room.status !== "lobby" && !!currentRound && !(currentRound.status === "results" && currentRound.evaluation);
+
   return (
-    <main className="mx-auto w-full max-w-md px-4 pt-[calc(0.75rem+env(safe-area-inset-top))]">
-      {connectionError && <div role="alert" className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-destructive p-3 text-sm"><p className="min-w-0 flex-1">{connectionError}</p><Button variant="outline" onClick={reconnect}><RefreshCw /> Reconectar</Button></div>}
+    <main className="mx-auto w-full max-w-md px-4">
       <header className="mb-5 space-y-3 border-b border-border/60 pb-4">
-        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 top-actions-clear">
+        <div className={`room-topbar -mx-4 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 pb-2 pl-4 pt-[calc(0.75rem+env(safe-area-inset-top))] top-actions-clear ${onRoundBoard ? "" : "sticky top-0 z-20 backdrop-blur-md"}`}>
           <div className="min-w-0"><h1 className="font-display text-2xl text-primary">STOP!</h1><Button variant="ghost" title="Copiar link da sala" aria-label={`Copiar link da sala ${room.code}`} className="max-w-full justify-start gap-1.5 px-0 text-xs text-muted-foreground" onClick={async () => {
             try {
               await navigator.clipboard.writeText(`${window.location.origin}/sala/${room.code}`);
@@ -409,18 +411,22 @@ function RoomPage() {
               toast.success("Copiado!", { duration: 1_500 });
             } catch { toast.error("Não foi possível copiar o link."); }
           }}>Sala {room.code}<Copy className="size-3.5 shrink-0" /></Button></div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => void handleExit()}
-            disabled={busy}
-            aria-label="Sair da sala"
-            title="Sair da sala"
-            className="size-12 text-muted-foreground"
-          >
-            <LogOut className="size-5" />
-          </Button>
+          <div className="flex shrink-0 items-center gap-1">
+            <div id="room-chat-slot" className="relative shrink-0" />
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => void handleExit()}
+              disabled={busy}
+              aria-label="Sair da sala"
+              title="Sair da sala"
+              className="size-12 text-muted-foreground"
+            >
+              <LogOut className="size-5" />
+            </Button>
+          </div>
         </div>
+        {connectionError && <div role="alert" className="flex flex-wrap items-center gap-2 rounded-lg border border-destructive p-3 text-sm"><p className="min-w-0 flex-1">{connectionError}</p><Button variant="outline" onClick={reconnect}><RefreshCw /> Reconectar</Button></div>}
         <div className="scoreboard flex items-center gap-2 overflow-x-auto pb-1 text-sm" aria-label="Jogadores e pontuação">
           {[...players]
             .sort((a, b) => b.score - a.score)
