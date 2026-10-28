@@ -5,6 +5,7 @@ import { ArrowLeft, Copy, Loader2, LogOut } from "lucide-react";
 import { toast } from "sonner";
 
 import { PartyFinal, PartyLobby, PartyPlay, type LobbyCtx, type PartyActions, type PartyCtx } from "@/components/party/PartyStage";
+import { StopPartyPlay } from "@/components/party/StopParty";
 import { useSound } from "@/components/SoundProvider";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
@@ -12,12 +13,10 @@ import { Input } from "@/components/ui/input";
 import { usePartyRoom } from "@/hooks/use-party-room";
 import { vibrate } from "@/lib/haptics";
 import { setDevGameContext } from "@/lib/dev-settings";
-import { createRoom as createStopRoom, joinRoom as joinStopRoom } from "@/lib/game.functions";
 import {
   advancePartyPhase,
   joinPartyRoom,
   leavePartyRoom,
-  linkPartyStop,
   nextPartyRound,
   replayPartyGame,
   restartPartyRoom,
@@ -25,11 +24,12 @@ import {
   selectPartyGame,
   skipRoletaChallenge,
   startPartyGame,
+  stopPartyRound,
   submitPartyAction,
   updatePartySettings,
 } from "@/lib/party.functions";
-import { isPartyGame, PARTY_GAMES, readPartySettings, readPublicState, readRoomGame } from "@/lib/party-games";
-import { getLastNickname, getOrCreateSessionId, getPlayer, removePlayer, savePartyLink, savePlayer } from "@/lib/session";
+import { isPartyGame, lobbyGameMeta, readPartySettings, readPublicState, readRoomGame } from "@/lib/party-games";
+import { getLastNickname, getOrCreateSessionId, getPlayer, removePlayer, savePlayer } from "@/lib/session";
 
 export const Route = createFileRoute("/festa/$code")({
   head: () => ({
@@ -67,9 +67,7 @@ function PartyRoomPage() {
   const selectFn = useServerFn(selectPartyGame);
   const replayFn = useServerFn(replayPartyGame);
   const lobbyFn = useServerFn(returnPartyToLobby);
-  const linkStopFn = useServerFn(linkPartyStop);
-  const createStopFn = useServerFn(createStopRoom);
-  const joinStopFn = useServerFn(joinStopRoom);
+  const stopFn = useServerFn(stopPartyRound);
 
   useEffect(() => {
     const sessionId = getOrCreateSessionId();
@@ -80,7 +78,6 @@ function PartyRoomPage() {
 
   const me = identity ? players.find((p) => p.id === identity.playerId) ?? null : null;
   const game = readRoomGame(room?.game);
-  const stopCode = room?.status === "playing" && game === "stop" ? readPublicState(room.public_state).stopCode ?? null : null;
 
   // The developer panel only offers settings for the game this room is on.
   useEffect(() => {
@@ -117,50 +114,24 @@ function PartyRoomPage() {
       },
       next: () => run("next", () => nextFn({ data: { ...base, round: room.round_number } })),
       skip: () => run("skip", () => skipFn({ data: { ...base, round: room.round_number } })),
-      start: () => run("start", async () => {
-        if (readRoomGame(room.game) !== "stop") {
-          await startFn({ data: base });
-          return;
-        }
-        // Stop keeps its own room, rules and AI: the host opens one and the group follows its code.
-        const host = players.find((p) => p.id === identity.playerId);
-        if (!host) throw new Error("Você não está mais nesta sala.");
-        const stop = await createStopFn({ data: { nickname: host.nickname, sessionId: identity.sessionId } });
-        savePlayer(stop.code, stop.playerId, host.nickname, identity.sessionId);
-        savePartyLink(stop.code, room.code);
-        await linkStopFn({ data: { ...base, stopCode: stop.code, stopPlayerId: stop.playerId } });
-        followedStop.current = stop.code;
-        play("create");
-        navigate({ to: "/sala/$code", params: { code: stop.code } });
-      }),
+      start: () => run("start", () => startFn({ data: base })),
       restart: () => run("restart", () => restartFn({ data: base })),
       updateSettings: (settings) => run("settings", () => settingsFn({ data: { ...base, settings } })),
       select: (choice) => run("select", async () => { await selectFn({ data: { ...base, game: choice } }); vibrate(10); }),
       replay: () => run("replay", () => replayFn({ data: base })),
       toLobby: () => run("lobby", () => lobbyFn({ data: base })),
+      stopSave: async (answers, done) => {
+        try {
+          await submitFn({ data: { ...base, round: room.round_number, phase: "write", payload: { answers, done } } });
+          if (done) { vibrate(15); play("ready"); }
+          return true;
+        } catch {
+          return false;
+        }
+      },
+      stopNow: (answers) => run("stop", async () => { await stopFn({ data: { ...base, round: room.round_number, answers } }); vibrate(40); }),
     };
-  }, [room, identity, players, run, submitFn, advanceFn, nextFn, skipFn, startFn, restartFn, settingsFn, selectFn, replayFn, lobbyFn, linkStopFn, createStopFn, navigate, refresh, play]);
-
-  // Everyone in the group follows the host into the Stop room (late joiners too).
-  const followedStop = useRef<string | null>(null);
-  const [followError, setFollowError] = useState<string | null>(null);
-  const followStop = useCallback(async (target: string) => {
-    if (!identity || !me) return;
-    followedStop.current = target;
-    setFollowError(null);
-    try {
-      const res = await joinStopFn({ data: { code: target, nickname: me.nickname, sessionId: identity.sessionId } });
-      savePlayer(res.code, res.playerId, me.nickname, identity.sessionId);
-      savePartyLink(res.code, code);
-      navigate({ to: "/sala/$code", params: { code: res.code } });
-    } catch (err) {
-      setFollowError(err instanceof Error ? err.message : "Não foi possível entrar no Stop.");
-    }
-  }, [code, identity, joinStopFn, me, navigate]);
-  useEffect(() => {
-    if (!stopCode || followedStop.current === stopCode || busy === "start") return;
-    void followStop(stopCode);
-  }, [stopCode, followStop, busy]);
+  }, [room, identity, run, submitFn, advanceFn, nextFn, skipFn, startFn, restartFn, settingsFn, selectFn, replayFn, lobbyFn, stopFn, refresh, play]);
 
   // Phase-change feedback without new game states.
   const lastPhase = useRef<string | null>(null);
@@ -229,7 +200,7 @@ function PartyRoomPage() {
     );
   }
 
-  const label = isPartyGame(game) ? PARTY_GAMES[game].name : game === "stop" ? "Stop" : "Sala da Galera";
+  const label = game === "lobby" ? "Sala da Galera" : lobbyGameMeta(game).name;
   const dataGame = game === "lobby" ? undefined : game;
 
   if (!me || !identity || !actions) {
@@ -251,7 +222,7 @@ function PartyRoomPage() {
   }
 
   const settings = readPartySettings(room.settings);
-  const ctx: PartyCtx | null = isPartyGame(game)
+  const ctx: PartyCtx | null = isPartyGame(game) || game === "stop"
     ? { room, players, me, isHost: me.is_host, game, state: readPublicState(room.public_state), settings, view: privateView, busy }
     : null;
   const lobbyCtx: LobbyCtx = { room, players, me, isHost: me.is_host, selected: game === "lobby" ? null : game, settings, busy };
@@ -259,7 +230,7 @@ function PartyRoomPage() {
   return (
     <main data-game={dataGame} className="game-screen mx-auto w-full max-w-md px-4 pt-[calc(0.75rem+env(safe-area-inset-top))]">
       {error && <p role="alert" className="mb-3 rounded-lg border border-destructive/60 p-3 text-sm">{error}</p>}
-      {room.status !== "playing" || room.phase === "reveal" || game === "stop" ? (
+      {room.status !== "playing" || room.phase === "reveal" ? (
         <header className="mb-4 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-border/60 pb-3 top-actions-clear">
           <div className="min-w-0">
             <p className="section-label party-accent truncate">{label}</p>
@@ -280,16 +251,10 @@ function PartyRoomPage() {
 
       {room.status === "lobby" ? (
         <PartyLobby ctx={lobbyCtx} actions={actions} />
-      ) : game === "stop" ? (
-        <section className="party-prompt space-y-4 text-center" role="status">
-          <Loader2 className="mx-auto size-8 animate-spin text-primary" aria-hidden="true" />
-          <h2 className="text-xl font-bold">Abrindo o Stop para a galera…</h2>
-          {followError && <p role="alert" className="text-sm text-muted-foreground">{followError}</p>}
-          {stopCode && <Button className="h-12 w-full" onClick={() => void followStop(stopCode)}>Entrar no Stop</Button>}
-          {me.is_host && <Button variant="secondary" className="h-12 w-full" disabled={busy !== null} onClick={() => void actions.toLobby()}><ArrowLeft /> Voltar ao lobby</Button>}
-        </section>
       ) : !ctx ? null : room.status === "ended" ? (
         <PartyFinal ctx={ctx} actions={actions} onHub={() => setLeaveOpen(true)} />
+      ) : ctx.game === "stop" ? (
+        <StopPartyPlay ctx={ctx} actions={actions} />
       ) : (
         <PartyPlay ctx={ctx} actions={actions} />
       )}
