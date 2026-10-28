@@ -123,11 +123,11 @@ export async function aiDebateComment(input: { tema: string; lado_a: string; lad
   return clean(result.comentario, 400);
 }
 
-export async function aiRoletaChallenge(intensity: "leve" | "media" | "caotica", previous: string[], tone?: PartyTone) {
+export async function aiRoletaChallenge(intensity: "leve" | "media" | "caotica", previous: string[], adminTone?: PartyTone) {
   const tone = intensity === "leve" ? "bem leve e fofo" : intensity === "media" ? "engraçado e criativo" : "caótico e absurdo, porém inofensivo";
   const result = await withTimeout(
     generateJsonGemini<{ titulo: string; desafio: string }>({
-      instructions: `Você cria desafios para a "Roleta do Caos". O desafio é cumprido POR ESCRITO no celular, em uma resposta curta. Tom: ${tone}. ${SAFETY} Nunca peça informações pessoais, fotos, contato com terceiros ou ações físicas. Título com até 4 palavras; desafio com até 25 palavras.${toneLine(tone)}`,
+      instructions: `Você cria desafios para a "Roleta do Caos". O desafio é cumprido POR ESCRITO no celular, em uma resposta curta. Tom: ${tone}. ${SAFETY} Nunca peça informações pessoais, fotos, contato com terceiros ou ações físicas. Título com até 4 palavras; desafio com até 25 palavras.${toneLine(adminTone)}`,
       input: JSON.stringify({ evitar_parecidos_com: previous.slice(-10) }),
       schemaName: "roleta_challenge",
       schema: { type: "object", additionalProperties: false, required: ["titulo", "desafio"], properties: { titulo: { type: "string" }, desafio: { type: "string" } } },
