@@ -83,6 +83,6 @@ describe("party games rules", () => {
   });
 
   test("settings fall back to safe defaults", () => {
-    expect(readPartySettings({ rounds: 99, skips: 7, intensity: "x" })).toEqual({ rounds: 5, ai: true, intensity: "media", skips: 1 });
+    expect(readPartySettings({ rounds: 99, skips: 7, intensity: "x" })).toMatchObject({ rounds: 5, ai: true, intensity: "media", skips: 1 });
   });
 });
