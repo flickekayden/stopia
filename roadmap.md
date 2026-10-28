@@ -72,3 +72,7 @@
 - [x] Adicionar notificações de sala, conclusão, STOP, tempo, reações e respostas de 20 pontos
 - [x] Desativar preenchimento automático e correção nos campos de respostas
 - [x] Focar a primeira resposta ao iniciar e rolar ao topo em cada categoria avaliada
+
+- [x] Product-designer pass: round HUD no longer jumps between fields, clears the sound button, compacts on scroll
+- [x] Last answer's Enter brings Terminei/STOP into view; home tabs fit on one line; room header exit button aligned
+- [x] Verify two-player round, results and narrow screens

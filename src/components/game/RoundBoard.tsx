@@ -61,8 +61,10 @@ export function RoundBoard({
   }, [now, play, round.status, startCount, startsAt]);
   const [focusedCat, setFocusedCat] = useState<string | null>(null);
   const [keyboardOpen, setKeyboardOpen] = useState(false);
-  const compactHeader = focusedCat !== null || keyboardOpen;
+  const [scrolledPastHud, setScrolledPastHud] = useState(false);
+  const compactHeader = focusedCat !== null || keyboardOpen || scrolledPastHud;
   const filledCount = round.categories.filter((c) => (values[c] ?? "").trim()).length;
+  const actionsBar = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const viewport = window.visualViewport;
@@ -72,6 +74,32 @@ export function RoundBoard({
     resize();
     return () => viewport.removeEventListener("resize", resize);
   }, []);
+
+  // Compact the HUD once the player scrolls into the fields; hysteresis avoids flicker at the threshold.
+  useEffect(() => {
+    let frame = 0;
+    const onScroll = () => {
+      if (frame) return;
+      frame = window.requestAnimationFrame(() => {
+        frame = 0;
+        const y = window.scrollY;
+        setScrolledPastHud((current) => (current ? y > 40 : y > 140));
+      });
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      if (frame) window.cancelAnimationFrame(frame);
+    };
+  }, []);
+
+  function releaseFocus() {
+    // Moving between answers fires blur before the next focus; keep the HUD compact across that gap.
+    window.requestAnimationFrame(() => {
+      if (!(document.activeElement instanceof HTMLInputElement && document.activeElement.id.startsWith("answer-field-"))) setFocusedCat(null);
+    });
+  }
 
   useEffect(() => {
     setValues({});
@@ -251,7 +279,7 @@ export function RoundBoard({
 
   return (
     <div className="game-screen dock-clearance space-y-4">
-      <div className={`round-hud sticky top-0 z-20 -mx-4 flex items-center border-b border-border/70 px-4 pt-[calc(0.75rem+env(safe-area-inset-top))] backdrop-blur-md transition-[padding] duration-200 ${compactHeader ? "gap-3 pb-3" : "gap-4 pb-4"}`}>
+      <div className={`round-hud sticky top-0 z-20 -mx-4 flex items-center border-b border-border/70 pl-4 pr-[4.5rem] pt-[calc(0.75rem+env(safe-area-inset-top))] backdrop-blur-md transition-[padding] duration-200 ${compactHeader ? "gap-3 pb-3" : "gap-4 pb-4"}`}>
         <div className={`letter-tile flex shrink-0 items-center justify-center transition-[width,height,border-radius] duration-200 ${compactHeader ? "size-11 rounded-lg" : "size-20 rounded-2xl"}`} aria-label={`Letra ${round.letter}`}>
           <span className={`font-display leading-none ${compactHeader ? "text-3xl" : "text-6xl"}`}>{round.letter}</span>
         </div>
@@ -342,12 +370,16 @@ export function RoundBoard({
                 if (event.key !== "Enter" || event.nativeEvent.isComposing) return;
                 event.preventDefault();
                 const next = answerInputs.current[index + 1];
-                if (next) { next.focus(); next.scrollIntoView({ behavior: "smooth", block: "center" }); }
-                else { event.currentTarget.blur(); setFocusedCat(null); }
+                if (next) { next.focus({ preventScroll: true }); next.scrollIntoView({ behavior: "smooth", block: "center" }); }
+                else {
+                  event.currentTarget.blur();
+                  // Bring "Terminei" and "STOP!" into reach once the last answer is done.
+                  window.setTimeout(() => actionsBar.current?.scrollIntoView({ behavior: "smooth", block: "end" }), 120);
+                }
               }}
               inputMode="text"
               onFocus={() => setFocusedCat(category)}
-              onBlur={() => setFocusedCat(null)}
+              onBlur={releaseFocus}
               name={`stop-answer-${index}`}
               data-form-type="other"
               data-lpignore="true"
@@ -359,7 +391,7 @@ export function RoundBoard({
       </div>
 
       {saveError && <div role="alert" className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-destructive/70 bg-destructive/10 p-3 text-sm"><p>Suas respostas continuam aqui, mas ainda não foram salvas.</p><Button variant="outline" disabled={sending || starting || round.status !== "answering"} onClick={() => void flush()}>Tentar salvar</Button></div>}
-      <div className={`mt-6 flex w-full flex-wrap gap-3 ${dev.buttonLayout === "reversed" ? "flex-row-reverse" : dev.buttonLayout === "stacked" ? "flex-col" : ""} border-t border-border/70 pt-5 pb-[calc(2rem+env(safe-area-inset-bottom))]`}>
+      <div ref={actionsBar} className={`round-actions mt-6 flex w-full flex-wrap gap-3 ${dev.buttonLayout === "reversed" ? "flex-row-reverse" : dev.buttonLayout === "stacked" ? "flex-col" : ""} border-t border-border/70 pt-5 pb-[calc(2rem+env(safe-area-inset-bottom))]`}>
         {evaluating ? (
           <EvaluationLoading />
         ) : (

@@ -212,8 +212,8 @@ function Home() {
         <p id="nickname-count" className="text-right text-xs tabular-nums text-muted-foreground">{nickname.length}/20 caracteres</p>
         {entryError && <p id="entry-error" role="alert" className="text-sm text-destructive">{entryError}</p>}
         <div className="entry-tabs grid grid-cols-2" role="group" aria-label="Entrada na sala">
-          <Button variant={entryMode === "create" ? "selected" : "segment"} aria-pressed={entryMode === "create"} onClick={() => setEntryMode("create")}><Plus /> Criar nova sala</Button>
-          <Button variant={entryMode === "join" ? "selected" : "segment"} aria-pressed={entryMode === "join"} onClick={() => setEntryMode("join")}><DoorOpen /> Entrar com código</Button>
+          <Button variant={entryMode === "create" ? "selected" : "segment"} aria-pressed={entryMode === "create"} onClick={() => setEntryMode("create")} className="whitespace-nowrap"><Plus /> Nova sala</Button>
+          <Button variant={entryMode === "join" ? "selected" : "segment"} aria-pressed={entryMode === "join"} onClick={() => setEntryMode("join")} className="whitespace-nowrap"><DoorOpen /> Tenho código</Button>
         </div>
       </section>
 

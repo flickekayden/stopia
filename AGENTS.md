@@ -25,11 +25,10 @@
 - Device haptics and installation prompts run only in effects or user handlers with capability checks so SSR and unsupported browsers stay safe.
 - UI hierarchy uses unframed game-section bands, shared segmented Button variants and global semantic surface/focus tokens; keep presentation changes separate from multiplayer state and developer overrides.
 - Visual refresh uses game-screen-scoped typography and layout classes with shared control variants so developer overrides and multiplayer logic remain independent of presentation.
-- Built-in keyboard keys use the keyboard-key exception to the global minimum-width rule so standard QWERTY rows fit the smartphone shell without horizontal overflow.
 - SettingsRuntime mounts useDockLayout to measure the active action bar and share scroll/chat clearance; short viewports keep bars in document flow so content remains reachable without changing game state.
 - Round starts use a future server-issued started_at and matching ends_at; shared timing helpers gate inputs and STOP without a schema change or device-local countdown origin.
 - ChatDrawer owns one chat subscription and portals its compact launcher into the active round header so message state survives phase transitions without floating over inputs.
-- Device keyboard overrides hydrate from storage in effects and fall back to global developer settings until explicitly chosen, preserving SSR and device preference boundaries.
+- Round answers use only the device's native keyboard with in-flow finish/STOP actions; the sticky round HUD compacts on answer focus, open keyboard or scroll (with hysteresis) and reserves space for the global sound control so typing never triggers header jumps or overlaps.
 - Final rankings use a browser-safe competition-rank helper so equal totals share a place without changing stored scoring rules.
 - Answer saves are serialized per round and late hydration preserves locally edited fields so slow acknowledgements cannot overwrite newer input.
 - Non-AI game actions verify the existing hashed player session in addition to host membership; direct table policies remain a separately audited security boundary.

@@ -368,7 +368,7 @@ function RoomPage() {
     <main className="mx-auto w-full max-w-md px-4 pt-[calc(0.75rem+env(safe-area-inset-top))]">
       {connectionError && <div role="alert" className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-destructive p-3 text-sm"><p className="min-w-0 flex-1">{connectionError}</p><Button variant="outline" onClick={reconnect}><RefreshCw /> Reconectar</Button></div>}
       <header className="mb-5 space-y-3 border-b border-border/60 pb-4">
-        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 pr-28">
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 pr-16">
           <div className="min-w-0"><h1 className="font-display text-2xl text-primary">STOP!</h1><Button variant="ghost" title="Copiar link da sala" aria-label={`Copiar link da sala ${room.code}`} className="max-w-full justify-start gap-1.5 px-0 text-xs text-muted-foreground" onClick={async () => {
             try {
               await navigator.clipboard.writeText(`${window.location.origin}/sala/${room.code}`);
