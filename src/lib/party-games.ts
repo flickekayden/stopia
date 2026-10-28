@@ -191,6 +191,8 @@ export type PartyPublicState = {
   scores?: Record<string, number>;
   ai?: PartyAiState;
   skipsLeft?: number;
+  /** Code of the Stop room the group is playing right now (public: Stop codes are shareable). */
+  stopCode?: string;
 };
 
 export function readPublicState(raw: unknown): PartyPublicState {
