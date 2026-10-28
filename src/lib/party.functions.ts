@@ -6,7 +6,7 @@ const gameId = z.enum(["tribunal", "autor", "infiltrado", "debate", "roleta"]);
 const server = () => import("./party.server");
 
 export const createPartyRoom = createServerFn({ method: "POST" })
-  .inputValidator((input: unknown) => z.object({ game: gameId, nickname: z.string().trim().min(1).max(20), sessionId: z.string().uuid() }).parse(input))
+  .inputValidator((input: unknown) => z.object({ game: gameId.optional(), nickname: z.string().trim().min(1).max(20), sessionId: z.string().uuid() }).parse(input))
   .handler(async ({ data }) => (await server()).createPartyRoom(data));
 
 export const joinPartyRoom = createServerFn({ method: "POST" })
@@ -65,3 +65,38 @@ export const advancePartyPhase = createServerFn({ method: "POST" })
 export const getPartyPrivateView = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => z.object(session).parse(input))
   .handler(async ({ data }) => (await server()).getPartyPrivateView(data));
+
+export const selectPartyGame = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => z.object({ ...session, game: z.union([gameId, z.literal("stop")]) }).parse(input))
+  .handler(async ({ data }) => (await server()).selectPartyGame(data));
+
+export const returnPartyToLobby = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => z.object(session).parse(input))
+  .handler(async ({ data }) => (await server()).returnPartyToLobby(data));
+
+export const replayPartyGame = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => z.object(session).parse(input))
+  .handler(async ({ data }) => (await server()).replayPartyGame(data));
+
+export const linkPartyStop = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => z.object({ ...session, stopCode: z.string().trim().length(4), stopPlayerId: z.string().uuid() }).parse(input))
+  .handler(async ({ data }) => (await server()).linkPartyStop(data));
+
+/** Per-game developer settings (timings, AI tone, chaos events); not secret, read by the admin panel. */
+export const getPartyAdmin = createServerFn({ method: "GET" }).handler(async () => (await server()).loadPartyAdmin());
+
+export const savePartyAdmin = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        token: z.string().max(200).optional(),
+        game: gameId,
+        config: z.object({
+          seconds: z.record(z.string(), z.number().int()).optional(),
+          tone: z.enum(["padrao", "leve", "acido", "teatral"]).optional(),
+          events: z.boolean().optional(),
+        }),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }) => (await server()).savePartyAdmin(data));

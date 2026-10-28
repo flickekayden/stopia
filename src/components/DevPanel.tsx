@@ -1,14 +1,16 @@
+import { useRouterState } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { FlaskConical, Loader2, RefreshCw, RotateCcw, Save, Settings } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
 import { AnswerCard, type AnswerCardData } from "@/components/game/AnswerCard";
+import { PartyAdminPanel } from "@/components/party/PartyAdminPanel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -20,8 +22,10 @@ import {
   resetDevSettings,
   setGlobalSettings,
   updateDevSettings,
+  useDevGameContext,
   useDevRound,
   useDevSettings,
+  type DevGameContext,
   type DevSettings,
   type GeminiModel,
 } from "@/lib/dev-settings";
@@ -47,11 +51,31 @@ function sample(points: number, response: string, comment: string): AnswerCardDa
   return { roundId: "dev", category: "Animal", playerId: `dev-${points}-${response}`, playerName: "Testador", response, points, comment };
 }
 
+const CONTEXT_LABELS: Record<DevGameContext, string> = {
+  global: "Geral",
+  stop: "Stop",
+  tribunal: "Tribunal dos Amigos",
+  autor: "Quem Escreveu?",
+  infiltrado: "Infiltrado",
+  debate: "Debate Impossível",
+  roleta: "Roleta do Caos",
+};
+
+/** Settings shown depend on where the developer is: global on the hub/lobby, per game inside a game. */
+function useActiveContext(): DevGameContext {
+  const pathname = useRouterState({ select: (state) => state.location.pathname });
+  const groupGame = useDevGameContext();
+  if (pathname.startsWith("/stop") || pathname.startsWith("/sala")) return "stop";
+  if (pathname.startsWith("/festa")) return groupGame;
+  return "global";
+}
+
 export function DevPanel() {
   const { isDev, settings: s } = useDevSettings();
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const save = useServerFn(saveAiSettings);
+  const context = useActiveContext();
   if (!isDev) return null;
 
   const patch = (fn: (p: DevSettings) => DevSettings) => updateDevSettings(fn);
@@ -61,7 +85,7 @@ export function DevPanel() {
       <Button
         variant="secondary"
         size="icon"
-        aria-label="Configurações Dev"
+        aria-label={`Configurações Dev: ${CONTEXT_LABELS[context]}`}
         onClick={() => setOpen(true)}
         className="fixed right-[max(4rem,calc((100vw-28rem)/2+4rem))] top-[calc(0.75rem+env(safe-area-inset-top))] z-40 size-12 rounded-full border border-border shadow-lg"
       >
@@ -70,31 +94,17 @@ export function DevPanel() {
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent side="bottom" className="mobile-sheet h-[85dvh] overflow-y-auto">
           <SheetHeader>
-            <SheetTitle>⚙️ Configurações Dev</SheetTitle>
+            <SheetTitle>⚙️ Configurações Dev · {CONTEXT_LABELS[context]}</SheetTitle>
+            <SheetDescription>
+              {context === "global" ? "Ajustes gerais do app. As regras de cada jogo aparecem dentro do próprio jogo." : `Só ajustes de ${CONTEXT_LABELS[context]}.`}
+            </SheetDescription>
           </SheetHeader>
-          <Tabs defaultValue="visual" className="px-4 pb-6">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="visual">Visual</TabsTrigger>
-              <TabsTrigger value="teclado">Teclado</TabsTrigger>
-              <TabsTrigger value="ia">IA</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="visual" className="space-y-5 pt-3">
-              <section className="space-y-2">
-                <Label>Posição dos botões da rodada</Label>
-                <Select
-                  value={s.buttonLayout}
-                  onValueChange={(v) => patch((p) => ({ ...p, buttonLayout: v as DevSettings["buttonLayout"] }))}
-                >
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="default">Padrão (Terminei | STOP)</SelectItem>
-                    <SelectItem value="reversed">Invertido (STOP | Terminei)</SelectItem>
-                    <SelectItem value="stacked">Empilhado</SelectItem>
-                  </SelectContent>
-                </Select>
-              </section>
-
+          {context !== "global" && context !== "stop" ? (
+            <PartyAdminPanel key={context} game={context} />
+          ) : (
+          <>
+          {context === "global" ? (
+            <div className="space-y-5 px-4 pb-6 pt-3">
               <section className="space-y-2">
                 <Label>Cores</Label>
                 <div className="grid grid-cols-2 gap-2">
@@ -119,6 +129,31 @@ export function DevPanel() {
                     </label>
                   ))}
                 </div>
+              </section>
+
+            </div>
+          ) : (
+          <Tabs defaultValue="visual" className="px-4 pb-6">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="visual">Visual</TabsTrigger>
+              <TabsTrigger value="teclado">Teclado</TabsTrigger>
+              <TabsTrigger value="ia">IA</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="visual" className="space-y-5 pt-3">
+              <section className="space-y-2">
+                <Label>Posição dos botões da rodada</Label>
+                <Select
+                  value={s.buttonLayout}
+                  onValueChange={(v) => patch((p) => ({ ...p, buttonLayout: v as DevSettings["buttonLayout"] }))}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="default">Padrão (Terminei | STOP)</SelectItem>
+                    <SelectItem value="reversed">Invertido (STOP | Terminei)</SelectItem>
+                    <SelectItem value="stacked">Empilhado</SelectItem>
+                  </SelectContent>
+                </Select>
               </section>
 
               <section className="space-y-2">
@@ -199,6 +234,7 @@ export function DevPanel() {
               <AiTab s={s} patch={patch} />
             </TabsContent>
           </Tabs>
+          )}
           <div className="sticky bottom-0 space-y-2 border-t border-border bg-background px-4 pt-3 pb-[calc(1rem+env(safe-area-inset-bottom))]">
             <Button
               className="w-full"
@@ -234,6 +270,8 @@ export function DevPanel() {
               <RotateCcw /> Restaurar padrões
             </Button>
           </div>
+          </>
+          )}
         </SheetContent>
       </Sheet>
     </>

@@ -30,8 +30,13 @@ import {
   PARTY_GAME_IDS,
   PARTY_TEXT_MAX,
   PHASE_SECONDS,
+  isPartyGame,
+  missingPlayers,
+  phaseSecondsFor,
+  readPartyAdmin,
   readPartySettings,
   readPublicState,
+  type PartyAdminConfig,
   type PartyEntry,
   type PartyGameId,
   type PartyPhaseId,
@@ -88,9 +93,38 @@ function gameOf(room: RoomRow): PartyGameId {
   return (PARTY_GAME_IDS as readonly string[]).includes(room.game) ? (room.game as PartyGameId) : "tribunal";
 }
 
-function deadline(phase: PartyPhaseId) {
-  const seconds = PHASE_SECONDS[phase];
+function deadline(game: PartyGameId, phase: PartyPhaseId, admin: PartyAdminConfig) {
+  const seconds = phaseSecondsFor(game, phase, admin);
   return seconds ? new Date(Date.now() + seconds * 1000).toISOString() : null;
+}
+
+/* Developer settings per game (app_settings "party"): briefly cached per worker isolate. */
+const ADMIN_KEY = "party";
+let adminCache: { at: number; value: PartyAdminConfig } | null = null;
+
+export async function loadPartyAdmin(): Promise<PartyAdminConfig> {
+  if (adminCache && Date.now() - adminCache.at < 10_000) return adminCache.value;
+  const { data } = await db().from("app_settings").select("value").eq("key", ADMIN_KEY).maybeSingle();
+  const value = readPartyAdmin(data?.value ?? {});
+  adminCache = { at: Date.now(), value };
+  return value;
+}
+
+export async function savePartyAdmin(input: { token?: string | undefined; game: PartyGameId; config: unknown }) {
+  const { isDeveloper } = await import("./dev-session.server");
+  if (!(await isDeveloper(input.token))) throw new Error("Só o desenvolvedor pode salvar estas configurações.");
+  const current = await loadPartyAdmin().catch(() => ({}) as PartyAdminConfig);
+  const next = readPartyAdmin({ ...current, [input.game]: input.config });
+  const { error } = await db().from("app_settings").upsert({ key: ADMIN_KEY, value: asJson(next), updated_at: new Date().toISOString() });
+  if (error) throw new Error("Não foi possível salvar as configurações do jogo.");
+  adminCache = { at: Date.now(), value: next };
+  return { ok: true as const, config: next };
+}
+
+/** Same derivation Stop uses for its stored session ids, so a linked Stop room can be verified. */
+function stopSessionHash(sessionId: string) {
+  const hex = createHash("sha256").update(sessionId).digest("hex").slice(0, 32);
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
 async function loadRoom(roomId: string) {
@@ -161,11 +195,11 @@ async function uniqueCode() {
 
 /* ---------------------------------- Rooms --------------------------------- */
 
-export async function createPartyRoom(input: { game: PartyGameId; nickname: string; sessionId: string }) {
+export async function createPartyRoom(input: { game?: PartyGameId | undefined; nickname: string; sessionId: string }) {
   const code = await uniqueCode();
   const { data: room, error } = await db()
     .from("party_rooms")
-    .insert({ code, game: input.game, settings: asJson(readPartySettings({})), public_state: asJson({ scores: {} }) })
+    .insert({ code, game: input.game ?? "lobby", settings: asJson(readPartySettings({})), public_state: asJson({ scores: {} }) })
     .select()
     .single();
   if (error || !room) throw new Error("Não foi possível criar a sala");
@@ -222,8 +256,87 @@ export async function leavePartyRoom(input: { roomId: string; playerId: string; 
     await db().from("party_players").update({ is_host: true }).eq("id", remaining[0]!.id);
   }
   const room = await loadRoom(input.roomId);
-  if (room.status === "playing") await syncSubmitted(room.id);
+  if (room.status === "playing" && isPartyGame(room.game)) await syncSubmitted(room.id);
   return { ok: true };
+}
+
+/* ------------------------------ Group room flow ----------------------------- */
+
+const RESET_TO_LOBBY = {
+  status: "lobby",
+  phase: "lobby",
+  round_number: 0,
+  phase_started_at: null,
+  phase_ends_at: null,
+  public_state: asJson({ scores: {} }),
+} satisfies Partial<RoomRow>;
+
+async function clearRoundData(roomId: string) {
+  await Promise.all([
+    db().from("party_submissions").delete().eq("room_id", roomId),
+    db().from("party_private").delete().eq("room_id", roomId).gt("round_number", 0),
+  ]);
+}
+
+/** Host picks (or changes) the game while the group waits in the lobby. */
+export async function selectPartyGame(input: { roomId: string; playerId: string; sessionId: string; game: PartyGameId | "stop" }) {
+  await requireHost(input.roomId, input.playerId, input.sessionId);
+  const room = await loadRoom(input.roomId);
+  if (room.status !== "lobby") throw new Error("Termine ou encerre a partida antes de trocar de jogo.");
+  if (room.game === input.game) return { ok: true };
+  const updated = await guardedUpdate(room, { game: input.game });
+  if (!updated) throw new Error("A sala mudou ao mesmo tempo. Tente de novo.");
+  return { ok: true };
+}
+
+/** Host sends everyone back to the group lobby, keeping the room code and every player. */
+export async function returnPartyToLobby(input: { roomId: string; playerId: string; sessionId: string }) {
+  await requireHost(input.roomId, input.playerId, input.sessionId);
+  const room = await loadRoom(input.roomId);
+  if (room.game === "lobby" && room.status === "lobby") return { ok: true };
+  await clearRoundData(room.id);
+  const updated = await guardedUpdate(room, { ...RESET_TO_LOBBY, game: "lobby" });
+  if (!updated) {
+    const fresh = await loadRoom(room.id);
+    if (fresh.game === "lobby" && fresh.status === "lobby") return { ok: true };
+    throw new Error("A sala mudou ao mesmo tempo. Tente de novo.");
+  }
+  return { ok: true };
+}
+
+/**
+ * Links a Stop room the host just created to this group room. Stop keeps its own tables,
+ * rules and AI; the group room only publishes the Stop code so every member can follow.
+ */
+export async function linkPartyStop(input: { roomId: string; playerId: string; sessionId: string; stopCode: string; stopPlayerId: string }) {
+  const host = await requireHost(input.roomId, input.playerId, input.sessionId);
+  const room = await loadRoom(input.roomId);
+  if (room.status !== "lobby" || room.game !== "stop") throw new Error("Escolha o Stop no lobby antes de começar.");
+  const players = await loadPlayers(room.id);
+  const missing = missingPlayers("stop", players.length);
+  if (missing > 0) throw new Error(`Este jogo precisa de pelo menos ${players.length + missing} jogadores.`);
+  const code = input.stopCode.trim().toUpperCase();
+  const { data: stopRoom } = await db().from("rooms").select("id, status, host_player_id").eq("code", code).maybeSingle();
+  if (!stopRoom || stopRoom.status !== "lobby" || stopRoom.host_player_id !== input.stopPlayerId) throw new Error("Não foi possível abrir a sala do Stop.");
+  const { data: stopHost } = await db().from("players").select("id, nickname").eq("id", input.stopPlayerId).eq("room_id", stopRoom.id).eq("session_id", stopSessionHash(input.sessionId)).maybeSingle();
+  if (!stopHost || stopHost.nickname.toLocaleLowerCase("pt-BR") !== host.nickname.toLocaleLowerCase("pt-BR")) throw new Error("Não foi possível abrir a sala do Stop.");
+  await clearRoundData(room.id);
+  const updated = await guardedUpdate(room, {
+    status: "playing",
+    phase: "stop",
+    round_number: 0,
+    phase_started_at: new Date().toISOString(),
+    phase_ends_at: null,
+    public_state: asJson({ scores: {}, stopCode: code }),
+  });
+  if (!updated) throw new Error("A sala mudou ao mesmo tempo. Tente de novo.");
+  return { ok: true, stopCode: code };
+}
+
+/** "Jogar novamente": same game, fresh scores, straight into round one. */
+export async function replayPartyGame(input: { roomId: string; playerId: string; sessionId: string }) {
+  await restartPartyRoom(input);
+  return startPartyGame(input);
 }
 
 export async function updatePartySettings(input: { roomId: string; playerId: string; sessionId: string; settings: Partial<PartySettings> }) {
@@ -240,7 +353,8 @@ export async function startPartyGame(input: { roomId: string; playerId: string; 
   await requireHost(input.roomId, input.playerId, input.sessionId);
   const room = await loadRoom(input.roomId);
   if (room.status === "playing") return { ok: true };
-  const game = gameOf(room);
+  if (!isPartyGame(room.game)) throw new Error(room.game === "stop" ? "O Stop abre na sala própria dele." : "Escolha um jogo primeiro.");
+  const game = room.game;
   const players = await loadPlayers(room.id);
   const min = PARTY_GAMES[game].minPlayers;
   if (players.length < min) throw new Error(`Este jogo precisa de pelo menos ${min} jogadores.`);
@@ -256,26 +370,17 @@ export async function startPartyGame(input: { roomId: string; playerId: string; 
 export async function restartPartyRoom(input: { roomId: string; playerId: string; sessionId: string }) {
   await requireHost(input.roomId, input.playerId, input.sessionId);
   const room = await loadRoom(input.roomId);
-  await Promise.all([
-    db().from("party_submissions").delete().eq("room_id", room.id),
-    db().from("party_private").delete().eq("room_id", room.id).gt("round_number", 0),
-  ]);
-  const updated = await guardedUpdate(room, {
-    status: "lobby",
-    phase: "lobby",
-    round_number: 0,
-    phase_started_at: null,
-    phase_ends_at: null,
-    public_state: asJson({ scores: {} }),
-  });
+  await clearRoundData(room.id);
+  const updated = await guardedUpdate(room, RESET_TO_LOBBY);
   if (!updated) throw new Error("A sala mudou ao mesmo tempo. Tente de novo.");
   return { ok: true };
 }
 
 /* ---------------------------------- Rounds -------------------------------- */
 
-async function buildPrompt(room: RoomRow, players: PlayerRow[], round: number, settings: PartySettings) {
+async function buildPrompt(room: RoomRow, players: PlayerRow[], round: number, settings: PartySettings, admin: PartyAdminConfig) {
   const game = gameOf(room);
+  const tone = admin[game]?.tone;
   const roomPrivate = await readPrivate<RoomPrivate>(room.id, 0);
   const used = { ...(roomPrivate.used ?? {}) };
   const history = [...(roomPrivate.history ?? [])];
@@ -293,7 +398,7 @@ async function buildPrompt(room: RoomRow, players: PlayerRow[], round: number, s
     let prompt: PartyPrompt | null = null;
     if (ai) {
       try {
-        const made = await (await import("./party-ai.server")).aiTribunalCase(defendant, history);
+        const made = await (await import("./party-ai.server")).aiTribunalCase(defendant, history, tone);
         prompt = { ...made, source: "ai" };
       } catch { prompt = null; }
     }
@@ -308,7 +413,7 @@ async function buildPrompt(room: RoomRow, players: PlayerRow[], round: number, s
     let prompt: PartyPrompt | null = null;
     if (ai) {
       try {
-        const text = await (await import("./party-ai.server")).aiAutorPrompt(history);
+        const text = await (await import("./party-ai.server")).aiAutorPrompt(history, tone);
         prompt = { title: "A pergunta é…", text, source: "ai" };
       } catch { prompt = null; }
     }
@@ -330,7 +435,7 @@ async function buildPrompt(room: RoomRow, players: PlayerRow[], round: number, s
     let prompt: PartyPrompt | null = null;
     if (ai) {
       try {
-        const made = await (await import("./party-ai.server")).aiDebateTopic(history);
+        const made = await (await import("./party-ai.server")).aiDebateTopic(history, tone);
         prompt = { title: made.title, text: "Defenda o lado sorteado para você, concordando ou não.", sideA: made.sideA, sideB: made.sideB, source: "ai" };
       } catch { prompt = null; }
     }
@@ -343,7 +448,7 @@ async function buildPrompt(room: RoomRow, players: PlayerRow[], round: number, s
     data.prompt = prompt;
     data.sides = assignSides(players.map((p) => p.id));
   } else {
-    data.prompt = await roletaPrompt(settings, used, history, remember);
+    data.prompt = await roletaPrompt(settings, used, history, remember, admin);
   }
 
   if (data.prompt) history.push(data.prompt.text);
@@ -356,11 +461,15 @@ async function roletaPrompt(
   used: NonNullable<RoomPrivate["used"]>,
   history: string[],
   remember: (key: keyof NonNullable<RoomPrivate["used"]>, index: number) => void,
+  admin: PartyAdminConfig,
 ): Promise<PartyPrompt> {
-  const event = ROLETA_EVENTS[Math.floor(Math.random() * ROLETA_EVENTS.length)] ?? ROLETA_EVENTS[0]!;
+  // Developer can switch chaos events off: every round then scores normally (×1).
+  const event = admin.roleta?.events === false
+    ? { label: "Rodada normal", multiplier: 1 }
+    : ROLETA_EVENTS[Math.floor(Math.random() * ROLETA_EVENTS.length)] ?? ROLETA_EVENTS[0]!;
   if (settings.ai) {
     try {
-      const made = await (await import("./party-ai.server")).aiRoletaChallenge(settings.intensity, history);
+      const made = await (await import("./party-ai.server")).aiRoletaChallenge(settings.intensity, history, admin.roleta?.tone);
       return { ...made, event, source: "ai" };
     } catch { /* fall back to the built-in list */ }
   }
@@ -374,7 +483,8 @@ async function roletaPrompt(
 async function startRound(room: RoomRow, players: PlayerRow[], round: number, scores: Record<string, number>, skipsLeft: number | undefined) {
   const settings = readPartySettings(room.settings);
   const game = gameOf(room);
-  const candidate = await buildPrompt(room, players, round, settings);
+  const admin = await loadPartyAdmin();
+  const candidate = await buildPrompt(room, players, round, settings, admin);
   // First writer of a round's private data wins; every racer then reads back the same stored round.
   await db().from("party_private").upsert({ room_id: room.id, round_number: round, data: asJson(candidate) }, { onConflict: "room_id,round_number", ignoreDuplicates: true });
   const stored = await readPrivate<RoundPrivate>(room.id, round);
@@ -393,7 +503,7 @@ async function startRound(room: RoomRow, players: PlayerRow[], round: number, sc
     round_number: round,
     phase,
     phase_started_at: new Date().toISOString(),
-    phase_ends_at: deadline(phase),
+    phase_ends_at: deadline(game, phase, admin),
     public_state: asJson(state),
   });
   return updated;
@@ -423,15 +533,16 @@ export async function skipRoletaChallenge(input: { roomId: string; playerId: str
   if (gameOf(room) !== "roleta" || room.phase !== "respond" || room.round_number !== input.round) return { ok: true };
   if ((state.skipsLeft ?? 0) <= 0) throw new Error("Não há mais pulos disponíveis nesta partida.");
   const settings = readPartySettings(room.settings);
+  const admin = await loadPartyAdmin();
   const roomPrivate = await readPrivate<RoomPrivate>(room.id, 0);
   const used = { ...(roomPrivate.used ?? {}) };
   const history = [...(roomPrivate.history ?? [])];
-  const prompt = await roletaPrompt(settings, used, history, (key, index) => { used[key] = [...(used[key] ?? []), index]; });
+  const prompt = await roletaPrompt(settings, used, history, (key, index) => { used[key] = [...(used[key] ?? []), index]; }, admin);
   history.push(prompt.text);
   const roundPrivate = await readPrivate<RoundPrivate>(room.id, room.round_number);
   const updated = await guardedUpdate(room, {
     phase_started_at: new Date().toISOString(),
-    phase_ends_at: deadline("respond"),
+    phase_ends_at: deadline("roleta", "respond", admin),
     public_state: asJson({ ...state, prompt, submitted: [], skipsLeft: (state.skipsLeft ?? 1) - 1 }),
   });
   if (!updated) throw new Error("A rodada mudou ao mesmo tempo. Tente de novo.");
@@ -573,10 +684,13 @@ async function advance(room: RoomRow): Promise<boolean> {
 }
 
 async function advanceOnce(room: RoomRow): Promise<boolean> {
+  if (!isPartyGame(room.game)) return false;
   const game = gameOf(room);
   const phase = room.phase as PartyPhaseId;
   const state = readPublicState(room.public_state);
   const settings = readPartySettings(room.settings);
+  const admin = await loadPartyAdmin();
+  const tone = admin[game]?.tone;
   const players = await loadPlayers(room.id);
   const present = new Set(players.map((p) => p.id));
   const presentIds = players.map((p) => p.id);
@@ -588,7 +702,7 @@ async function advanceOnce(room: RoomRow): Promise<boolean> {
     Boolean(await guardedUpdate(room, {
       phase: next,
       phase_started_at: new Date().toISOString(),
-      phase_ends_at: deadline(next),
+      phase_ends_at: deadline(game, next, admin),
       public_state: asJson({ ...state, ...extra, submitted: [] }),
     }));
 
@@ -635,7 +749,7 @@ async function advanceOnce(room: RoomRow): Promise<boolean> {
         veredito: result.verdict,
         votos_culpado: result.guilty,
         votos_inocente: result.innocent,
-      }),
+      }, tone),
     );
   }
 
@@ -668,7 +782,7 @@ async function advanceOnce(room: RoomRow): Promise<boolean> {
       (await ai()).aiAutorComment({
         pergunta: state.prompt?.text ?? "",
         respostas: revealed.map((entry) => ({ texto: entry.text, autor: nickname(entry.authorId), quantos_adivinharam_o_autor: entry.correct.length })),
-      }),
+      }, tone),
     );
   }
 
@@ -710,7 +824,7 @@ async function advanceOnce(room: RoomRow): Promise<boolean> {
         lado_a: state.prompt?.sideA ?? "",
         lado_b: state.prompt?.sideB ?? "",
         argumentos: (state.entries ?? []).map((e) => ({ lado: state.sides?.[e.playerId ?? ""] ?? "?", autor: nickname(e.playerId), texto: e.text, votos: result.counts[e.playerId ?? ""] ?? 0 })),
-      }),
+      }, tone),
     );
   }
 

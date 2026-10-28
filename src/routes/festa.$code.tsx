@@ -4,32 +4,38 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Copy, Loader2, LogOut } from "lucide-react";
 import { toast } from "sonner";
 
-import { PartyFinal, PartyLobby, PartyPlay, type PartyActions, type PartyCtx } from "@/components/party/PartyStage";
+import { PartyFinal, PartyLobby, PartyPlay, type LobbyCtx, type PartyActions, type PartyCtx } from "@/components/party/PartyStage";
 import { useSound } from "@/components/SoundProvider";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { usePartyRoom } from "@/hooks/use-party-room";
 import { vibrate } from "@/lib/haptics";
+import { setDevGameContext } from "@/lib/dev-settings";
+import { createRoom as createStopRoom, joinRoom as joinStopRoom } from "@/lib/game.functions";
 import {
   advancePartyPhase,
   joinPartyRoom,
   leavePartyRoom,
+  linkPartyStop,
   nextPartyRound,
+  replayPartyGame,
   restartPartyRoom,
+  returnPartyToLobby,
+  selectPartyGame,
   skipRoletaChallenge,
   startPartyGame,
   submitPartyAction,
   updatePartySettings,
 } from "@/lib/party.functions";
-import { PARTY_GAMES, PARTY_GAME_IDS, readPartySettings, readPublicState, type PartyGameId } from "@/lib/party-games";
-import { getLastNickname, getOrCreateSessionId, getPlayer, removePlayer, savePlayer } from "@/lib/session";
+import { isPartyGame, PARTY_GAMES, readPartySettings, readPublicState, readRoomGame } from "@/lib/party-games";
+import { getLastNickname, getOrCreateSessionId, getPlayer, removePlayer, savePartyLink, savePlayer } from "@/lib/session";
 
 export const Route = createFileRoute("/festa/$code")({
   head: () => ({
     meta: [
-      { title: "Sala da Central de Jogos — Stopia" },
-      { name: "description", content: "Entre na sala e jogue Tribunal dos Amigos, Quem Escreveu Essa Desgraça?, Infiltrado, Debate Impossível ou Roleta do Caos." },
+      { title: "Sala da Galera — Central de Jogos do Stopia" },
+      { name: "description", content: "Entre na sala da galera e joguem juntos Stop, Tribunal dos Amigos, Quem Escreveu Essa Desgraça?, Infiltrado, Debate Impossível ou Roleta do Caos." },
       { property: "og:title", content: "Bora jogar? Sala da Central de Jogos do Stopia" },
       { property: "og:description", content: "Entre com o código e jogue com a galera pelo celular." },
       { property: "og:type", content: "website" },
@@ -58,6 +64,12 @@ function PartyRoomPage() {
   const settingsFn = useServerFn(updatePartySettings);
   const joinFn = useServerFn(joinPartyRoom);
   const leaveFn = useServerFn(leavePartyRoom);
+  const selectFn = useServerFn(selectPartyGame);
+  const replayFn = useServerFn(replayPartyGame);
+  const lobbyFn = useServerFn(returnPartyToLobby);
+  const linkStopFn = useServerFn(linkPartyStop);
+  const createStopFn = useServerFn(createStopRoom);
+  const joinStopFn = useServerFn(joinStopRoom);
 
   useEffect(() => {
     const sessionId = getOrCreateSessionId();
@@ -67,7 +79,14 @@ function PartyRoomPage() {
   }, [code]);
 
   const me = identity ? players.find((p) => p.id === identity.playerId) ?? null : null;
-  const game: PartyGameId = room && (PARTY_GAME_IDS as readonly string[]).includes(room.game) ? (room.game as PartyGameId) : "tribunal";
+  const game = readRoomGame(room?.game);
+  const stopCode = room?.status === "playing" && game === "stop" ? readPublicState(room.public_state).stopCode ?? null : null;
+
+  // The developer panel only offers settings for the game this room is on.
+  useEffect(() => {
+    setDevGameContext(game === "lobby" ? "global" : game);
+    return () => setDevGameContext("global");
+  }, [game]);
 
   const run = useCallback(async (key: string, task: () => Promise<unknown>) => {
     setBusy(key);
@@ -98,11 +117,50 @@ function PartyRoomPage() {
       },
       next: () => run("next", () => nextFn({ data: { ...base, round: room.round_number } })),
       skip: () => run("skip", () => skipFn({ data: { ...base, round: room.round_number } })),
-      start: () => run("start", () => startFn({ data: base })),
+      start: () => run("start", async () => {
+        if (readRoomGame(room.game) !== "stop") {
+          await startFn({ data: base });
+          return;
+        }
+        // Stop keeps its own room, rules and AI: the host opens one and the group follows its code.
+        const host = players.find((p) => p.id === identity.playerId);
+        if (!host) throw new Error("Você não está mais nesta sala.");
+        const stop = await createStopFn({ data: { nickname: host.nickname, sessionId: identity.sessionId } });
+        savePlayer(stop.code, stop.playerId, host.nickname, identity.sessionId);
+        savePartyLink(stop.code, room.code);
+        await linkStopFn({ data: { ...base, stopCode: stop.code, stopPlayerId: stop.playerId } });
+        followedStop.current = stop.code;
+        play("create");
+        navigate({ to: "/sala/$code", params: { code: stop.code } });
+      }),
       restart: () => run("restart", () => restartFn({ data: base })),
       updateSettings: (settings) => run("settings", () => settingsFn({ data: { ...base, settings } })),
+      select: (choice) => run("select", async () => { await selectFn({ data: { ...base, game: choice } }); vibrate(10); }),
+      replay: () => run("replay", () => replayFn({ data: base })),
+      toLobby: () => run("lobby", () => lobbyFn({ data: base })),
     };
-  }, [room, identity, run, submitFn, advanceFn, nextFn, skipFn, startFn, restartFn, settingsFn, refresh, play]);
+  }, [room, identity, players, run, submitFn, advanceFn, nextFn, skipFn, startFn, restartFn, settingsFn, selectFn, replayFn, lobbyFn, linkStopFn, createStopFn, navigate, refresh, play]);
+
+  // Everyone in the group follows the host into the Stop room (late joiners too).
+  const followedStop = useRef<string | null>(null);
+  const [followError, setFollowError] = useState<string | null>(null);
+  const followStop = useCallback(async (target: string) => {
+    if (!identity || !me) return;
+    followedStop.current = target;
+    setFollowError(null);
+    try {
+      const res = await joinStopFn({ data: { code: target, nickname: me.nickname, sessionId: identity.sessionId } });
+      savePlayer(res.code, res.playerId, me.nickname, identity.sessionId);
+      savePartyLink(res.code, code);
+      navigate({ to: "/sala/$code", params: { code: res.code } });
+    } catch (err) {
+      setFollowError(err instanceof Error ? err.message : "Não foi possível entrar no Stop.");
+    }
+  }, [code, identity, joinStopFn, me, navigate]);
+  useEffect(() => {
+    if (!stopCode || followedStop.current === stopCode || busy === "start") return;
+    void followStop(stopCode);
+  }, [stopCode, followStop, busy]);
 
   // Phase-change feedback without new game states.
   const lastPhase = useRef<string | null>(null);
@@ -171,14 +229,15 @@ function PartyRoomPage() {
     );
   }
 
-  const meta = PARTY_GAMES[game];
+  const label = isPartyGame(game) ? PARTY_GAMES[game].name : game === "stop" ? "Stop" : "Sala da Galera";
+  const dataGame = game === "lobby" ? undefined : game;
 
   if (!me || !identity || !actions) {
     return (
-      <main data-game={game} className="game-screen mx-auto flex min-h-[100dvh] w-full max-w-md flex-col justify-center gap-4 px-5">
-        <p className="section-label party-accent">{meta.name}</p>
+      <main data-game={dataGame} className="game-screen mx-auto flex min-h-[100dvh] w-full max-w-md flex-col justify-center gap-4 px-5">
+        <p className="section-label party-accent">{label}</p>
         <h1 className="font-display text-4xl">Sala {room.code}</h1>
-        <p className="text-muted-foreground">{meta.short}</p>
+        <p className="text-muted-foreground">Entre e jogue com a galera: o mestre escolhe o jogo e todo mundo começa junto.</p>
         <form onSubmit={handleJoin} className="space-y-3">
           <label htmlFor="party-apelido" className="section-label block">Seu apelido</label>
           <Input id="party-apelido" value={nickname} maxLength={20} autoComplete="nickname" placeholder="Ex.: Juninho" onChange={(e) => setNickname(e.target.value)} className="h-14 text-lg" />
@@ -191,29 +250,23 @@ function PartyRoomPage() {
     );
   }
 
-  const ctx: PartyCtx = {
-    room,
-    players,
-    me,
-    isHost: me.is_host,
-    game,
-    state: readPublicState(room.public_state),
-    settings: readPartySettings(room.settings),
-    view: privateView,
-    busy,
-  };
+  const settings = readPartySettings(room.settings);
+  const ctx: PartyCtx | null = isPartyGame(game)
+    ? { room, players, me, isHost: me.is_host, game, state: readPublicState(room.public_state), settings, view: privateView, busy }
+    : null;
+  const lobbyCtx: LobbyCtx = { room, players, me, isHost: me.is_host, selected: game === "lobby" ? null : game, settings, busy };
 
   return (
-    <main data-game={game} className="game-screen mx-auto w-full max-w-md px-4 pt-[calc(0.75rem+env(safe-area-inset-top))]">
+    <main data-game={dataGame} className="game-screen mx-auto w-full max-w-md px-4 pt-[calc(0.75rem+env(safe-area-inset-top))]">
       {error && <p role="alert" className="mb-3 rounded-lg border border-destructive/60 p-3 text-sm">{error}</p>}
-      {room.status !== "playing" || room.phase === "reveal" ? (
+      {room.status !== "playing" || room.phase === "reveal" || game === "stop" ? (
         <header className="mb-4 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-border/60 pb-3 pr-16">
           <div className="min-w-0">
-            <p className="section-label party-accent truncate">{meta.name}</p>
+            <p className="section-label party-accent truncate">{label}</p>
             <Button variant="ghost" className="justify-start gap-1.5 px-0 font-display text-2xl" aria-label={`Copiar link da sala ${room.code}`} onClick={async () => {
               try {
                 const url = `${window.location.origin}/festa/${room.code}`;
-                if (navigator.share) await navigator.share({ title: meta.name, text: `Bora jogar ${meta.name}! Sala ${room.code}`, url });
+                if (navigator.share) await navigator.share({ title: label, text: `Bora jogar na Central de Jogos! Sala ${room.code}`, url });
                 else { await navigator.clipboard.writeText(url); toast.success("Link copiado!", { duration: 1_500 }); }
                 vibrate(15);
               } catch (err) {
@@ -226,8 +279,16 @@ function PartyRoomPage() {
       ) : null}
 
       {room.status === "lobby" ? (
-        <PartyLobby ctx={ctx} actions={actions} />
-      ) : room.status === "ended" ? (
+        <PartyLobby ctx={lobbyCtx} actions={actions} />
+      ) : game === "stop" ? (
+        <section className="party-prompt space-y-4 text-center" role="status">
+          <Loader2 className="mx-auto size-8 animate-spin text-primary" aria-hidden="true" />
+          <h2 className="text-xl font-bold">Abrindo o Stop para a galera…</h2>
+          {followError && <p role="alert" className="text-sm text-muted-foreground">{followError}</p>}
+          {stopCode && <Button className="h-12 w-full" onClick={() => void followStop(stopCode)}>Entrar no Stop</Button>}
+          {me.is_host && <Button variant="secondary" className="h-12 w-full" disabled={busy !== null} onClick={() => void actions.toLobby()}><ArrowLeft /> Voltar ao lobby</Button>}
+        </section>
+      ) : !ctx ? null : room.status === "ended" ? (
         <PartyFinal ctx={ctx} actions={actions} onHub={() => setLeaveOpen(true)} />
       ) : (
         <PartyPlay ctx={ctx} actions={actions} />
@@ -237,7 +298,7 @@ function PartyRoomPage() {
         <AlertDialogContent className="w-[calc(100%_-_2rem)] rounded-2xl border-border bg-card">
           <AlertDialogHeader>
             <AlertDialogTitle>Sair da sala {room.code}?</AlertDialogTitle>
-            <AlertDialogDescription>Você sai da partida e volta para a Central de Jogos. Se for o mestre, outra pessoa assume.</AlertDialogDescription>
+            <AlertDialogDescription>Você sai da sala da galera e volta para a Central de Jogos. Se for o mestre, outra pessoa assume.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={busy === "leave"}>Ficar</AlertDialogCancel>

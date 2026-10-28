@@ -191,6 +191,8 @@ export type PartyPublicState = {
   scores?: Record<string, number>;
   ai?: PartyAiState;
   skipsLeft?: number;
+  /** Code of the Stop room the group is playing right now (public: Stop codes are shareable). */
+  stopCode?: string;
 };
 
 export function readPublicState(raw: unknown): PartyPublicState {
@@ -230,3 +232,115 @@ export const FIRST_PHASE: Record<PartyGameId, PartyPhaseId> = {
   debate: "argue",
   roleta: "respond",
 };
+
+/* ----------------------------- Unified group room ----------------------------- */
+
+/** What a group room (party_rooms.game) can hold: nothing chosen yet, Stop, or a party game. */
+export type RoomGameId = "lobby" | "stop" | PartyGameId;
+export type LobbyGameId = "stop" | PartyGameId;
+
+export function isPartyGame(value: unknown): value is PartyGameId {
+  return typeof value === "string" && (PARTY_GAME_IDS as readonly string[]).includes(value);
+}
+
+export function readRoomGame(value: unknown): RoomGameId {
+  return value === "stop" || isPartyGame(value) ? value : "lobby";
+}
+
+export type LobbyGameMeta = {
+  id: LobbyGameId;
+  name: string;
+  short: string;
+  minPlayers: number;
+  duration: string;
+  icon: PartyGameMeta["icon"] | "stop";
+};
+
+export const STOP_LOBBY_META: LobbyGameMeta = {
+  id: "stop",
+  name: "Stop",
+  short: "O clássico Adedonha com o juiz de IA sarcástico de sempre.",
+  minPlayers: 2,
+  duration: "≈ 15 min",
+  icon: "stop",
+};
+
+const DURATIONS: Record<PartyGameId, string> = {
+  tribunal: "≈ 15 min",
+  autor: "≈ 15 min",
+  infiltrado: "≈ 12 min",
+  debate: "≈ 12 min",
+  roleta: "≈ 10 min",
+};
+
+/** The six games a host can pick inside a group room, in display order. */
+export const LOBBY_GAMES: readonly LobbyGameMeta[] = [
+  STOP_LOBBY_META,
+  ...PARTY_GAME_IDS.map((id) => ({ id, name: PARTY_GAMES[id].name, short: PARTY_GAMES[id].short, minPlayers: PARTY_GAMES[id].minPlayers, duration: DURATIONS[id], icon: PARTY_GAMES[id].icon })),
+];
+
+export function lobbyGameMeta(id: LobbyGameId) {
+  return LOBBY_GAMES.find((game) => game.id === id) ?? STOP_LOBBY_META;
+}
+
+/** Players still missing before a game can start (0 = ready). */
+export function missingPlayers(id: LobbyGameId, players: number) {
+  return Math.max(0, lobbyGameMeta(id).minPlayers - players);
+}
+
+/* ------------------------- Developer settings per game ------------------------- */
+
+/** Timed phases each party game uses; only these can be tuned by the developer. */
+export const GAME_PHASES: Record<PartyGameId, PartyPhaseId[]> = {
+  tribunal: ["defense", "vote"],
+  autor: ["write", "guess"],
+  infiltrado: ["clues", "vote", "last_guess"],
+  debate: ["argue", "vote"],
+  roleta: ["respond", "vote"],
+};
+
+export const PARTY_TONES = ["padrao", "leve", "acido", "teatral"] as const;
+export type PartyTone = (typeof PARTY_TONES)[number];
+export const PARTY_TONE_LABELS: Record<PartyTone, string> = {
+  padrao: "Padrão do jogo",
+  leve: "Leve e carinhoso",
+  acido: "Ácido e sarcástico",
+  teatral: "Teatral e exagerado",
+};
+/** Games whose AI writes content or comments (Infiltrado only uses its built-in list). */
+export const AI_TONE_GAMES: readonly PartyGameId[] = ["tribunal", "autor", "debate", "roleta"];
+
+export const PHASE_SECONDS_MIN = 15;
+export const PHASE_SECONDS_MAX = 300;
+
+export type PartyGameAdmin = { seconds?: Partial<Record<PartyPhaseId, number>>; tone?: PartyTone; events?: boolean };
+export type PartyAdminConfig = Partial<Record<PartyGameId, PartyGameAdmin>>;
+
+/** Sanitizes developer settings: unknown games/phases are dropped and seconds are clamped. */
+export function readPartyAdmin(raw: unknown): PartyAdminConfig {
+  const source = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  const config: PartyAdminConfig = {};
+  for (const game of PARTY_GAME_IDS) {
+    const value = source[game];
+    if (!value || typeof value !== "object") continue;
+    const entry = value as { seconds?: unknown; tone?: unknown; events?: unknown };
+    const out: PartyGameAdmin = {};
+    const seconds = entry.seconds && typeof entry.seconds === "object" ? (entry.seconds as Record<string, unknown>) : {};
+    for (const phase of GAME_PHASES[game]) {
+      const n = Number(seconds[phase]);
+      if (Number.isFinite(n) && seconds[phase] !== null && seconds[phase] !== undefined) {
+        out.seconds = { ...out.seconds, [phase]: Math.min(PHASE_SECONDS_MAX, Math.max(PHASE_SECONDS_MIN, Math.round(n))) };
+      }
+    }
+    if (AI_TONE_GAMES.includes(game) && (PARTY_TONES as readonly string[]).includes(entry.tone as string)) out.tone = entry.tone as PartyTone;
+    if (game === "roleta" && typeof entry.events === "boolean") out.events = entry.events;
+    config[game] = out;
+  }
+  return config;
+}
+
+/** Seconds for a phase, honouring the developer override for that game only. */
+export function phaseSecondsFor(game: PartyGameId, phase: PartyPhaseId, admin: PartyAdminConfig = {}) {
+  if (!GAME_PHASES[game].includes(phase)) return PHASE_SECONDS[phase];
+  return admin[game]?.seconds?.[phase] ?? PHASE_SECONDS[phase];
+}

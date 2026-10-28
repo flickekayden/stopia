@@ -84,3 +84,11 @@
 - [x] Tribunal dos Amigos, Quem Escreveu Essa Desgraça?, Roleta do Caos
 - [x] Infiltrado (server-only secret word/role) and Debate Impossível
 - [x] Regression tests for party scoring + Stop tests; real multiplayer verification
+
+## Sala da Galera unificada
+- [x] Home with one nickname, "Criar Sala da Galera" and code entry; games showcase
+- [x] Group lobby: host picks any of six games, minimum-player gate, waiting card for guests
+- [x] Stop integrated by link: whole group enters the Stop room and returns together
+- [x] End of match: "Jogar Novamente" / "Trocar de Jogo"; guests wait for the host
+- [x] Developer panel scoped to the game on screen, per-game timings/AI tone/chaos events
+- [x] Tests and real two-player verification (Debate match, switch, Stop round-trip)

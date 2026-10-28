@@ -1,4 +1,4 @@
-import { Crown, Loader2, Share2, Trophy } from "lucide-react";
+import { Crown, LayoutGrid, Loader2, Share2, Trophy } from "lucide-react";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 
 import { toast } from "sonner";
@@ -17,6 +17,9 @@ export function FinalRanking({
   isHost,
   restarting,
   onPlayAgain,
+  onSwitchGame,
+  switching = false,
+  waitingForGroupHost = false,
 }: {
   room: Room;
   players: Player[];
@@ -26,6 +29,11 @@ export function FinalRanking({
   isHost: boolean;
   restarting: boolean;
   onPlayAgain: () => void;
+  /** Present only for the group-room host when this Stop match was opened from a group room. */
+  onSwitchGame?: (() => void) | undefined;
+  switching?: boolean;
+  /** Linked to a group room and this player is not its host. */
+  waitingForGroupHost?: boolean;
 }) {
   const { play } = useSound();
   const ranked = rankPlayers(players);
@@ -160,17 +168,32 @@ export function FinalRanking({
         >
           {sharing ? <Loader2 className="animate-spin" /> : <Share2 />} {sharing ? "Compartilhando..." : "Compartilhar resultado"}
         </Button>
-        {isHost ? (
-          <Button
-            onClick={onPlayAgain}
-            disabled={restarting}
-            variant="default"
-            className="h-14 w-full rounded-2xl text-lg font-bold"
-          >
-            {restarting ? "Preparando sala..." : "Jogar de novo"}
-          </Button>
+        {isHost || onSwitchGame ? (
+          <div className={onSwitchGame && isHost ? "grid grid-cols-2 gap-2" : undefined}>
+            {isHost && (
+              <Button
+                onClick={onPlayAgain}
+                disabled={restarting || switching}
+                variant="default"
+                className="h-14 w-full rounded-2xl text-lg font-bold"
+              >
+                {restarting ? "Preparando sala..." : "Jogar de novo"}
+              </Button>
+            )}
+            {onSwitchGame && (
+              <Button
+                onClick={onSwitchGame}
+                disabled={restarting || switching}
+                aria-busy={switching}
+                variant="secondary"
+                className="h-14 w-full rounded-2xl text-base font-bold"
+              >
+                {switching ? <Loader2 className="animate-spin" /> : <LayoutGrid />} {isHost ? "Trocar de Jogo" : "Voltar ao Lobby (Trocar de Jogo)"}
+              </Button>
+            )}
+          </div>
         ) : (
-          <p className="text-center text-sm text-muted-foreground">Esperando o mestre preparar outra partida...</p>
+          <p className="text-center text-sm text-muted-foreground">{waitingForGroupHost ? "Aguardando decisão do Mestre..." : "Esperando o mestre preparar outra partida..."}</p>
         )}
       </div>
     </div>

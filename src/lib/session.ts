@@ -45,3 +45,33 @@ export function getLastNickname() {
   const all = Object.values(read());
   return all.at(-1)?.nickname ?? "";
 }
+
+/* Stop rooms opened from a group room remember their group so players can return together. */
+const LINK_KEY = "stop-party-links";
+
+function readLinks(): Record<string, string> {
+  if (typeof window === "undefined") return {};
+  try {
+    return JSON.parse(window.localStorage.getItem(LINK_KEY) ?? "{}") as Record<string, string>;
+  } catch {
+    return {};
+  }
+}
+
+export function savePartyLink(stopCode: string, partyCode: string) {
+  if (typeof window === "undefined") return;
+  const all = readLinks();
+  all[stopCode.toUpperCase()] = partyCode.toUpperCase();
+  window.localStorage.setItem(LINK_KEY, JSON.stringify(all));
+}
+
+export function getPartyLink(stopCode: string) {
+  return readLinks()[stopCode.toUpperCase()] ?? null;
+}
+
+export function removePartyLink(stopCode: string) {
+  if (typeof window === "undefined") return;
+  const all = readLinks();
+  delete all[stopCode.toUpperCase()];
+  window.localStorage.setItem(LINK_KEY, JSON.stringify(all));
+}
