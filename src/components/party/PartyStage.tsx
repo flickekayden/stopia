@@ -26,6 +26,7 @@ import {
   type PartyPublicState,
   type PartySettings,
 } from "@/lib/party-games";
+import { vibrate } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
 
 export type PartyCtx = {
