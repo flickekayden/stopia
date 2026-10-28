@@ -5,6 +5,7 @@ import { ArrowLeft, ArrowRight, BookOpen, Loader2, Users } from "lucide-react";
 import { toast } from "sonner";
 
 import { PartyIcon } from "@/components/party/PartyIcon";
+import { RulesList } from "@/components/party/RulesList";
 import { useSound } from "@/components/SoundProvider";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -192,22 +193,5 @@ function GamesHub() {
         </DialogContent>
       </Dialog>
     </main>
-  );
-}
-
-export function RulesList({ game }: { game: PartyGameId }) {
-  const meta = PARTY_GAMES[game];
-  return (
-    <div className="space-y-4 text-sm">
-      <div>
-        <p className="section-label mb-2">Como jogar</p>
-        <ol className="list-decimal space-y-1.5 pl-5">{meta.rules.map((rule) => <li key={rule}>{rule}</li>)}</ol>
-      </div>
-      <div>
-        <p className="section-label mb-2">Pontuação</p>
-        <ul className="list-disc space-y-1.5 pl-5">{meta.scoring.map((rule) => <li key={rule}>{rule}</li>)}</ul>
-      </div>
-      <p className="text-xs text-muted-foreground">Mínimo de {meta.minPlayers} jogadores · tudo é escrito no app.</p>
-    </div>
   );
 }
