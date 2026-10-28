@@ -105,7 +105,7 @@ export function PartyRoomsAdmin() {
             <li key={room.id} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 p-3">
               <div className="min-w-0">
                 <p className="truncate font-display text-xl tracking-wider">{room.code}</p>
-                <p className="truncate text-xs text-muted-foreground">
+                <p className="text-balance-safe text-xs leading-snug text-muted-foreground">
                   {gameLabel(room.game)} · {STATUS_LABELS[room.status] ?? room.status} · {room.playerCount} {room.playerCount === 1 ? "jogador" : "jogadores"} · {since(room.updatedAt)}
                 </p>
               </div>
