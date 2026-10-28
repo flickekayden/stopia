@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
-import { ArrowRight, BookOpen, Loader2, Users } from "lucide-react";
+import { ArrowRight, BookOpen, Clock, Loader2, Users } from "lucide-react";
 import { toast } from "sonner";
 
 import { PartyIcon } from "@/components/party/PartyIcon";
@@ -11,16 +11,16 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { createPartyRoom, joinPartyRoom } from "@/lib/party.functions";
-import { PARTY_GAMES, PARTY_GAME_IDS, type PartyGameId } from "@/lib/party-games";
+import { LOBBY_GAMES, PARTY_GAMES, type PartyGameId } from "@/lib/party-games";
 import { getLastNickname, getOrCreateSessionId, savePlayer } from "@/lib/session";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
       { title: "Central de Jogos do Stopia — jogos para jogar com os amigos" },
-      { name: "description", content: "Stop, Tribunal dos Amigos, Quem Escreveu Essa Desgraça?, Infiltrado, Debate Impossível e Roleta do Caos: seis jogos em grupo no celular." },
+      { name: "description", content: "Crie uma sala da galera e escolham juntos: Stop, Tribunal dos Amigos, Quem Escreveu Essa Desgraça?, Infiltrado, Debate Impossível ou Roleta do Caos." },
       { property: "og:title", content: "Central de Jogos do Stopia" },
-      { property: "og:description", content: "Seis jogos para grupos de amigos, direto no celular e sem cadastro." },
+      { property: "og:description", content: "Uma sala para a galera e seis jogos para escolher, direto no celular e sem cadastro." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
@@ -35,7 +35,7 @@ function GamesHub() {
   const join = useServerFn(joinPartyRoom);
   const [nickname, setNickname] = useState("");
   const [code, setCode] = useState("");
-  const [busy, setBusy] = useState<PartyGameId | "join" | null>(null);
+  const [busy, setBusy] = useState<"create" | "join" | null>(null);
   const [rulesFor, setRulesFor] = useState<PartyGameId | null>(null);
   const [nicknameError, setNicknameError] = useState(false);
 
@@ -53,12 +53,12 @@ function GamesHub() {
     return false;
   }
 
-  async function handleCreate(game: PartyGameId) {
+  async function handleCreate() {
     if (!requireNickname() || busy) return;
-    setBusy(game);
+    setBusy("create");
     try {
       const sessionId = getOrCreateSessionId();
-      const res = await create({ data: { game, nickname: nickname.trim(), sessionId } });
+      const res = await create({ data: { nickname: nickname.trim(), sessionId } });
       play("create");
       savePlayer(res.code, res.playerId, nickname.trim(), sessionId);
       navigate({ to: "/festa/$code", params: { code: res.code } });
@@ -102,79 +102,73 @@ function GamesHub() {
     <main className="game-screen mx-auto flex min-h-[100dvh] w-full max-w-md flex-col gap-6 px-5 pb-[calc(2rem+env(safe-area-inset-bottom))] pt-[calc(1.25rem+env(safe-area-inset-top))]">
       <header className="space-y-3 pr-14 pt-2">
         <h1 className="font-display text-5xl leading-none text-primary">Central de Jogos</h1>
-        <p className="text-base text-muted-foreground">Seis jogos para a galera, no celular e sem cadastro. Escolha um e chame os amigos.</p>
+        <p className="text-base text-muted-foreground">Reúna a galera numa sala só e escolham juntos o que jogar. No celular e sem cadastro.</p>
       </header>
 
-      <section className="space-y-2">
-        <label htmlFor="hub-apelido" className="section-label block">Seu apelido</label>
-        <Input
-          id="hub-apelido"
-          value={nickname}
-          maxLength={20}
-          autoComplete="nickname"
-          placeholder="Ex.: Juninho"
-          aria-invalid={nicknameError && !nickname.trim()}
-          onChange={(event) => { setNickname(event.target.value); setNicknameError(false); }}
-          className="h-14 text-lg"
-        />
-      </section>
-
-      <section className="space-y-3" aria-label="Jogos disponíveis">
-        <article data-game="stop" className="party-card p-4" style={{ "--enter-index": 0 } as React.CSSProperties}>
-          <div className="flex items-start gap-3">
-            <span className="party-icon size-12"><PartyIcon name="stop" className="size-6" /></span>
-            <div className="min-w-0 flex-1">
-              <h2 className="text-lg font-bold leading-tight">Stop</h2>
-              <p className="mt-1 text-sm text-muted-foreground">O clássico Adedonha com o juiz de IA sarcástico de sempre.</p>
-            </div>
-          </div>
-          <Button asChild className="mt-4 h-12 w-full"><Link to="/stop">Jogar Stop <ArrowRight /></Link></Button>
-        </article>
-
-        {PARTY_GAME_IDS.map((id, index) => {
-          const game = PARTY_GAMES[id];
-          return (
-            <article key={id} data-game={id} className="party-card p-4" style={{ "--enter-index": index + 1 } as React.CSSProperties}>
-              <div className="flex items-start gap-3">
-                <span className="party-icon size-12"><PartyIcon name={game.icon} className="size-6" /></span>
-                <div className="min-w-0 flex-1">
-                  <h2 className="text-balance-safe text-lg font-bold leading-tight">{game.name}</h2>
-                  <p className="mt-1 text-sm text-muted-foreground">{game.short}</p>
-                  <p className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-muted-foreground"><Users className="size-3.5" aria-hidden="true" /> {game.minPlayers}+ jogadores</p>
-                </div>
-              </div>
-              <div className="mt-4 grid grid-cols-[auto_minmax(0,1fr)] gap-2">
-                <Button variant="secondary" onClick={() => setRulesFor(id)} aria-label={`Como jogar ${game.name}`}><BookOpen /> Regras</Button>
-                <Button className="party-accent-button shadow-none" disabled={busy !== null} aria-busy={busy === id} onClick={() => void handleCreate(id)}>
-                  {busy === id ? <Loader2 className="animate-spin" /> : null}
-                  {busy === id ? "Criando sala…" : "Criar sala"}
-                </Button>
-              </div>
-            </article>
-          );
-        })}
-      </section>
-
-      <form onSubmit={handleJoin} className="party-panel space-y-3" aria-labelledby="hub-join-title">
-        <h2 id="hub-join-title" className="text-lg font-bold">Tem um código?</h2>
-        <p className="text-sm text-muted-foreground">Funciona para qualquer jogo da central, inclusive o Stop.</p>
-        <div className="flex gap-2">
+      <section className="party-panel space-y-4" aria-labelledby="hub-entrada">
+        <h2 id="hub-entrada" className="sr-only">Entrar na brincadeira</h2>
+        <div className="space-y-2">
+          <label htmlFor="hub-apelido" className="section-label block">Seu apelido</label>
           <Input
-            value={code}
-            maxLength={4}
-            aria-label="Código da sala"
-            autoCapitalize="characters"
-            autoComplete="off"
-            spellCheck={false}
-            placeholder="ABCD"
-            onChange={(event) => setCode(event.target.value.toUpperCase())}
-            className="h-14 min-w-0 flex-1 text-center font-display text-2xl tracking-[0.3em]"
+            id="hub-apelido"
+            value={nickname}
+            maxLength={20}
+            autoComplete="nickname"
+            placeholder="Ex.: Juninho"
+            aria-invalid={nicknameError && !nickname.trim()}
+            onChange={(event) => { setNickname(event.target.value); setNicknameError(false); }}
+            className="h-14 text-lg"
           />
-          <Button type="submit" className="h-14 px-5" disabled={busy !== null} aria-busy={busy === "join"}>
-            {busy === "join" ? <Loader2 className="animate-spin" /> : <ArrowRight />} Entrar
-          </Button>
         </div>
-      </form>
+        <Button className="h-14 w-full text-lg font-bold" disabled={busy !== null} aria-busy={busy === "create"} onClick={() => void handleCreate()}>
+          {busy === "create" ? <Loader2 className="animate-spin" /> : <Users />}
+          {busy === "create" ? "Criando sala…" : "Criar Sala da Galera"}
+        </Button>
+        <form onSubmit={handleJoin} className="space-y-2" aria-labelledby="hub-join-title">
+          <p id="hub-join-title" className="section-label">Entrar com código</p>
+          <div className="flex gap-2">
+            <Input
+              value={code}
+              maxLength={4}
+              aria-label="Código da sala"
+              autoCapitalize="characters"
+              autoComplete="off"
+              spellCheck={false}
+              placeholder="ABCD"
+              onChange={(event) => setCode(event.target.value.toUpperCase())}
+              className="h-14 min-w-0 flex-1 text-center font-display text-2xl tracking-[0.3em]"
+            />
+            <Button type="submit" variant="secondary" className="h-14 px-5" disabled={busy !== null} aria-busy={busy === "join"}>
+              {busy === "join" ? <Loader2 className="animate-spin" /> : <ArrowRight />} Entrar
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">Funciona para salas da galera e salas antigas de Stop.</p>
+        </form>
+      </section>
+
+      <section className="space-y-3" aria-labelledby="hub-vitrine">
+        <h2 id="hub-vitrine" className="section-label">Jogos da sala</h2>
+        {LOBBY_GAMES.map((game, index) => (
+          <article key={game.id} data-game={game.id} className="party-card p-4" style={{ "--enter-index": index } as React.CSSProperties}>
+            <div className="flex items-start gap-3">
+              <span className="party-icon size-12"><PartyIcon name={game.icon} className="size-6" /></span>
+              <div className="min-w-0 flex-1">
+                <h3 className="text-balance-safe text-lg font-bold leading-tight">{game.name}</h3>
+                <p className="mt-1 text-sm text-muted-foreground">{game.short}</p>
+                <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-semibold text-muted-foreground">
+                  <span className="inline-flex items-center gap-1"><Users className="size-3.5" aria-hidden="true" /> {game.minPlayers}+ jogadores</span>
+                  <span className="inline-flex items-center gap-1"><Clock className="size-3.5" aria-hidden="true" /> {game.duration}</span>
+                </p>
+              </div>
+            </div>
+            {game.id === "stop" ? (
+              <Button asChild variant="secondary" className="mt-4 h-12 w-full"><Link to="/stop">Salas abertas de Stop <ArrowRight /></Link></Button>
+            ) : (
+              <Button variant="secondary" className="mt-4 h-12 w-full" onClick={() => setRulesFor(game.id as PartyGameId)} aria-label={`Como jogar ${game.name}`}><BookOpen /> Regras</Button>
+            )}
+          </article>
+        ))}
+      </section>
 
       <Dialog open={rules !== null} onOpenChange={(open) => !open && setRulesFor(null)}>
         <DialogContent className="max-h-[85dvh] w-[calc(100%_-_2rem)] overflow-y-auto rounded-2xl border-border bg-card" data-game={rules?.id}>
