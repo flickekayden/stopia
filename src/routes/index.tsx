@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { PartyIcon } from "@/components/party/PartyIcon";
 import { RulesList } from "@/components/party/RulesList";
 import { useSound } from "@/components/SoundProvider";
+import { ThemePicker } from "@/components/ThemePicker";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -145,6 +146,8 @@ function GamesHub() {
           <p className="text-xs text-muted-foreground">Funciona para salas da galera e salas antigas de Stop.</p>
         </form>
       </section>
+
+      <ThemePicker />
 
       <section className="space-y-3" aria-labelledby="hub-vitrine">
         <h2 id="hub-vitrine" className="section-label">Jogos da sala</h2>

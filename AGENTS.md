@@ -23,7 +23,7 @@
 - All routes share a smartphone-width shell, and portal sheets/fixed controls use the same width and safe-area offsets so desktop preserves mobile ergonomics.
 - The installation worker is network-only for navigations and never caches game/session data so multiplayer state remains authoritative.
 - Device haptics and installation prompts run only in effects or user handlers with capability checks so SSR and unsupported browsers stay safe.
-- Presentation uses game-screen-scoped classes, unframed game-section bands, shared Button variants and semantic tokens, kept separate from multiplayer state and developer overrides.
+- Presentation uses game-screen-scoped classes, unframed game-section bands, shared Button variants and semantic tokens, kept separate from multiplayer state; player colour schemes are device-local `html[data-theme]` token sets (list in `src/lib/themes.ts`, boot script avoids flashes) and admin colour overrides only tint the default scheme.
 - Round starts use a future server-issued started_at and matching ends_at; shared timing helpers gate inputs and STOP without a schema change or device-local countdown origin.
 - ChatDrawer owns one chat subscription and portals its compact launcher into the header slot of the screen on view (pinned room top bar, or the round HUD during answers) so message state survives phase transitions and nothing floats over content.
 - Fixed top-right controls (sound, developer gear) are reserved through the `--top-actions-space` variable (`top-actions-clear`); the page clips sideways overflow so hidden labels inside horizontal scrollers never make phones zoom out.

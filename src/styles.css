@@ -271,7 +271,7 @@ html { scroll-padding-top: 6rem; scroll-padding-bottom: calc(var(--active-dock-h
 .ranking-row { background: var(--card); border: 1px solid color-mix(in oklch, var(--border) 75%, transparent); border-radius: calc(var(--radius) + 2px); animation: card-enter 280ms cubic-bezier(0.2, 0.8, 0.2, 1) both; animation-delay: calc(var(--enter-index, 0) * 60ms + 300ms); }
 .ranking-row[data-first="true"] { border-color: color-mix(in oklch, var(--gold) 55%, transparent); background: linear-gradient(90deg, color-mix(in oklch, var(--gold) 10%, var(--card)), var(--card) 70%); }
 .rank-badge { display: grid; place-items: center; flex-shrink: 0; width: 2.25rem; height: 2.25rem; border-radius: 999px; font-family: var(--font-display); font-size: 1.125rem; background: var(--secondary); color: var(--muted-foreground); }
-.rank-badge[data-place="1"] { background: var(--gold); color: var(--primary-foreground); }
+.rank-badge[data-place="1"] { background: var(--gold); color: var(--gold-foreground, var(--primary-foreground)); }
 .rank-badge[data-place="2"] { background: color-mix(in oklch, var(--silver) 25%, var(--secondary)); color: var(--silver); }
 .rank-badge[data-place="3"] { background: color-mix(in oklch, var(--bronze) 25%, var(--secondary)); color: var(--bronze); }
 
@@ -392,3 +392,112 @@ input, select, textarea { font-size: max(16px, 1em); }
 .party-choice:not(:disabled):active { transform: scale(0.98); }
 .party-choice:disabled { opacity: 0.55; cursor: not-allowed; }
 .secret-card { border: 1px dashed color-mix(in oklch, var(--game-accent) 60%, transparent); background: color-mix(in oklch, var(--game-accent) 8%, var(--background)); border-radius: calc(var(--radius) + 4px); }
+
+/* Player-selectable colour schemes (device-local, set on <html data-theme>). "premium" is the :root default above. */
+:root[data-theme="neon"] {
+  --device-surround: oklch(0.12 0.03 272);
+  --overlay: oklch(0.09 0.03 272 / 0.82);
+  --background: oklch(0.17 0.035 272);
+  --foreground: oklch(0.97 0.01 250);
+  --card: oklch(0.225 0.045 272); --card-foreground: var(--foreground);
+  --popover: var(--card); --popover-foreground: var(--foreground);
+  --primary: oklch(0.84 0.13 196); --primary-foreground: oklch(0.17 0.035 272);
+  --secondary: oklch(0.29 0.05 272); --secondary-foreground: var(--foreground);
+  --muted: oklch(0.255 0.045 272); --muted-foreground: oklch(0.72 0.04 260);
+  --accent: var(--secondary); --accent-foreground: var(--foreground);
+  --border: oklch(0.33 0.05 272); --input: oklch(0.37 0.055 272);
+  --surface-raised: var(--muted);
+  --ring: var(--primary); --chart-1: var(--primary);
+  --destructive: oklch(0.7 0.19 18);
+  --gold: oklch(0.86 0.16 92);
+  --sidebar: var(--card); --sidebar-primary: var(--primary); --sidebar-border: var(--border); --sidebar-ring: var(--primary);
+}
+:root[data-theme="brasa"] {
+  --device-surround: oklch(0.12 0.012 45);
+  --overlay: oklch(0.09 0.012 45 / 0.82);
+  --background: oklch(0.17 0.014 45);
+  --foreground: oklch(0.96 0.012 75);
+  --card: oklch(0.225 0.02 45); --card-foreground: var(--foreground);
+  --popover: var(--card); --popover-foreground: var(--foreground);
+  --primary: oklch(0.73 0.18 48); --primary-foreground: oklch(0.17 0.014 45);
+  --secondary: oklch(0.29 0.025 45); --secondary-foreground: var(--foreground);
+  --muted: oklch(0.255 0.022 45); --muted-foreground: oklch(0.72 0.03 60);
+  --accent: var(--secondary); --accent-foreground: var(--foreground);
+  --border: oklch(0.33 0.028 45); --input: oklch(0.37 0.03 45);
+  --surface-raised: var(--muted);
+  --ring: var(--primary); --chart-1: var(--primary);
+  --destructive: oklch(0.68 0.2 22);
+  --sidebar: var(--card); --sidebar-primary: var(--primary); --sidebar-border: var(--border); --sidebar-ring: var(--primary);
+}
+:root[data-theme="floresta"] {
+  --device-surround: oklch(0.12 0.015 160);
+  --overlay: oklch(0.09 0.015 160 / 0.82);
+  --background: oklch(0.17 0.02 160);
+  --foreground: oklch(0.96 0.015 130);
+  --card: oklch(0.225 0.027 160); --card-foreground: var(--foreground);
+  --popover: var(--card); --popover-foreground: var(--foreground);
+  --primary: oklch(0.88 0.19 128); --primary-foreground: oklch(0.17 0.02 160);
+  --secondary: oklch(0.29 0.032 160); --secondary-foreground: var(--foreground);
+  --muted: oklch(0.255 0.03 160); --muted-foreground: oklch(0.72 0.035 150);
+  --accent: var(--secondary); --accent-foreground: var(--foreground);
+  --border: oklch(0.33 0.035 160); --input: oklch(0.37 0.04 160);
+  --surface-raised: var(--muted);
+  --ring: var(--primary); --chart-1: var(--primary);
+  --success: oklch(0.78 0.13 175);
+  --sidebar: var(--card); --sidebar-primary: var(--primary); --sidebar-border: var(--border); --sidebar-ring: var(--primary);
+}
+:root[data-theme="festa"] {
+  --device-surround: oklch(0.12 0.03 330);
+  --overlay: oklch(0.09 0.03 330 / 0.82);
+  --background: oklch(0.17 0.035 330);
+  --foreground: oklch(0.97 0.012 340);
+  --card: oklch(0.225 0.045 330); --card-foreground: var(--foreground);
+  --popover: var(--card); --popover-foreground: var(--foreground);
+  --primary: oklch(0.74 0.19 355); --primary-foreground: oklch(0.17 0.035 330);
+  --secondary: oklch(0.29 0.05 330); --secondary-foreground: var(--foreground);
+  --muted: oklch(0.255 0.045 330); --muted-foreground: oklch(0.73 0.04 330);
+  --accent: var(--secondary); --accent-foreground: var(--foreground);
+  --border: oklch(0.33 0.05 330); --input: oklch(0.37 0.055 330);
+  --surface-raised: var(--muted);
+  --ring: var(--primary); --chart-1: var(--primary);
+  --destructive: oklch(0.72 0.17 35);
+  --sidebar: var(--card); --sidebar-primary: var(--primary); --sidebar-border: var(--border); --sidebar-ring: var(--primary);
+}
+:root[data-theme="caderno"] {
+  color-scheme: light;
+  --device-surround: oklch(0.88 0.012 85);
+  --overlay: oklch(0.25 0.02 260 / 0.55);
+  --background: oklch(0.966 0.012 88);
+  --foreground: oklch(0.22 0.02 262);
+  --card: oklch(0.995 0.003 88); --card-foreground: var(--foreground);
+  --popover: var(--card); --popover-foreground: var(--foreground);
+  --primary: oklch(0.52 0.19 262); --primary-foreground: oklch(0.99 0.004 88);
+  --secondary: oklch(0.92 0.014 88); --secondary-foreground: var(--foreground);
+  --muted: oklch(0.935 0.012 88); --muted-foreground: oklch(0.47 0.02 262);
+  --accent: var(--secondary); --accent-foreground: var(--foreground);
+  --border: oklch(0.86 0.015 88); --input: oklch(0.82 0.018 88);
+  --surface-raised: var(--muted);
+  --destructive: oklch(0.56 0.2 27); --destructive-foreground: oklch(0.99 0.004 88);
+  --success: oklch(0.52 0.13 155);
+  --gold: oklch(0.8 0.155 85); --gold-foreground: oklch(0.22 0.02 262);
+  --silver: oklch(0.55 0.02 260);
+  --bronze: oklch(0.55 0.12 50);
+  --ring: var(--primary); --chart-1: var(--primary);
+  --shadow-panel: 0 1px 2px color-mix(in oklch, var(--foreground) 8%, transparent), 0 8px 22px -16px color-mix(in oklch, var(--foreground) 30%, transparent);
+  --shadow-dock: 0 -8px 24px color-mix(in oklch, var(--foreground) 12%, transparent);
+  --game-tribunal: oklch(0.56 0.15 55);
+  --game-autor: oklch(0.54 0.19 350);
+  --game-infiltrado: oklch(0.54 0.2 25);
+  --game-debate: oklch(0.5 0.14 235);
+  --game-roleta: oklch(0.52 0.15 150);
+  --sidebar: var(--card); --sidebar-foreground: var(--foreground); --sidebar-primary: var(--primary); --sidebar-primary-foreground: var(--primary-foreground); --sidebar-accent: var(--secondary); --sidebar-accent-foreground: var(--foreground); --sidebar-border: var(--border); --sidebar-ring: var(--primary);
+}
+
+/* Home theme switcher */
+.theme-option { display: flex; flex-direction: column; align-items: stretch; gap: 0.5rem; padding: 0.5rem; border-radius: calc(var(--radius) + 2px); border: 1px solid var(--border); background: var(--card); text-align: left; transition: border-color 160ms ease, transform 160ms ease; }
+.theme-option:active { transform: scale(0.97); }
+.theme-option[aria-checked="true"] { border-color: var(--primary); box-shadow: 0 0 0 2px color-mix(in oklch, var(--primary) 35%, transparent); }
+.theme-swatch { position: relative; display: flex; height: 2.25rem; overflow: hidden; border-radius: var(--radius); border: 1px solid color-mix(in oklch, var(--foreground) 12%, transparent); }
+.theme-swatch > span { flex: 1; }
+.theme-swatch > span:last-child { flex: 0 0 38%; }
+@media (prefers-reduced-motion: reduce) { .theme-option { transition: none; } .theme-option:active { transform: none; } }
