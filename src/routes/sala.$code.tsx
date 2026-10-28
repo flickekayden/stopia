@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { Copy, Loader2, LogOut, RefreshCw, UserPlus, X } from "lucide-react";
+import { Copy, LayoutGrid, Loader2, LogOut, RefreshCw, UserPlus, X } from "lucide-react";
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -14,6 +14,7 @@ import { useSound } from "@/components/SoundProvider";
 import { Input } from "@/components/ui/input";
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
 import { useRoom } from "@/hooks/use-room";
+import { usePartyLink } from "@/hooks/use-party-link";
 import { supabase } from "@/integrations/supabase/client";
 import {
   evaluateRound,
@@ -27,7 +28,8 @@ import {
   stopRound,
 } from "@/lib/game.functions";
 import { devAiOverrides, setDevRound } from "@/lib/dev-settings";
-import { getLastNickname, getOrCreateSessionId, getPlayer, removePlayer as clearStoredPlayer, savePlayer } from "@/lib/session";
+import { returnPartyToLobby } from "@/lib/party.functions";
+import { getLastNickname, getOrCreateSessionId, getPlayer, removePartyLink, removePlayer as clearStoredPlayer, savePlayer } from "@/lib/session";
 import { vibrate } from "@/lib/haptics";
 
 const FinalRanking = lazy(() => import("@/components/game/FinalRanking").then((module) => ({ default: module.FinalRanking })));
@@ -70,6 +72,31 @@ function RoomPage() {
   const analyse = useServerFn(finalAnalysis);
   const removePlayer = useServerFn(removeRoomPlayer);
   const restart = useServerFn(restartRoom);
+  const backToLobby = useServerFn(returnPartyToLobby);
+  const party = usePartyLink(code);
+  const [switching, setSwitching] = useState(false);
+
+  // Group rooms: when the host picks another game, everyone in this Stop match goes back together.
+  useEffect(() => {
+    if (party.gone) { removePartyLink(code); return; }
+    if (!party.partyCode || !party.room || party.linked) return;
+    removePartyLink(code);
+    toast("Voltando para a sala da galera…", { duration: 2_000 });
+    void navigate({ to: "/festa/$code", params: { code: party.partyCode } });
+  }, [code, navigate, party.gone, party.linked, party.partyCode, party.room]);
+
+  async function handleSwitchGame() {
+    if (!party.room || !party.identity || switching) return;
+    setSwitching(true);
+    try {
+      await backToLobby({ data: { roomId: party.room.id, ...party.identity } });
+    } catch (e) {
+      play("error");
+      toast.error(e instanceof Error ? e.message : "Não foi possível voltar ao lobby");
+      setSwitching(false);
+    }
+  }
+  const canSwitchGame = party.linked && party.isHost;
 
   useEffect(() => {
     setSessionId(getOrCreateSessionId());
@@ -291,6 +318,12 @@ function RoomPage() {
     try {
       await removePlayer({ data: { roomId: room.id, requesterId: playerId, playerId, sessionId } });
       clearStoredPlayer(code);
+      const linkedGroup = party.partyCode;
+      removePartyLink(code);
+      if (linkedGroup) {
+        await navigate({ to: "/" });
+        return;
+      }
       window.close();
       if (!window.closed) await navigate({ to: "/stop" });
     } catch (e) {
@@ -428,9 +461,19 @@ function RoomPage() {
           isHost={isHost}
           restarting={busy}
           onPlayAgain={handlePlayAgain}
+          onSwitchGame={canSwitchGame ? () => void handleSwitchGame() : undefined}
+          switching={switching}
+          waitingForGroupHost={party.linked && !party.isHost}
         />
       ) : room.status === "lobby" || !currentRound ? (
-        <Lobby room={room} players={players} isHost={isHost} starting={busy} onStart={handleStart} />
+        <>
+          {canSwitchGame && (
+            <Button variant="ghost" className="mb-3 w-full justify-center text-muted-foreground" disabled={switching} aria-busy={switching} onClick={() => void handleSwitchGame()}>
+              {switching ? <Loader2 className="animate-spin" /> : <LayoutGrid />} Voltar ao lobby da galera (trocar de jogo)
+            </Button>
+          )}
+          <Lobby room={room} players={players} isHost={isHost} starting={busy} onStart={handleStart} />
+        </>
       ) : currentRound.status === "results" && currentRound.evaluation ? (
         <RoundResults
           key={currentRound.id}
