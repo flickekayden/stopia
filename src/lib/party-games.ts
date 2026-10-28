@@ -1,4 +1,5 @@
-/** Browser-safe catalogue and shared types for the party mini-games (Stop stays in its own modules). */
+/** Browser-safe catalogue and shared types for the group-room games (Stop included as a native group game). */
+import { DEFAULT_CATEGORIES } from "./game";
 
 export type PartyGameId = "tribunal" | "autor" | "infiltrado" | "debate" | "roleta";
 
@@ -14,6 +15,7 @@ export type PartyPhaseId =
   | "vote"
   | "guess"
   | "last_guess"
+  | "evaluating"
   | "reveal"
   | "final";
 
@@ -253,6 +255,8 @@ export type PartyResults = {
   sideTotals?: { A: number; B: number };
   winnerSide?: "A" | "B" | null;
   multiplier?: number;
+  /** Stop: the judge's result for every player x category of the round. */
+  stop?: StopJudgedAnswer[];
 };
 
 /** What the server reveals to one specific, session-validated player. */
@@ -264,7 +268,7 @@ export type PartyPrivateViewData = {
 };
 
 /** Shape of one player's stored submission for a phase. */
-export type PartyMine = { text?: string; target?: string; verdict?: string; guesses?: Record<string, string> };
+export type PartyMine = { text?: string; target?: string; verdict?: string; guesses?: Record<string, string>; answers?: Record<string, string>; done?: boolean };
 
 /** Everything here is readable by every client in realtime: never put secrets in it. */
 export type PartyPublicState = {
@@ -280,8 +284,19 @@ export type PartyPublicState = {
   scores?: Record<string, number>;
   ai?: PartyAiState;
   skipsLeft?: number;
-  /** Code of the Stop room the group is playing right now (public: Stop codes are shareable). */
+  /** Stop round: letter and categories are public; answers stay in party_submissions until the judge runs. */
+  stop?: StopRoundState;
+  /** DEPRECATED: Stop used to run in a separate linked room; kept so old links still read. */
   stopCode?: string;
+};
+
+export type StopRoundState = {
+  letter: string;
+  categories: string[];
+  /** Server-issued start (after the 3-second countdown). */
+  startsAt: string;
+  stopBy?: string;
+  stopAt?: string;
 };
 
 export function readPublicState(raw: unknown): PartyPublicState {
@@ -298,6 +313,7 @@ export const PHASE_LABELS: Record<PartyPhaseId, string> = {
   vote: "Votação",
   guess: "Quem escreveu?",
   last_guess: "Última chance do infiltrado",
+  evaluating: "A IA está julgando",
   reveal: "Resultado",
   final: "Fim de jogo",
 };
