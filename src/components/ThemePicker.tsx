@@ -23,7 +23,7 @@ export function ThemePicker() {
     if (!step) return;
     event.preventDefault();
     const index = THEMES.findIndex((theme) => theme.id === active);
-    const next = THEMES[(index + step + THEMES.length) % THEMES.length];
+    const next = THEMES[(index + step + THEMES.length) % THEMES.length] ?? THEMES[0]!;
     choose(next.id);
     (event.currentTarget.querySelector(`[data-theme-id="${next.id}"]`) as HTMLButtonElement | null)?.focus();
   }
