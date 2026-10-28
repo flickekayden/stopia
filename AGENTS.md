@@ -18,7 +18,7 @@
 - Global settings synchronization and theme application live in SettingsRuntime; the developer editor is lazy-loaded only for unlocked devices to keep its UI dependencies out of initial loading.
 - Room snapshots read only the latest round; player updates and answer changes apply room-scoped realtime rows directly, with coalesced snapshot refreshes and a trailing refresh for in-flight events to avoid request storms without losing transitions.
 - Room chat uses lightweight plain-text bubbles and design-system input controls rather than AI Markdown/attachment engines; append realtime messages and cap history at the newest 100 entries to bound work and memory.
-- Results and final rankings are lazy-loaded game phases; unchanged answer cards retain memoized renders so countdown ticks do not repaint every answer.
+- Results and final rankings are lazy-loaded; unchanged answer cards stay memoized so countdown ticks do not repaint them.
 - Independent server reads and score writes run in parallel with at most six outbound requests per batch to respect the deployed runtime budget.
 - All routes share a smartphone-width shell, and portal sheets/fixed controls use the same width and safe-area offsets so desktop preserves mobile ergonomics.
 - The installation worker is network-only for navigations and never caches game/session data so multiplayer state remains authoritative.
@@ -32,3 +32,5 @@
 - Final rankings use a browser-safe competition-rank helper so equal totals share a place without changing stored scoring rules.
 - Answer saves are serialized per round and late hydration preserves locally edited fields so slow acknowledgements cannot overwrite newer input.
 - Non-AI game actions verify the existing hashed player session in addition to host membership; direct table policies remain a separately audited security boundary.
+- Party mini-games use separate party_* tables, `party.server.ts` and `/festa/$code`, never Stop's modules; secrets (infiltrado word/role, anonymous authors, pre-reveal votes) stay in party_private/party_submissions without client grants, never in realtime-readable public_state.
+- Party transitions are version-guarded, recompute submissions from the table and keep scores inside public_state, so concurrent advances resolve once; party AI prompts stay isolated in `party-ai.server.ts` with built-in fallbacks and never control voting or scoring.

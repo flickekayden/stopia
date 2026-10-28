@@ -15,6 +15,13 @@
       "when": 1791845136445,
       "tag": "0001_enable_game_realtime",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1793150142340,
+      "tag": "0002_party_games",
+      "breakpoints": true
     }
   ]
 }

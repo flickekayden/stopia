@@ -1,7 +1,7 @@
-import { createFileRoute, useNavigate, useRouter } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
-import { ArrowRight, ChevronDown, DoorOpen, Loader2, LockKeyhole, Plus, Trash2, Users } from "lucide-react";
+import { ArrowRight, ChevronDown, DoorOpen, Gamepad2, Loader2, LockKeyhole, Plus, Trash2, Users } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -191,6 +191,15 @@ function Home() {
           Adedonha online com os amigos. Sem cadastro, só apelido e vergonha na cara.
         </p>
       </header>
+
+      <Link to="/jogos" className="party-card flex min-h-16 items-center gap-3 p-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" data-game="roleta">
+        <span className="party-icon size-11"><Gamepad2 className="size-5" aria-hidden="true" /></span>
+        <span className="min-w-0 flex-1">
+          <span className="block font-bold">Central de Jogos</span>
+          <span className="block text-sm text-muted-foreground">Mais 5 jogos para a galera: Tribunal, Infiltrado, Roleta…</span>
+        </span>
+        <ArrowRight className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
+      </Link>
 
       <section className="space-y-3">
         <label className="section-label block" htmlFor="apelido">

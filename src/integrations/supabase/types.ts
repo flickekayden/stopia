@@ -137,6 +137,196 @@ export type Database = {
           },
         ]
       }
+      party_players: {
+        Row: {
+          created_at: string
+          id: string
+          is_host: boolean
+          last_seen: string
+          nickname: string
+          room_id: string
+          score: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_host?: boolean
+          last_seen?: string
+          nickname: string
+          room_id: string
+          score?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_host?: boolean
+          last_seen?: string
+          nickname?: string
+          room_id?: string
+          score?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "party_players_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "party_rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      party_private: {
+        Row: {
+          data: Json
+          room_id: string
+          round_number: number
+        }
+        Insert: {
+          data?: Json
+          room_id: string
+          round_number: number
+        }
+        Update: {
+          data?: Json
+          room_id?: string
+          round_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "party_private_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "party_rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      party_rooms: {
+        Row: {
+          code: string
+          created_at: string
+          game: string
+          id: string
+          phase: string
+          phase_ends_at: string | null
+          phase_started_at: string | null
+          public_state: Json
+          round_number: number
+          settings: Json
+          status: string
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          game: string
+          id?: string
+          phase?: string
+          phase_ends_at?: string | null
+          phase_started_at?: string | null
+          public_state?: Json
+          round_number?: number
+          settings?: Json
+          status?: string
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          game?: string
+          id?: string
+          phase?: string
+          phase_ends_at?: string | null
+          phase_started_at?: string | null
+          public_state?: Json
+          round_number?: number
+          settings?: Json
+          status?: string
+          updated_at?: string
+          version?: number
+        }
+        Relationships: []
+      }
+      party_sessions: {
+        Row: {
+          player_id: string
+          room_id: string
+          session_hash: string
+        }
+        Insert: {
+          player_id: string
+          room_id: string
+          session_hash: string
+        }
+        Update: {
+          player_id?: string
+          room_id?: string
+          session_hash?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "party_sessions_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: true
+            referencedRelation: "party_players"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "party_sessions_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "party_rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      party_submissions: {
+        Row: {
+          created_at: string
+          id: string
+          payload: Json
+          phase: string
+          player_id: string
+          room_id: string
+          round_number: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          payload?: Json
+          phase: string
+          player_id: string
+          room_id: string
+          round_number: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          payload?: Json
+          phase?: string
+          player_id?: string
+          room_id?: string
+          round_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "party_submissions_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "party_players"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "party_submissions_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "party_rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       players: {
         Row: {
           created_at: string
