@@ -276,7 +276,7 @@ function PhaseHeader({ ctx, now }: { ctx: PartyCtx; now: number }) {
   const endsAt = ctx.room.phase_ends_at ? new Date(ctx.room.phase_ends_at).getTime() : null;
   const seconds = endsAt ? Math.max(0, Math.ceil((endsAt - now) / 1000)) : null;
   return (
-    <div className="round-hud sticky top-0 z-20 -mx-4 flex items-center gap-3 border-b border-border/70 pb-3 pl-4 pr-[4.5rem] pt-[calc(0.75rem+env(safe-area-inset-top))] backdrop-blur-md">
+    <div className="round-hud sticky top-0 z-20 -mx-4 flex items-center gap-3 border-b border-border/70 pb-3 pl-4 pr-[calc(var(--top-actions-space)+0.5rem)] pt-[calc(0.75rem+env(safe-area-inset-top))] backdrop-blur-md">
       <span className="party-icon size-11"><PartyIcon name={PARTY_GAMES[ctx.game].icon} className="size-5" /></span>
       <div className="min-w-0 flex-1">
         <p className="section-label">Rodada <span className="tabular-nums text-foreground">{ctx.room.round_number}</span> de {ctx.settings.rounds}</p>

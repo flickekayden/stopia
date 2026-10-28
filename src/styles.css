@@ -180,7 +180,6 @@ html { scroll-padding-top: 6rem; scroll-padding-bottom: calc(var(--active-dock-h
   .mobile-bottom-bar { position: relative !important; bottom: auto !important; max-height: none; margin-top: 1rem; }
   .dock-clearance { padding-bottom: calc(1rem + env(safe-area-inset-bottom)); }
   .mobile-app-frame main { padding-top: calc(0.75rem + env(safe-area-inset-top)); }
-  .chat-launcher { bottom: calc(1rem + env(safe-area-inset-bottom)); }
   .mobile-sheet { max-height: calc(100dvh - env(safe-area-inset-top) - var(--keyboard-inset, 0px)); }
 }
 .mobile-app-frame [role="button"] { min-width: 48px; }

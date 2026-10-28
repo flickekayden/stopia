@@ -279,7 +279,7 @@ export function RoundBoard({
 
   return (
     <div className="game-screen dock-clearance space-y-4">
-      <div className={`round-hud sticky top-0 z-20 -mx-4 flex items-center border-b border-border/70 pl-4 pr-[4.5rem] pt-[calc(0.75rem+env(safe-area-inset-top))] backdrop-blur-md transition-[padding] duration-200 ${compactHeader ? "gap-3 pb-3" : "gap-4 pb-4"}`}>
+      <div className={`round-hud sticky top-0 z-20 -mx-4 flex items-center border-b border-border/70 pl-4 pr-[calc(var(--top-actions-space)+0.5rem)] pt-[calc(0.75rem+env(safe-area-inset-top))] backdrop-blur-md transition-[padding] duration-200 ${compactHeader ? "gap-3 pb-3" : "gap-4 pb-4"}`}>
         <div className={`letter-tile flex shrink-0 items-center justify-center transition-[width,height,border-radius] duration-200 ${compactHeader ? "size-11 rounded-lg" : "size-20 rounded-2xl"}`} aria-label={`Letra ${round.letter}`}>
           <span className={`font-display leading-none ${compactHeader ? "text-3xl" : "text-6xl"}`}>{round.letter}</span>
         </div>

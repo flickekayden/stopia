@@ -100,7 +100,7 @@ function GamesHub() {
 
   return (
     <main className="game-screen mx-auto flex min-h-[100dvh] w-full max-w-md flex-col gap-6 px-5 pb-[calc(2rem+env(safe-area-inset-bottom))] pt-[calc(1.25rem+env(safe-area-inset-top))]">
-      <header className="space-y-3 pr-14 pt-2">
+      <header className="space-y-3 top-actions-clear pt-2">
         <h1 className="font-display text-5xl leading-none text-primary">Central de Jogos</h1>
         <p className="text-base text-muted-foreground">Reúna a galera numa sala só e escolham juntos o que jogar. No celular e sem cadastro.</p>
       </header>
