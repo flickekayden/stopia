@@ -292,7 +292,7 @@ function RoomPage() {
       await removePlayer({ data: { roomId: room.id, requesterId: playerId, playerId, sessionId } });
       clearStoredPlayer(code);
       window.close();
-      if (!window.closed) await navigate({ to: "/" });
+      if (!window.closed) await navigate({ to: "/stop" });
     } catch (e) {
       play("error");
       toast.error(e instanceof Error ? e.message : "Não consegui sair da sala");
@@ -325,14 +325,14 @@ function RoomPage() {
   }
 
   if (connectionError && !room) {
-    return <main className="mx-auto flex min-h-[100dvh] w-full max-w-md flex-col items-center justify-center gap-4 px-5 text-center"><h1 className="font-display text-3xl">Não foi possível conectar</h1><p role="alert" className="text-muted-foreground">{connectionError}</p><Button onClick={reconnect}><RefreshCw /> Tentar novamente</Button><Button variant="ghost" onClick={() => navigate({ to: "/" })}>Voltar ao início</Button></main>;
+    return <main className="mx-auto flex min-h-[100dvh] w-full max-w-md flex-col items-center justify-center gap-4 px-5 text-center"><h1 className="font-display text-3xl">Não foi possível conectar</h1><p role="alert" className="text-muted-foreground">{connectionError}</p><Button onClick={reconnect}><RefreshCw /> Tentar novamente</Button><Button variant="ghost" onClick={() => navigate({ to: "/stop" })}>Voltar ao início</Button></main>;
   }
 
   if (missing || !room) {
     return (
       <main className="mx-auto flex min-h-[100dvh] w-full max-w-md flex-col items-center justify-center gap-4 px-5 text-center">
         <h1 className="font-display text-3xl">Sala não encontrada</h1>
-        <Button onClick={() => navigate({ to: "/" })} className="h-14 rounded-2xl px-8 text-lg font-bold">
+        <Button onClick={() => navigate({ to: "/stop" })} className="h-14 rounded-2xl px-8 text-lg font-bold">
           Voltar
         </Button>
       </main>
