@@ -259,11 +259,7 @@ export async function createPartyRoom(input: { game?: PartyGameId | undefined; n
 export async function joinPartyRoom(input: { code: string; nickname: string; sessionId: string }) {
   const code = input.code.trim().toUpperCase();
   const { data: room } = await db().from("party_rooms").select("*").eq("code", code).maybeSingle();
-  if (!room) {
-    const { data: stopRoom } = await db().from("rooms").select("code").eq("code", code).maybeSingle();
-    if (stopRoom) return { kind: "stop" as const, code: stopRoom.code };
-    throw new Error("Sala não encontrada");
-  }
+  if (!room) throw new Error("Sala não encontrada");
   const sessionHash = hashSession(input.sessionId);
   const { data: existing } = await db().from("party_sessions").select("player_id").eq("room_id", room.id).eq("session_hash", sessionHash).maybeSingle();
   if (existing) {
