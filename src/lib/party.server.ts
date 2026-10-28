@@ -678,7 +678,7 @@ async function advanceOnce(room: RoomRow): Promise<boolean> {
     const finish = (votes: Record<string, string>, guess: string | null) => {
       const guessCorrect = guess === null ? null : normalizeText(guess).replace(/ /g, "") === normalizeText(roundPrivate.word ?? "").replace(/ /g, "");
       const result = scoreInfiltrado({ infiltradoId, playerIds: roundPlayers, votes, guessCorrect });
-      return reveal({ infiltradoId, word: roundPrivate.word, category: roundPrivate.category, votes, counts: result.counts, accusedId: result.accusedId, guess, guessCorrect, outcome: result.outcome }, result.deltas, null);
+      return reveal({ infiltradoId, word: roundPrivate.word ?? "", category: roundPrivate.category ?? "", votes, counts: result.counts, accusedId: result.accusedId, guess, guessCorrect, outcome: result.outcome }, result.deltas, null);
     };
     if (phase === "clues") return toPhase("vote", { entries: textEntries(subs, present), eligible: roundPlayers });
     if (phase === "vote") {

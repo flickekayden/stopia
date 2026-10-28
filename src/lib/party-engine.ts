@@ -151,7 +151,7 @@ export function scoreDebate(sides: Record<string, "A" | "B">, votes: Record<stri
     const side = sides[id];
     if (side) sideTotals[side] += count;
   }
-  const winnerSide = sideTotals.A === sideTotals.B ? null : sideTotals.A > sideTotals.B ? "A" : "B";
+  const winnerSide: "A" | "B" | null = sideTotals.A === sideTotals.B ? null : sideTotals.A > sideTotals.B ? "A" : "B";
   if (winnerSide) for (const [id, side] of Object.entries(sides)) if (side === winnerSide) add(deltas, id, 1);
   return { counts, sideTotals, winnerSide, deltas };
 }
