@@ -92,3 +92,10 @@
 - [x] End of match: "Jogar Novamente" / "Trocar de Jogo"; guests wait for the host
 - [x] Developer panel scoped to the game on screen, per-game timings/AI tone/chaos events
 - [x] Tests and real two-player verification (Debate match, switch, Stop round-trip)
+
+## Correções de sala global e mobile
+- [ ] Card de link/compartilhar na sala da galera
+- [ ] Listar e excluir salas globais (admin)
+- [ ] Sem sobreposição: sair, chat, admin e som no topo
+- [ ] Chat fixo no cabeçalho em todas as telas
+- [ ] Revisar telas no celular (largura, rodapé, placar)
