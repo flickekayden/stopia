@@ -171,8 +171,11 @@ export type PartyPrivateViewData = {
   role: "infiltrado" | "cidadao" | "espectador" | null;
   word: string | null;
   myEntryId: string | null;
-  mine: Record<string, unknown> | null;
+  mine: PartyMine | null;
 };
+
+/** Shape of one player's stored submission for a phase. */
+export type PartyMine = { text?: string; target?: string; verdict?: string; guesses?: Record<string, string> };
 
 /** Everything here is readable by every client in realtime: never put secrets in it. */
 export type PartyPublicState = {

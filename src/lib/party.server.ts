@@ -35,6 +35,7 @@ import {
   type PartyEntry,
   type PartyGameId,
   type PartyPhaseId,
+  type PartyMine,
   type PartyPrivateViewData,
   type PartyPrompt,
   type PartyResults,
@@ -323,7 +324,7 @@ async function buildPrompt(room: RoomRow, players: PlayerRow[], round: number, s
     const item = INFILTRADO_WORDS[index]!;
     data.word = item.word;
     data.category = item.category;
-    data.infiltradoId = shuffle(players.map((p) => p.id))[0];
+    data.infiltradoId = shuffle(players.map((p) => p.id))[0] ?? players[0]!.id;
     data.prompt = { title: `Categoria: ${item.category}`, text: "Escreva uma pista curta sobre a palavra secreta, sem entregá-la.", category: item.category, source: "banco" };
   } else if (game === "debate") {
     let prompt: PartyPrompt | null = null;
@@ -379,7 +380,7 @@ async function startRound(room: RoomRow, players: PlayerRow[], round: number, sc
   const stored = await readPrivate<RoundPrivate>(room.id, round);
   const phase = FIRST_PHASE[game];
   const state: PartyPublicState = {
-    prompt: stored.prompt,
+    ...(stored.prompt ? { prompt: stored.prompt } : {}),
     eligible: stored.playerIds ?? players.map((p) => p.id),
     submitted: [],
     scores,
@@ -547,16 +548,16 @@ export async function advancePartyPhase(input: { roomId: string; playerId: strin
 
 async function submissionsFor(room: RoomRow, phase: string) {
   const { data } = await db().from("party_submissions").select("player_id, payload, created_at").eq("room_id", room.id).eq("round_number", room.round_number).eq("phase", phase).order("created_at");
-  return (data ?? []) as { player_id: string; payload: Record<string, unknown>; created_at: string }[];
+  return (data ?? []) as unknown as { player_id: string; payload: PartyMine; created_at: string }[];
 }
 
-function textEntries(subs: { player_id: string; payload: Record<string, unknown> }[], present: Set<string>): PartyEntry[] {
+function textEntries(subs: { player_id: string; payload: PartyMine }[], present: Set<string>): PartyEntry[] {
   return subs
     .filter((s) => present.has(s.player_id) && typeof s.payload.text === "string")
     .map((s) => ({ id: s.player_id, playerId: s.player_id, text: String(s.payload.text) }));
 }
 
-function targetVotes(subs: { player_id: string; payload: Record<string, unknown> }[]) {
+function targetVotes(subs: { player_id: string; payload: PartyMine }[]) {
   const votes: Record<string, string> = {};
   for (const s of subs) if (typeof s.payload.target === "string") votes[s.player_id] = s.payload.target;
   return votes;
@@ -726,7 +727,7 @@ export async function getPartyPrivateView(input: { roomId: string; playerId: str
     readPrivate<RoundPrivate>(room.id, room.round_number),
     db().from("party_submissions").select("payload").eq("room_id", room.id).eq("round_number", room.round_number).eq("phase", room.phase).eq("player_id", player.id).maybeSingle(),
   ]);
-  const view: PartyPrivateViewData = { ...empty, mine: (mine?.payload ?? null) as Record<string, unknown> | null };
+  const view: PartyPrivateViewData = { ...empty, mine: (mine?.payload ?? null) as PartyMine | null };
   const game = gameOf(room);
   if (game === "infiltrado" && room.phase !== "reveal") {
     if (!(roundPrivate.playerIds ?? []).includes(player.id)) view.role = "espectador";

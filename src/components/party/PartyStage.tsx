@@ -264,7 +264,7 @@ function TextSubmit({ ctx, actions, label, placeholder }: { ctx: PartyCtx; actio
       setSentText(null);
     }
   }, [phaseKey]);
-  const saved = typeof ctx.view?.mine?.text === "string" ? (ctx.view.mine.text as string) : null;
+  const saved = ctx.view?.mine?.text ?? null;
   useEffect(() => {
     if (saved && !touched) {
       setText(saved);
@@ -338,7 +338,7 @@ function EntryList({ ctx, entries, onPick, selected, showAuthor }: { ctx: PartyC
 }
 
 function VoteTarget({ ctx, actions, entries, showAuthor }: { ctx: PartyCtx; actions: PartyActions; entries: PartyEntry[]; showAuthor: boolean }) {
-  const saved = typeof ctx.view?.mine?.target === "string" ? (ctx.view.mine.target as string) : null;
+  const saved = ctx.view?.mine?.target ?? null;
   const [picked, setPicked] = useState<string | null>(null);
   const current = picked ?? saved;
   return (
@@ -354,7 +354,7 @@ function VoteTarget({ ctx, actions, entries, showAuthor }: { ctx: PartyCtx; acti
 }
 
 function InfiltradoVote({ ctx, actions }: { ctx: PartyCtx; actions: PartyActions }) {
-  const saved = typeof ctx.view?.mine?.target === "string" ? (ctx.view.mine.target as string) : null;
+  const saved = ctx.view?.mine?.target ?? null;
   const [picked, setPicked] = useState<string | null>(null);
   const current = picked ?? saved;
   const candidates = (ctx.state.eligible ?? []).filter((id) => ctx.players.some((p) => p.id === id));
@@ -381,7 +381,7 @@ function InfiltradoVote({ ctx, actions }: { ctx: PartyCtx; actions: PartyActions
 }
 
 function TribunalVote({ ctx, actions }: { ctx: PartyCtx; actions: PartyActions }) {
-  const saved = ctx.view?.mine?.verdict as string | undefined;
+  const saved = ctx.view?.mine?.verdict;
   const [picked, setPicked] = useState<string | null>(null);
   const current = picked ?? saved ?? null;
   const voting = (ctx.state.eligible ?? []).includes(ctx.me.id);
@@ -406,7 +406,7 @@ function TribunalVote({ ctx, actions }: { ctx: PartyCtx; actions: PartyActions }
 }
 
 function AutorGuess({ ctx, actions }: { ctx: PartyCtx; actions: PartyActions }) {
-  const saved = (ctx.view?.mine?.guesses ?? null) as Record<string, string> | null;
+  const saved = ctx.view?.mine?.guesses ?? null;
   const [guesses, setGuesses] = useState<Record<string, string>>({});
   const [touched, setTouched] = useState(false);
   useEffect(() => { if (saved && !touched) setGuesses(saved); }, [saved, touched]);

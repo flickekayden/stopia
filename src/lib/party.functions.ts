@@ -31,7 +31,10 @@ export const updatePartySettings = createServerFn({ method: "POST" })
       })
       .parse(input),
   )
-  .handler(async ({ data }) => (await server()).updatePartySettings(data));
+  .handler(async ({ data }) => {
+    const settings = Object.fromEntries(Object.entries(data.settings).filter(([, value]) => value !== undefined));
+    return (await server()).updatePartySettings({ ...data, settings });
+  });
 
 export const startPartyGame = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => z.object(session).parse(input))
