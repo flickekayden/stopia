@@ -203,3 +203,27 @@ export function useDevRound() {
     () => null,
   );
 }
+
+/* Which game the developer panel should configure right now (set by the group room screen). */
+export type DevGameContext = "global" | "stop" | "tribunal" | "autor" | "infiltrado" | "debate" | "roleta";
+let devGameContext: DevGameContext = "global";
+const contextListeners = new Set<() => void>();
+export function setDevGameContext(value: DevGameContext) {
+  if (devGameContext === value) return;
+  devGameContext = value;
+  contextListeners.forEach((l) => l());
+}
+export function useDevGameContext() {
+  return useSyncExternalStore(
+    (l) => {
+      contextListeners.add(l);
+      return () => contextListeners.delete(l);
+    },
+    () => devGameContext,
+    () => "global" as DevGameContext,
+  );
+}
+
+export function getDevToken() {
+  return devToken();
+}
