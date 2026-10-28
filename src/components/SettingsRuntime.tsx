@@ -33,12 +33,12 @@ export function SettingsRuntime() {
       if (value) root.style.setProperty(`--${key}`, value);
       else root.style.removeProperty(`--${key}`);
     }
-    const theme = document.querySelector('meta[name="theme-color"]');
-    if (theme) {
+    const themeMeta = document.querySelector('meta[name="theme-color"]');
+    if (themeMeta) {
       const probe = document.createElement("span");
       probe.style.color = "var(--background)";
       root.appendChild(probe);
-      theme.setAttribute("content", getComputedStyle(probe).color);
+      themeMeta.setAttribute("content", getComputedStyle(probe).color);
       probe.remove();
     }
   }, [effective.colors, theme]);
