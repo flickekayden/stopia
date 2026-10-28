@@ -39,7 +39,7 @@ function GamesHub() {
   const [nickname, setNickname] = useState("");
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState<"create" | "join" | null>(null);
-  const [rulesFor, setRulesFor] = useState<PartyGameId | null>(null);
+  const [rulesFor, setRulesFor] = useState<LobbyGameId | null>(null);
   const [nicknameError, setNicknameError] = useState(false);
 
   useEffect(() => {
@@ -141,7 +141,7 @@ function GamesHub() {
               {busy === "join" ? <Loader2 className="animate-spin" /> : <ArrowRight />} Entrar
             </Button>
           </div>
-          <p className="text-xs text-muted-foreground">Funciona para salas da galera e salas antigas de Stop.</p>
+          <p className="text-xs text-muted-foreground">Todos os jogos, incluindo o Stop, acontecem nesta sala.</p>
         </form>
       </section>
 
