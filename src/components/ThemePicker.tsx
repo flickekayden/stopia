@@ -15,7 +15,7 @@ export function ThemePicker() {
   function choose(id: ThemeId) {
     if (id === active) return;
     setTheme(id);
-    play("tap");
+    play("click");
   }
 
   function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {

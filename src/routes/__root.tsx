@@ -16,6 +16,7 @@ import { SoundProvider } from "@/components/SoundProvider";
 import { Toaster } from "@/components/ui/sonner";
 import { SettingsRuntime } from "@/components/SettingsRuntime";
 import { Button } from "@/components/ui/button";
+import { THEME_BOOT_SCRIPT } from "@/lib/themes";
 
 function NotFoundComponent() {
   return (
@@ -104,8 +105,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: ReactNode }) {
   return (
-    <html lang="pt-BR">
+    <html lang="pt-BR" suppressHydrationWarning>
       <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
         <HeadContent />
       </head>
       <body>
