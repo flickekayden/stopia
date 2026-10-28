@@ -1,18 +1,20 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
 import { ArrowRight, BookOpen, Clock, Loader2, Users } from "lucide-react";
 import { toast } from "sonner";
 
+import { InstallApp } from "@/components/InstallApp";
 import { PartyIcon } from "@/components/party/PartyIcon";
 import { RulesList } from "@/components/party/RulesList";
+import { StopRules } from "@/components/party/StopParty";
 import { useSound } from "@/components/SoundProvider";
 import { ThemePicker } from "@/components/ThemePicker";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { createPartyRoom, joinPartyRoom } from "@/lib/party.functions";
-import { LOBBY_GAMES, PARTY_GAMES, type PartyGameId } from "@/lib/party-games";
+import { LOBBY_GAMES, PARTY_GAMES, STOP_LOBBY_META, type LobbyGameId } from "@/lib/party-games";
 import { getLastNickname, getOrCreateSessionId, savePlayer } from "@/lib/session";
 
 export const Route = createFileRoute("/")({
@@ -83,10 +85,6 @@ function GamesHub() {
     try {
       const sessionId = getOrCreateSessionId();
       const res = await join({ data: { code: code.trim(), nickname: nickname.trim(), sessionId } });
-      if (res.kind === "stop") {
-        navigate({ to: "/sala/$code", params: { code: res.code } });
-        return;
-      }
       savePlayer(res.code, res.playerId, nickname.trim(), sessionId);
       navigate({ to: "/festa/$code", params: { code: res.code } });
     } catch (error) {
@@ -97,7 +95,7 @@ function GamesHub() {
     }
   }
 
-  const rules = rulesFor ? PARTY_GAMES[rulesFor] : null;
+  const rules = rulesFor && rulesFor !== "stop" ? PARTY_GAMES[rulesFor] : null;
 
   return (
     <main className="game-screen mx-auto flex min-h-[100dvh] w-full max-w-md flex-col gap-6 px-5 pb-[calc(2rem+env(safe-area-inset-bottom))] pt-[calc(1.25rem+env(safe-area-inset-top))]">
