@@ -391,7 +391,7 @@ function StopBoard({ ctx, actions }: { ctx: PartyCtx; actions: PartyActions }) {
 
   return (
     <div className="dock-clearance space-y-4" data-game="stop">
-      <div className="round-hud sticky top-0 z-20 -mx-4 flex items-center gap-3 border-b border-border/70 pb-3 pl-4 pr-[calc(var(--top-actions-space)+0.5rem)] pt-[calc(0.75rem+env(safe-area-inset-top))] backdrop-blur-md">
+      <div className="round-hud sticky top-0 z-20 -mx-4 flex items-center gap-3 border-b border-border/70 pb-3 pl-4 pr-[calc(var(--top-actions-space)+0.5rem)] pt-[calc(0.75rem+env(safe-area-inset-top))]">
         <div className="letter-tile flex size-14 shrink-0 items-center justify-center rounded-xl" aria-label={`Letra ${starting ? "a ser revelada" : stop.letter}`}>
           <span className="font-display text-4xl leading-none">{starting ? "?" : stop.letter}</span>
         </div>
@@ -572,7 +572,7 @@ function StopReveal({ ctx, actions }: { ctx: PartyCtx; actions: PartyActions }) 
 
       <StopScoreboard ctx={ctx} />
 
-      <div className="mobile-bottom-bar fixed inset-x-0 bottom-0 mx-auto w-full max-w-md border-t border-border bg-background/95 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] backdrop-blur">
+      <div className="mobile-bottom-bar fixed inset-x-0 bottom-0 mx-auto w-full max-w-md border-t border-border bg-background/95 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
         {ctx.isHost ? (
           <Button className="party-accent-button h-14 w-full text-lg font-bold shadow-none" disabled={ctx.busy !== null} aria-busy={ctx.busy === "next"} onClick={() => void actions.next()}>
             {ctx.busy === "next" ? <><Loader2 className="animate-spin" /> Preparando…</> : last ? "Ver resultado final" : "Próxima rodada"}
