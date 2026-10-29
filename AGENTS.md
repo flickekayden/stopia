@@ -35,3 +35,5 @@
 - The developer panel is context-scoped: colors on hub/lobby, Stop technical tools on Stop, per-party-game timings/tone/events in app_settings `party` via `readPartyAdmin`.
 - No `attachSupabaseAuth` in `src/start.ts`: players are verified by hashed room sessions and no server function needs a Supabase bearer, so the browser database client stays out of the home page bundle; re-add it only with a real sign-in feature.
 - `usePartyRoom` applies realtime rows directly (room updates version-guarded), re-syncs with one embedded room+players query on subscribe, tab return or reconnect, and polls only while realtime is silent and the tab is visible.
+- Group-room chat lives in `party_chat` (anon SELECT for realtime, inserts only through session-verified `sendPartyChat`, which allows only quick reactions while Stop answers are open); crowd reactions are ephemeral realtime broadcasts, never stored, so result screens add no database writes.
+- The room's cumulative "Rei da Noite" tally reuses `party_players.score`, incremented only by the caller whose version-guarded update ended the match, so replays and concurrent advances never double count.
