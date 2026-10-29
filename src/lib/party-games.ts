@@ -348,7 +348,7 @@ export type PartyResults = {
   winnerSide?: "A" | "B" | null;
   multiplier?: number;
   /** Debate/Roleta judged by the AI: the chosen best entry and a short note per player. */
-  judge?: { by: "ia"; bestId: string | null; bonus?: number; notes?: Record<string, string> };
+  judge?: { by: "ia"; bestId: string | null; bonus?: number; notes?: Record<string, string>; sentence?: string };
   /** Stop: the judge's result for every player x category of the round. */
   stop?: StopJudgedAnswer[];
 };
@@ -382,6 +382,15 @@ export type PartyPublicState = {
   stop?: StopRoundState;
   /** DEPRECATED: Stop used to run in a separate linked room; kept so old links still read. */
   stopCode?: string;
+  /** Final podium: AI awards for the match (Debate). Absent when the AI is off for the room. */
+  finalCommentary?: FinalCommentary;
+};
+
+export type FinalCommentary = {
+  status: "pending" | "ready" | "failed";
+  title?: string;
+  highlights?: { playerId: string; title: string; text: string }[];
+  summary?: string;
 };
 
 export type StopRoundState = {
@@ -483,7 +492,7 @@ const DURATIONS: Record<PartyGameId, string> = {
 };
 
 const TAGLINES: Record<PartyGameId, string> = {
-  tribunal: "3+ jogadores · Exige grupo",
+  tribunal: "2+ jogadores · Duelo ou Júri da galera",
   autor: "3+ jogadores · Exige grupo",
   infiltrado: "3+ jogadores · Exige grupo",
   debate: "2+ jogadores · Duelo com Juiz de IA",
@@ -509,7 +518,7 @@ export function missingPlayers(id: LobbyGameId, players: number) {
 
 /** Timed phases the developer can tune; Debate's argument and Roleta's answer times belong to the host. */
 export const GAME_PHASES: Record<PartyGameId, PartyPhaseId[]> = {
-  tribunal: ["defense", "vote"],
+  tribunal: ["vote"],
   autor: ["write", "guess"],
   infiltrado: ["clues", "vote", "last_guess"],
   debate: ["vote"],
