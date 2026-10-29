@@ -542,6 +542,23 @@ function SecretCard({ ctx }: { ctx: PartyCtx }) {
   );
 }
 
+/** Tribunal: who you are in this case and who decides, so nobody has to guess their job. */
+function TribunalRole({ ctx, isDefendant, duel }: { ctx: PartyCtx; isDefendant: boolean; duel: boolean }) {
+  const byAi = duel || effectiveJudgeFor("tribunal", ctx.settings, (ctx.state.eligible ?? []).length) === "ia";
+  const role = isDefendant ? "RÉU" : duel ? "PROMOTOR" : "ACUSADOR";
+  const mission = isDefendant
+    ? "Convença o juiz da sua inocência."
+    : `Convença o juiz de que @${nick(ctx.players, ctx.state.defendantId)} é culpado.`;
+  return (
+    <div className="rounded-xl border-2 border-[var(--game-accent)] bg-background p-4" role="note" aria-label={`Seu papel: ${role}`}>
+      <p className="section-label inline-flex items-center gap-1.5 party-accent"><Gavel className="size-3.5" aria-hidden="true" /> Seu papel</p>
+      <p className="font-display text-3xl leading-tight party-accent">{role}</p>
+      <p className="mt-1 font-semibold">{mission}</p>
+      <p className="mt-1 text-xs text-muted-foreground">{byAi ? "Quem decide: o Juiz de IA, lendo os dois lados." : "Quem decide: o júri da galera, votando culpado ou inocente."}</p>
+    </div>
+  );
+}
+
 function TextSubmit({ ctx, actions, label, placeholder }: { ctx: PartyCtx; actions: PartyActions; label: string; placeholder: string }) {
   const phaseKey = `${ctx.room.round_number}:${ctx.room.phase}`;
   const [text, setText] = useState("");
@@ -887,15 +904,48 @@ function RevealBody({ ctx }: { ctx: PartyCtx }) {
 
   if (ctx.game === "tribunal") {
     const verdict = results.verdict;
+    const judge = results.judge;
+    const byAi = judge?.by === "ia";
     return (
       <div className="space-y-3">
-        <section className="party-prompt text-center">
-          <p className="section-label">Veredito para @{nick(ctx.players, ctx.state.defendantId)}</p>
-          <p className={cn("font-display text-5xl", verdict === "culpado" ? "text-destructive" : "text-success")}>{verdict === "culpado" ? "CULPADO" : "INOCENTE"}</p>
-          <p className="text-sm tabular-nums text-muted-foreground">{String(results.guilty ?? 0)} culpado · {String(results.innocent ?? 0)} inocente{verdict === "inocente" && Number(results.guilty) === Number(results.innocent) ? " · empate absolve" : ""}</p>
-        </section>
-        <AiCard ctx={ctx} title="Sentença do juiz" />
-        <EntryList ctx={ctx} entries={ctx.state.entries ?? []} showAuthor />
+        {notice && <p className="party-panel text-sm text-muted-foreground">{notice}</p>}
+        {verdict && (
+          <section className="party-prompt space-y-2 text-center">
+            <span className="party-icon mx-auto size-12"><Gavel className="size-6" aria-hidden="true" /></span>
+            <p className="section-label">Veredito para @{nick(ctx.players, ctx.state.defendantId)}</p>
+            <p className={cn("font-display text-5xl", verdict === "culpado" ? "text-destructive" : "text-success")}>{verdict === "culpado" ? "CULPADO" : "INOCENTE"}</p>
+            {byAi ? (
+              <>
+                {judge?.sentence && (
+                  <p className="text-balance-safe rounded-xl border border-border/60 bg-background px-3 py-2 text-base font-semibold">
+                    <span className="section-label block party-accent">{verdict === "culpado" ? "Pena" : "Absolvição"}</span>
+                    {judge.sentence}
+                  </p>
+                )}
+                <p className="text-xs text-muted-foreground">Decisão do Juiz de IA{judge?.bonus ? ` · bônus +${judge.bonus}` : ""}</p>
+              </>
+            ) : (
+              <p className="text-sm tabular-nums text-muted-foreground">{String(results.guilty ?? 0)} culpado · {String(results.innocent ?? 0)} inocente{verdict === "inocente" && Number(results.guilty) === Number(results.innocent) ? " · empate absolve" : ""}</p>
+            )}
+          </section>
+        )}
+        <AiCard ctx={ctx} title={byAi ? "Por que o juiz decidiu assim" : "Sentença do juiz"} />
+        <ul className="space-y-2">
+          {(ctx.state.entries ?? []).map((entry, index) => {
+            const id = entry.playerId ?? "";
+            const isDefendant = id === ctx.state.defendantId;
+            const best = byAi && id === judge?.bestId;
+            return (
+              <li key={entry.id} className={cn("party-panel answer-card", best && "ring-2 ring-[var(--game-accent)]")} style={{ "--enter-index": index } as CSSProperties}>
+                <p className="text-xs font-semibold text-muted-foreground">
+                  {best && <Trophy className="mr-1 inline size-3.5 party-accent" aria-label="Melhor acusação" />}
+                  {nick(ctx.players, id)}{id === ctx.me.id ? " (você)" : ""} · {isDefendant ? "Defesa" : (ctx.state.eligible ?? []).length <= 2 ? "Promotor" : "Acusação"}
+                </p>
+                <p className="text-balance-safe mt-0.5 font-semibold">“{entry.text}”</p>
+              </li>
+            );
+          })}
+        </ul>
       </div>
     );
   }
@@ -1020,6 +1070,40 @@ function PartyReveal({ ctx, actions }: { ctx: PartyCtx; actions: PartyActions })
 
 /* ---------------------------------- Final --------------------------------- */
 
+/** Debate podium: the AI's comic awards for the match; never blocks the ranking. */
+function FinalCommentaryCard({ ctx }: { ctx: PartyCtx }) {
+  const commentary = ctx.state.finalCommentary;
+  if (!commentary) return null;
+  return (
+    <section className="party-prompt space-y-3" aria-live="polite" aria-label="Sentença final da IA">
+      <p className="section-label inline-flex items-center gap-1.5 party-accent"><Sparkles className="size-3.5" aria-hidden="true" /> {commentary.title ?? "Sentença Final da Corte"}</p>
+      {commentary.status === "pending" && <p className="inline-flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="size-4 animate-spin" aria-hidden="true" /> A IA está escolhendo os troféus da partida…</p>}
+      {commentary.status === "failed" && <p className="text-sm text-muted-foreground">A IA não conseguiu entregar os troféus desta vez. O placar vale normalmente.</p>}
+      {commentary.status === "ready" && (
+        <>
+          {(commentary.highlights ?? []).length > 0 && (
+            <ul className="grid gap-2">
+              {(commentary.highlights ?? []).map((h) => (
+                <li key={h.title} className="rounded-xl border border-border/60 bg-background p-3">
+                  <p className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide party-accent"><Award className="size-3.5" aria-hidden="true" /> {h.title}</p>
+                  <p className="font-bold">{nick(ctx.players, h.playerId)}{h.playerId === ctx.me.id ? " (você)" : ""}</p>
+                  <p className="text-balance-safe text-sm text-muted-foreground">{h.text}</p>
+                </li>
+              ))}
+            </ul>
+          )}
+          {commentary.summary && (
+            <div>
+              <p className="section-label mb-1">Palavra final da corte</p>
+              <p className="text-balance-safe text-base font-semibold italic">“{commentary.summary}”</p>
+            </div>
+          )}
+        </>
+      )}
+    </section>
+  );
+}
+
 export function PartyFinal({ ctx, actions, onHub }: { ctx: PartyCtx; actions: PartyActions; onHub: () => void }) {
   const scores = ctx.state.scores ?? {};
   const ranked = useMemo(() => rankPlayers(ctx.players.map((p) => ({ ...p, score: scores[p.id] ?? 0 }))), [ctx.players, scores]);
@@ -1044,6 +1128,7 @@ export function PartyFinal({ ctx, actions, onHub }: { ctx: PartyCtx; actions: Pa
           ))}
         </div>
       )}
+      <FinalCommentaryCard ctx={ctx} />
       <ol className="space-y-2" aria-label="Classificação final">
         {ranked.map((row, index) => (
           <li key={row.player.id} className="ranking-row flex items-center gap-3 p-3" data-first={row.place === 1} style={{ "--enter-index": index } as CSSProperties}>
