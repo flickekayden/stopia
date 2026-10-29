@@ -13,7 +13,7 @@
 - Built-in category presets live in a browser-safe constants module alongside a deduplicating merge helper; shared saved lists remain database-backed so built-ins require no migration or page-load seeding.
 - Lobby categories are authoritative room settings, never automatically restored from device storage, so new rooms retain their defaults and reconnections preserve shared choices.
 - Round selection uses a shuffled least-recently-used category pool capped at eight, so unused categories are exhausted before repeats.
-- Voice reactions use private Storage uploads through session-hash-validated server functions and room-scoped realtime metadata; signed playback links are issued only to current-round players because the workspace blocks public buckets.
+- Voice reactions (legacy rooms) use private Storage via session-validated server functions; signed links go only to current-round players because public buckets are blocked.
 - Results reuse round ends_at as a server-issued viewing deadline and shared pacing constants; startNextRound validates the host session, expected round and readiness/override before advancing or ending to keep multiplayer transitions authoritative without changing the schema.
 - Room snapshots read only the latest round; player updates and answer changes apply room-scoped realtime rows directly, with coalesced snapshot refreshes and a trailing refresh for in-flight events to avoid request storms without losing transitions.
 - Independent server reads and score writes run in parallel with at most six outbound requests per batch to respect the deployed runtime budget.
@@ -35,5 +35,5 @@
 - The developer panel is context-scoped: colors on hub/lobby, Stop technical tools on Stop, per-party-game timings/tone/events in app_settings `party` via `readPartyAdmin`.
 - No `attachSupabaseAuth` in `src/start.ts`: players are verified by hashed room sessions and no server function needs a Supabase bearer, so the browser database client stays out of the home page bundle; re-add it only with a real sign-in feature.
 - `usePartyRoom` applies realtime rows directly (room updates version-guarded), re-syncs with one embedded room+players query on subscribe, tab return or reconnect, and polls only while realtime is silent and the tab is visible.
-- Group-room chat lives in `party_chat` (anon SELECT for realtime, inserts only through session-verified `sendPartyChat`, which allows only quick reactions while Stop answers are open); crowd reactions are ephemeral realtime broadcasts, never stored, so result screens add no database writes.
-- The room's cumulative "Rei da Noite" tally reuses `party_players.score`, incremented only by the caller whose version-guarded update ended the match, so replays and concurrent advances never double count.
+- Group-room chat is `party_chat` (anon SELECT for realtime; inserts only via session-verified `sendPartyChat`, quick reactions only while Stop answers are open); crowd reactions are unstored realtime broadcasts.
+- "Rei da Noite" reuses `party_players.score`, added only by the caller whose version-guarded update ended the match, so nothing double counts.
