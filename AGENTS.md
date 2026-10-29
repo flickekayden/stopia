@@ -38,3 +38,6 @@
 - Group-room Stop is a native party game (game "stop": write → evaluating → reveal) in `/festa/$code`, no second room; answers stay in party_submissions until the version-guarded judge runs once. Legacy `rooms` tables and `/sala/$code` remain only for already-open links; `stopCode` is legacy.
 - Stop's AI judge lives only in `stop-judge.server.ts`, shared by both Stops so they judge identically; scoring mode and intensity are host room rules (`PartySettings`), not developer settings.
 - The developer panel is context-scoped: colors on hub/lobby, Stop technical tools on Stop, per-party-game timings/tone/events in app_settings `party` via `readPartyAdmin`.
+- No `attachSupabaseAuth` in `src/start.ts`: players are verified by hashed room sessions and no server function needs a Supabase bearer, so the browser database client stays out of the home page bundle; re-add it only with a real sign-in feature.
+- `usePartyRoom` applies realtime rows directly (room updates version-guarded), re-syncs with one embedded room+players query on subscribe, tab return or reconnect, and polls only while realtime is silent and the tab is visible.
+- Countdown ticks live in small leaf components (round header, deadline watcher) and Stop answer rows are memoized, so clocks never repaint whole round screens.
