@@ -107,16 +107,21 @@ function GamesHub() {
         <h2 id="hub-entrada" className="sr-only">Entrar na brincadeira</h2>
         <div className="space-y-2">
           <label htmlFor="hub-apelido" className="section-label block">Seu apelido</label>
-          <Input
-            id="hub-apelido"
-            value={nickname}
-            maxLength={20}
-            autoComplete="nickname"
-            placeholder="Ex.: Juninho"
-            aria-invalid={nicknameError && !nickname.trim()}
-            onChange={(event) => { setNickname(event.target.value); setNicknameError(false); }}
-            className="h-14 text-lg"
-          />
+          <div className="flex gap-2">
+            <Input
+              id="hub-apelido"
+              value={nickname}
+              maxLength={20}
+              autoComplete="nickname"
+              placeholder="Ex.: Juninho"
+              aria-invalid={nicknameError && !nickname.trim()}
+              onChange={(event) => { setNickname(event.target.value); setNicknameError(false); }}
+              className="h-14 text-lg"
+            />
+            <Button type="button" variant="secondary" size="icon" className="size-14 shrink-0" aria-label="Sortear apelido engraçado" title="Sortear apelido" onClick={() => { setNickname((current) => randomNickname(Math.random, current)); setNicknameError(false); vibrate(10); }}>
+              <Dices className="size-6" />
+            </Button>
+          </div>
         </div>
         <Button className="h-14 w-full text-lg font-bold" disabled={busy !== null} aria-busy={busy === "create"} onClick={() => void handleCreate()}>
           {busy === "create" ? <Loader2 className="animate-spin" /> : <Users />}
