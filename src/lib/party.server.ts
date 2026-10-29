@@ -758,6 +758,28 @@ async function advanceOnce(room: RoomRow): Promise<boolean> {
 
   const ai = () => import("./party-ai.server");
 
+  // Debate/Roleta with the AI judge: claim "evaluating" once (version-guarded), then judge and reveal.
+  const claimJudge = async (extra: PartyPublicState) => {
+    const claimed = await guardedUpdate(room, {
+      phase: "evaluating",
+      phase_started_at: new Date().toISOString(),
+      phase_ends_at: new Date(Date.now() + JUDGE_EVAL_MS).toISOString(),
+      public_state: asJson({ ...state, ...extra, submitted: [], ai: { status: "pending" } }),
+    });
+    if (!claimed) return false;
+    await runPartyJudge(claimed, presentIds, settings, admin);
+    return true;
+  };
+  if (phase === "evaluating") {
+    // Retry only when a previous judge request died past its deadline.
+    if (room.phase_ends_at !== null && Date.now() < Date.parse(room.phase_ends_at)) return false;
+    return claimJudge({});
+  }
+  const judgedByAi = (() => {
+    const mode = judgeModeFor(game, settings);
+    return mode !== null && effectiveJudge(mode, presentIds.length) === "ia";
+  })();
+
   if (game === "tribunal") {
     if (phase === "defense") {
       const entries = textEntries(subs, present).sort((a, b) => (a.playerId === state.defendantId ? -1 : b.playerId === state.defendantId ? 1 : 0));
@@ -840,7 +862,8 @@ async function advanceOnce(room: RoomRow): Promise<boolean> {
   if (game === "debate") {
     if (phase === "argue") {
       const entries = textEntries(subs, present);
-      if (entries.length < 2) return reveal({ votes: {}, counts: {}, sideTotals: { A: 0, B: 0 }, winnerSide: null, notice: "Poucos argumentos para votar nesta rodada." }, {}, null);
+      if (entries.length < 2) return reveal({ votes: {}, counts: {}, sideTotals: { A: 0, B: 0 }, winnerSide: null, notice: "Poucos argumentos para julgar nesta rodada." }, {}, null);
+      if (judgedByAi) return claimJudge({ entries, eligible: [] });
       return toPhase("vote", { entries, eligible: presentIds });
     }
     const authors = (state.entries ?? []).map((e) => e.playerId!).filter(Boolean);
@@ -860,7 +883,8 @@ async function advanceOnce(room: RoomRow): Promise<boolean> {
   // Roleta do Caos
   if (phase === "respond") {
     const entries = textEntries(subs, present);
-    if (entries.length < 2) return reveal({ votes: {}, counts: {}, multiplier: state.prompt?.event?.multiplier ?? 1, notice: "Poucas respostas para votar nesta rodada." }, {}, null);
+    if (entries.length < (judgedByAi ? 1 : 2)) return reveal({ votes: {}, counts: {}, multiplier: state.prompt?.event?.multiplier ?? 1, notice: "Poucas respostas para votar nesta rodada." }, {}, null);
+    if (judgedByAi) return claimJudge({ entries, eligible: [] });
     return toPhase("vote", { entries, eligible: presentIds });
   }
   const authors = (state.entries ?? []).map((e) => e.playerId!).filter(Boolean);
@@ -868,6 +892,67 @@ async function advanceOnce(room: RoomRow): Promise<boolean> {
   const multiplier = state.prompt?.event?.multiplier ?? 1;
   const result = scoreRoleta(votes, authors, multiplier);
   return reveal({ votes, counts: result.counts, multiplier }, result.deltas, null);
+}
+
+/**
+ * AI judge for Debate/Roleta. Entries reach the AI under neutral labels (no nicknames); scoring stays in
+ * the deterministic engine. If the AI fails, the round falls back to a group vote instead of stalling.
+ */
+async function runPartyJudge(room: RoomRow, presentIds: string[], settings: PartySettings, admin: PartyAdminConfig) {
+  const game = gameOf(room);
+  const state = readPublicState(room.public_state);
+  const entries = (state.entries ?? []).filter((e) => e.playerId);
+  const labelled = entries.map((entry, index) => ({ label: String(index + 1), id: entry.playerId!, text: entry.text }));
+  const idOf = (label: string) => labelled.find((l) => l.label === label)?.id ?? null;
+  const tone = admin[game]?.tone;
+  try {
+    const ai = await import("./party-ai.server");
+    let results: PartyResults;
+    let deltas: Deltas;
+    let text: string;
+    if (game === "debate") {
+      const sides = Object.fromEntries(Object.entries(state.sides ?? {}).filter(([id]) => labelled.some((l) => l.id === id)));
+      const made = await ai.aiJudgeDebate({
+        tema: state.prompt?.title ?? "",
+        lado_a: state.prompt?.sideA ?? "",
+        lado_b: state.prompt?.sideB ?? "",
+        argumentos: labelled.filter((l) => sides[l.id]).map((l) => ({ rotulo: l.label, lado: sides[l.id]!, texto: l.text })),
+      }, tone);
+      const winnerId = idOf(made.winner);
+      const scored = scoreDebateJudge(sides, winnerId, made.bonus);
+      results = { votes: {}, counts: {}, winnerSide: scored.winnerSide, judge: { by: "ia", bestId: winnerId, bonus: Math.max(0, Math.min(2, Math.round(made.bonus))) } };
+      deltas = scored.deltas;
+      text = made.verdict;
+    } else {
+      const multiplier = state.prompt?.event?.multiplier ?? 1;
+      const made = await ai.aiJudgeRoleta({ desafio: state.prompt?.text ?? "", respostas: labelled.map((l) => ({ rotulo: l.label, texto: l.text })) }, tone);
+      const points: Record<string, number> = {};
+      const notes: Record<string, string> = {};
+      for (const l of labelled) {
+        points[l.id] = made.notes[l.label]?.points ?? 0;
+        if (made.notes[l.label]?.comment) notes[l.id] = made.notes[l.label]!.comment;
+      }
+      const scored = scoreRoletaJudge(points, labelled.map((l) => l.id), multiplier);
+      const top = Math.max(0, ...Object.values(scored.counts));
+      const best = Object.entries(scored.counts).filter(([, v]) => v === top && top > 0);
+      results = { votes: {}, counts: scored.counts, multiplier, judge: { by: "ia", bestId: best.length === 1 ? best[0]![0] : null, notes } };
+      deltas = scored.deltas;
+      text = made.summary;
+    }
+    await guardedUpdate(room, {
+      phase: "reveal",
+      phase_started_at: new Date().toISOString(),
+      phase_ends_at: null,
+      public_state: asJson({ ...state, submitted: [], results, deltas, scores: addScores(state.scores ?? {}, deltas), ai: text ? { status: "done", text } : { status: "off" } }),
+    });
+  } catch {
+    await guardedUpdate(room, {
+      phase: "vote",
+      phase_started_at: new Date().toISOString(),
+      phase_ends_at: deadline(game, "vote", admin, settings),
+      public_state: asJson({ ...state, eligible: presentIds, submitted: [], ai: { status: "failed", text: "O juiz de IA não respondeu. Desta vez, votem vocês!" } }),
+    });
+  }
 }
 
 /* ----------------------------------- Stop ---------------------------------- */
