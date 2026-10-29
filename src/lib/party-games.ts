@@ -362,7 +362,7 @@ export type PartyResults = {
   verdict?: "culpado" | "inocente";
   guilty?: number;
   innocent?: number;
-  entries?: { id: string; text: string; authorId: string; correct: string[]; fooled: number }[];
+  entries?: { id: string; text: string; authorId: string; correct: string[]; fooled: number; bluff?: boolean }[];
   infiltradoId?: string;
   word?: string;
   category?: string;
