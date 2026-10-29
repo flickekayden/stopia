@@ -301,6 +301,8 @@ export type PartyResults = {
   sideTotals?: { A: number; B: number };
   winnerSide?: "A" | "B" | null;
   multiplier?: number;
+  /** Debate/Roleta judged by the AI: the chosen best entry and a short note per player. */
+  judge?: { by: "ia"; bestId: string | null; bonus?: number; notes?: Record<string, string> };
   /** Stop: the judge's result for every player x category of the round. */
   stop?: StopJudgedAnswer[];
 };
@@ -404,6 +406,8 @@ export type LobbyGameMeta = {
   short: string;
   minPlayers: number;
   duration: string;
+  /** Who the game is for, shown on the lobby cards (e.g. "2+ jogadores · Duelo com Juiz de IA"). */
+  tagline: string;
   icon: PartyGameMeta["icon"] | "stop";
 };
 
@@ -413,6 +417,7 @@ export const STOP_LOBBY_META: LobbyGameMeta = {
   short: "O clássico Adedonha com o juiz de IA sarcástico de sempre.",
   minPlayers: 2,
   duration: "≈ 15 min",
+  tagline: "2+ jogadores · Clássico competitivo",
   icon: "stop",
 };
 
@@ -431,10 +436,18 @@ const DURATIONS: Record<PartyGameId, string> = {
   roleta: "≈ 10 min",
 };
 
+const TAGLINES: Record<PartyGameId, string> = {
+  tribunal: "3+ jogadores · Exige grupo",
+  autor: "3+ jogadores · Exige grupo",
+  infiltrado: "3+ jogadores · Exige grupo",
+  debate: "2+ jogadores · Duelo com Juiz de IA",
+  roleta: "2+ jogadores · Desafios rápidos",
+};
+
 /** The six games a host can pick inside a group room, in display order. */
 export const LOBBY_GAMES: readonly LobbyGameMeta[] = [
   STOP_LOBBY_META,
-  ...PARTY_GAME_IDS.map((id) => ({ id, name: PARTY_GAMES[id].name, short: PARTY_GAMES[id].short, minPlayers: PARTY_GAMES[id].minPlayers, duration: DURATIONS[id], icon: PARTY_GAMES[id].icon })),
+  ...PARTY_GAME_IDS.map((id) => ({ id, name: PARTY_GAMES[id].name, short: PARTY_GAMES[id].short, minPlayers: PARTY_GAMES[id].minPlayers, duration: DURATIONS[id], tagline: TAGLINES[id], icon: PARTY_GAMES[id].icon })),
 ];
 
 export function lobbyGameMeta(id: LobbyGameId) {
