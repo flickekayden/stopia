@@ -191,15 +191,18 @@ async function loadPlayers(roomId: string) {
 }
 
 async function requireSession(roomId: string, playerId: string, sessionId: string) {
-  const { data } = await db()
-    .from("party_sessions")
-    .select("player_id")
-    .eq("room_id", roomId)
-    .eq("player_id", playerId)
-    .eq("session_hash", hashSession(sessionId))
-    .maybeSingle();
+  // Both lookups use ids the caller already sent, so they run in one round-trip.
+  const [{ data }, { data: player }] = await Promise.all([
+    db()
+      .from("party_sessions")
+      .select("player_id")
+      .eq("room_id", roomId)
+      .eq("player_id", playerId)
+      .eq("session_hash", hashSession(sessionId))
+      .maybeSingle(),
+    db().from("party_players").select("*").eq("id", playerId).eq("room_id", roomId).maybeSingle(),
+  ]);
   if (!data) throw new Error("Sessão inválida. Entre novamente na sala.");
-  const { data: player } = await db().from("party_players").select("*").eq("id", playerId).maybeSingle();
   if (!player) throw new Error("Você não está mais nesta sala.");
   return player;
 }
@@ -592,8 +595,7 @@ function targetPayload(payload: unknown, voterId: string, allowed: readonly stri
 }
 
 export async function submitPartyAction(input: { roomId: string; playerId: string; sessionId: string; round: number; phase: string; payload: unknown }) {
-  const player = await requireSession(input.roomId, input.playerId, input.sessionId);
-  const room = await loadRoom(input.roomId);
+  const [player, room] = await Promise.all([requireSession(input.roomId, input.playerId, input.sessionId), loadRoom(input.roomId)]);
   if (room.status !== "playing" || room.round_number !== input.round || room.phase !== input.phase) {
     throw new Error("Essa etapa já foi encerrada.");
   }
@@ -675,8 +677,7 @@ async function syncSubmitted(roomId: string) {
 }
 
 export async function advancePartyPhase(input: { roomId: string; playerId: string; sessionId: string; round: number; phase: string }) {
-  const player = await requireSession(input.roomId, input.playerId, input.sessionId);
-  const room = await loadRoom(input.roomId);
+  const [player, room] = await Promise.all([requireSession(input.roomId, input.playerId, input.sessionId), loadRoom(input.roomId)]);
   if (room.status !== "playing" || room.round_number !== input.round || room.phase !== input.phase) return { ok: true };
   const expired = room.phase_ends_at !== null && Date.now() >= new Date(room.phase_ends_at).getTime() - 500;
   if (!expired && !player.is_host) throw new Error("Ainda há tempo nesta etapa.");
@@ -718,13 +719,16 @@ async function advanceOnce(room: RoomRow): Promise<boolean> {
   const phase = room.phase as PartyPhaseId;
   const state = readPublicState(room.public_state);
   const settings = readPartySettings(room.settings);
-  const admin = await loadPartyAdmin();
+  // Independent reads in one round-trip (four requests, under the per-batch budget).
+  const [admin, players, roundPrivate, subs] = await Promise.all([
+    loadPartyAdmin(),
+    loadPlayers(room.id),
+    readPrivate<RoundPrivate>(room.id, room.round_number),
+    submissionsFor(room, phase),
+  ]);
   const tone = admin[game]?.tone;
-  const players = await loadPlayers(room.id);
   const present = new Set(players.map((p) => p.id));
   const presentIds = players.map((p) => p.id);
-  const roundPrivate = await readPrivate<RoundPrivate>(room.id, room.round_number);
-  const subs = await submissionsFor(room, phase);
   const nickname = (id: string | undefined) => players.find((p) => p.id === id)?.nickname ?? "Alguém";
 
   const toPhase = async (next: PartyPhaseId, extra: PartyPublicState) =>
@@ -1085,8 +1089,7 @@ async function judgeStop(room: RoomRow) {
 /* ------------------------------- Private view ------------------------------ */
 
 export async function getPartyPrivateView(input: { roomId: string; playerId: string; sessionId: string }): Promise<PartyPrivateViewData> {
-  const player = await requireSession(input.roomId, input.playerId, input.sessionId);
-  const room = await loadRoom(input.roomId);
+  const [player, room] = await Promise.all([requireSession(input.roomId, input.playerId, input.sessionId), loadRoom(input.roomId)]);
   const empty: PartyPrivateViewData = { role: null, word: null, myEntryId: null, mine: null };
   if (room.status !== "playing" || room.round_number < 1) return empty;
   const [roundPrivate, { data: mine }] = await Promise.all([
