@@ -36,6 +36,8 @@ import {
   sanitizeStopAnswers,
   stopAnswersComplete,
   stopRoundDeltas,
+  PARTY_CHAT_MAX,
+  PARTY_CHAT_QUICK,
   PARTY_GAME_IDS,
   PHASE_SECONDS,
   effectiveJudgeFor,
@@ -441,7 +443,13 @@ async function buildPrompt(room: RoomRow, players: PlayerRow[], round: number, s
     }
     data.prompt = prompt;
   } else if (game === "infiltrado") {
-    const index = pickUnused(INFILTRADO_WORDS.length, used.infiltrado ?? []);
+    // Host theme: pick only among that theme's words (indices stay global, so "used" keeps working).
+    const pool = INFILTRADO_WORDS.map((item, i) => ({ item, i })).filter(({ item }) => settings.infiltradoTheme === "todas" || item.category === settings.infiltradoTheme);
+    const candidates = pool.length > 0 ? pool.map(({ i }) => i) : INFILTRADO_WORDS.map((_, i) => i);
+    const usedHere = (used.infiltrado ?? []).filter((i) => candidates.includes(i));
+    const index = candidates[pickUnused(candidates.length, usedHere.map((i) => candidates.indexOf(i)))] ?? 0;
+    // Theme exhausted: start the theme over without forgetting other themes' history.
+    if (usedHere.length >= candidates.length) used.infiltrado = (used.infiltrado ?? []).filter((i) => !candidates.includes(i));
     remember("infiltrado", index);
     const item = INFILTRADO_WORDS[index]!;
     data.word = item.word;
@@ -534,15 +542,18 @@ export async function nextPartyRound(input: { roomId: string; playerId: string; 
   const settings = readPartySettings(room.settings);
   const state = readPublicState(room.public_state);
   if (room.round_number >= settings.rounds) {
-    // Debate with AI on: the podium shows right away and the AI awards fill in when ready.
-    const withAwards = room.game === "debate" && settings.ai;
+    // Debate/Tribunal with AI on: the podium shows right away and the AI awards fill in when ready.
+    const withAwards = (room.game === "debate" || room.game === "tribunal") && settings.ai;
     const ended = await guardedUpdate(room, {
       status: "ended",
       phase: "final",
       phase_ends_at: null,
       ...(withAwards ? { public_state: asJson({ ...state, finalCommentary: { status: "pending" } }) } : {}),
     });
-    if (ended && withAwards) await buildDebateCommentary(ended);
+    if (!ended) return { ok: true };
+    // Only the caller that ended the match adds it to the room's "Rei da Noite" tally.
+    await addNightScores(room.id, state.scores ?? {});
+    if (withAwards) await (room.game === "debate" ? buildDebateCommentary(ended) : buildTribunalCommentary(ended));
     return { ok: true };
   }
   const players = await loadPlayers(room.id);
@@ -1033,6 +1044,90 @@ async function buildDebateCommentary(room: RoomRow) {
     finalCommentary = { status: "failed" };
   }
   await guardedUpdate(room, { public_state: asJson({ ...state, finalCommentary }) });
+}
+
+/** Tribunal podium: comic awards (best alibi, toughest prosecutor) and a summary of the group's "criminal record". */
+async function buildTribunalCommentary(room: RoomRow) {
+  const admin = await loadPartyAdmin();
+  const [players, { data: subs }, { data: rounds }] = await Promise.all([
+    loadPlayers(room.id),
+    db().from("party_submissions").select("round_number, player_id, payload").eq("room_id", room.id).eq("phase", "defense"),
+    db().from("party_private").select("round_number, data").eq("room_id", room.id).gt("round_number", 0).order("round_number"),
+  ]);
+  const state = readPublicState(room.public_state);
+  const scores = state.scores ?? {};
+  const label = new Map(players.map((p, index) => [p.id, `J${index + 1}`]));
+  const idOf = (value: string) => players.find((p) => label.get(p.id) === value)?.id ?? null;
+  let finalCommentary: PartyPublicState["finalCommentary"];
+  try {
+    const casos = (rounds ?? []).map((row) => {
+      const data = (row.data ?? {}) as RoundPrivate;
+      const texts = (subs ?? []).filter((s) => s.round_number === row.round_number && label.has(s.player_id));
+      const text = (id: string) => String((texts.find((s) => s.player_id === id)?.payload as PartyMine | null)?.text ?? "").slice(0, 400);
+      const defendantId = data.defendantId ?? "";
+      return {
+        caso: data.prompt?.text ?? "",
+        reu: label.get(defendantId) ?? "?",
+        defesa: text(defendantId),
+        acusacoes: texts.filter((s) => s.player_id !== defendantId).map((s) => ({ rotulo: label.get(s.player_id)!, texto: text(s.player_id) })).filter((a) => a.texto),
+      };
+    }).filter((c) => c.defesa || c.acusacoes.length > 0);
+    if (casos.length === 0) throw new Error("sem casos");
+    const made = await (await import("./party-ai.server")).aiMatchSummaryTribunal({
+      casos,
+      jogadores: players.map((p) => ({ rotulo: label.get(p.id)!, apelido: p.nickname, pontos: scores[p.id] ?? 0 })),
+    }, admin.tribunal?.tone);
+    const highlights = made.highlights.map((h) => ({ playerId: idOf(h.label) ?? "", title: h.title, text: h.text })).filter((h) => h.playerId);
+    finalCommentary = { status: "ready", title: "Veredito da História", highlights, summary: made.summary };
+  } catch {
+    finalCommentary = { status: "failed" };
+  }
+  await guardedUpdate(room, { public_state: asJson({ ...state, finalCommentary }) });
+}
+
+/** "Rei da Noite": each finished match adds its points to party_players.score, at most six writes at a time. */
+async function addNightScores(roomId: string, scores: Record<string, number>) {
+  const players = await loadPlayers(roomId);
+  const updates = players.filter((p) => (scores[p.id] ?? 0) > 0);
+  for (let i = 0; i < updates.length; i += 6) {
+    await Promise.all(updates.slice(i, i + 6).map((p) => db().from("party_players").update({ score: p.score + (scores[p.id] ?? 0) }).eq("id", p.id)));
+  }
+}
+
+/* ---------------------------------- Chat ----------------------------------- */
+
+export async function listPartyChat(input: { roomId: string; playerId: string; sessionId: string }) {
+  await requireSession(input.roomId, input.playerId, input.sessionId);
+  const { data, error } = await db()
+    .from("party_chat")
+    .select("id, room_id, player_id, nickname, content, created_at")
+    .eq("room_id", input.roomId)
+    .order("created_at", { ascending: false })
+    .limit(80);
+  if (error) throw new Error("Não foi possível carregar o chat.");
+  return (data ?? []).reverse();
+}
+
+export async function sendPartyChat(input: { roomId: string; playerId: string; sessionId: string; content: string }) {
+  const [player, room] = await Promise.all([requireSession(input.roomId, input.playerId, input.sessionId), loadRoom(input.roomId)]);
+  const content = input.content.replace(/\s+/g, " ").trim().slice(0, PARTY_CHAT_MAX);
+  if (!content) throw new Error("Escreva uma mensagem.");
+  // While Stop answers are open, only one-tap reactions go through, so nobody can share answers.
+  const stopWriting = room.game === "stop" && room.status === "playing" && room.phase === "write";
+  if (stopWriting && !(PARTY_CHAT_QUICK as readonly string[]).includes(content)) {
+    throw new Error("Durante as respostas do Stop, só valem as reações rápidas.");
+  }
+  // Light flood guard: at most 5 messages from the same player in 10 seconds.
+  const since = new Date(Date.now() - 10_000).toISOString();
+  const { count } = await db().from("party_chat").select("id", { count: "exact", head: true }).eq("room_id", room.id).eq("player_id", player.id).gte("created_at", since);
+  if ((count ?? 0) >= 5) throw new Error("Calma! Espere uns segundos para mandar mais.");
+  const { data, error } = await db()
+    .from("party_chat")
+    .insert({ room_id: room.id, player_id: player.id, nickname: player.nickname, content })
+    .select("id, room_id, player_id, nickname, content, created_at")
+    .single();
+  if (error || !data) throw new Error("Não foi possível enviar.");
+  return data;
 }
 
 /* ----------------------------------- Stop ---------------------------------- */
