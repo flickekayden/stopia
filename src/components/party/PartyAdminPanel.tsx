@@ -27,9 +27,9 @@ import {
 } from "@/lib/party-games";
 
 const HINTS: Partial<Record<PartyGameId, string>> = {
-  tribunal: "Duração do debate (defesas e acusações) e da votação do júri, e o tom do juiz de IA.",
+  tribunal: "Duração da votação do júri e o tom do juiz de IA. O tempo de defesa e acusação é escolhido pelo mestre da sala.",
   infiltrado: "Tempo de discussão (pistas), da votação e da última chance. As palavras vêm só da lista do jogo.",
-  roleta: "Tempo dos desafios e da votação, tom da IA e se os eventos do caos (pontos em dobro/triplo) aparecem.",
+  roleta: "Tempo da votação, tom da IA e se os eventos do caos (pontos em dobro/triplo) aparecem. O tempo dos desafios é do mestre da sala.",
 };
 
 function formatSeconds(value: number) {
