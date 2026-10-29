@@ -330,8 +330,7 @@ async function clearRoundData(roomId: string) {
 
 /** Host picks (or changes) the game while the group waits in the lobby. */
 export async function selectPartyGame(input: { roomId: string; playerId: string; sessionId: string; game: PartyGameId | "stop" }) {
-  await requireHost(input.roomId, input.playerId, input.sessionId);
-  const room = await loadRoom(input.roomId);
+  const [, room] = await Promise.all([requireHost(input.roomId, input.playerId, input.sessionId), loadRoom(input.roomId)]);
   if (room.status !== "lobby") throw new Error("Termine ou encerre a partida antes de trocar de jogo.");
   if (room.game === input.game) return { ok: true };
   const updated = await guardedUpdate(room, { game: input.game });
@@ -341,8 +340,7 @@ export async function selectPartyGame(input: { roomId: string; playerId: string;
 
 /** Host sends everyone back to the group lobby, keeping the room code and every player. */
 export async function returnPartyToLobby(input: { roomId: string; playerId: string; sessionId: string }) {
-  await requireHost(input.roomId, input.playerId, input.sessionId);
-  const room = await loadRoom(input.roomId);
+  const [, room] = await Promise.all([requireHost(input.roomId, input.playerId, input.sessionId), loadRoom(input.roomId)]);
   if (room.game === "lobby" && room.status === "lobby") return { ok: true };
   await clearRoundData(room.id);
   const updated = await guardedUpdate(room, { ...RESET_TO_LOBBY, game: "lobby" });
@@ -361,8 +359,7 @@ export async function replayPartyGame(input: { roomId: string; playerId: string;
 }
 
 export async function updatePartySettings(input: { roomId: string; playerId: string; sessionId: string; settings: Partial<PartySettings> }) {
-  await requireHost(input.roomId, input.playerId, input.sessionId);
-  const room = await loadRoom(input.roomId);
+  const [, room] = await Promise.all([requireHost(input.roomId, input.playerId, input.sessionId), loadRoom(input.roomId)]);
   if (room.status === "playing") throw new Error("As regras só mudam antes da partida começar.");
   const settings = readPartySettings({ ...readPartySettings(room.settings), ...input.settings });
   const updated = await guardedUpdate(room, { settings: asJson(settings) });
@@ -371,8 +368,7 @@ export async function updatePartySettings(input: { roomId: string; playerId: str
 }
 
 export async function startPartyGame(input: { roomId: string; playerId: string; sessionId: string }) {
-  await requireHost(input.roomId, input.playerId, input.sessionId);
-  const room = await loadRoom(input.roomId);
+  const [, room] = await Promise.all([requireHost(input.roomId, input.playerId, input.sessionId), loadRoom(input.roomId)]);
   if (room.status === "playing") return { ok: true };
   if (!isPartyGame(room.game) && room.game !== "stop") throw new Error("Escolha um jogo primeiro.");
   const game = room.game;
@@ -390,8 +386,7 @@ export async function startPartyGame(input: { roomId: string; playerId: string; 
 }
 
 export async function restartPartyRoom(input: { roomId: string; playerId: string; sessionId: string }) {
-  await requireHost(input.roomId, input.playerId, input.sessionId);
-  const room = await loadRoom(input.roomId);
+  const [, room] = await Promise.all([requireHost(input.roomId, input.playerId, input.sessionId), loadRoom(input.roomId)]);
   await clearRoundData(room.id);
   const updated = await guardedUpdate(room, RESET_TO_LOBBY);
   if (!updated) throw new Error("A sala mudou ao mesmo tempo. Tente de novo.");
@@ -534,8 +529,7 @@ async function startRound(room: RoomRow, players: PlayerRow[], round: number, sc
 }
 
 export async function nextPartyRound(input: { roomId: string; playerId: string; sessionId: string; round: number }) {
-  await requireHost(input.roomId, input.playerId, input.sessionId);
-  const room = await loadRoom(input.roomId);
+  const [, room] = await Promise.all([requireHost(input.roomId, input.playerId, input.sessionId), loadRoom(input.roomId)]);
   if (room.phase !== "reveal" || room.round_number !== input.round) return { ok: true };
   const settings = readPartySettings(room.settings);
   const state = readPublicState(room.public_state);
@@ -552,8 +546,7 @@ export async function nextPartyRound(input: { roomId: string; playerId: string; 
 }
 
 export async function skipRoletaChallenge(input: { roomId: string; playerId: string; sessionId: string; round: number }) {
-  await requireHost(input.roomId, input.playerId, input.sessionId);
-  const room = await loadRoom(input.roomId);
+  const [, room] = await Promise.all([requireHost(input.roomId, input.playerId, input.sessionId), loadRoom(input.roomId)]);
   const state = readPublicState(room.public_state);
   if (gameOf(room) !== "roleta" || room.phase !== "respond" || room.round_number !== input.round) return { ok: true };
   if ((state.skipsLeft ?? 0) <= 0) throw new Error("Não há mais pulos disponíveis nesta partida.");
