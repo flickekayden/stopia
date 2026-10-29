@@ -5,6 +5,7 @@ import { ArrowLeft, Copy, Loader2, LogOut } from "lucide-react";
 import { toast } from "sonner";
 
 import { PartyFinal, PartyLobby, PartyPlay, type LobbyCtx, type PartyActions, type PartyCtx } from "@/components/party/PartyStage";
+import { PartyChat } from "@/components/party/PartyChat";
 import { StopPartyPlay } from "@/components/party/StopParty";
 import { useSound } from "@/components/SoundProvider";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -254,6 +255,8 @@ function PartyRoomPage() {
       ) : (
         <PartyPlay ctx={ctx} actions={actions} />
       )}
+
+      <PartyChat roomId={room.id} playerId={identity.playerId} sessionId={identity.sessionId} players={players} quickOnly={game === "stop" && room.status === "playing" && room.phase === "write"} />
 
       <AlertDialog open={leaveOpen} onOpenChange={setLeaveOpen}>
         <AlertDialogContent className="w-[calc(100%_-_2rem)] rounded-2xl border-border bg-card">

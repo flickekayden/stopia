@@ -53,7 +53,7 @@ export function CrowdReactions({ roomId }: { roomId: string }) {
           <Button key={emoji} type="button" variant="secondary" className="h-12 text-2xl" aria-label={`Reagir com ${emoji}`} onClick={() => react(emoji)}>{emoji}</Button>
         ))}
       </div>
-      <div className="pointer-events-none fixed inset-x-0 bottom-0 mx-auto h-0 w-full max-w-md" aria-hidden="true">
+      <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 mx-auto h-0 w-full max-w-md" aria-hidden="true">
         {floats.map((f) => <span key={f.id} className="crowd-float" style={{ left: `${f.left}%` }}>{f.emoji}</span>)}
       </div>
     </section>

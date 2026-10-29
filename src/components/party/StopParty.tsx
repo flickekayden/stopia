@@ -4,6 +4,7 @@ import { toast } from "sonner";
 
 import { AnswerCard, type AnswerCardData } from "@/components/game/AnswerCard";
 import { CategoryPresets } from "@/components/game/CategoryPresets";
+import { CrowdReactions } from "@/components/party/CrowdReactions";
 import { EvaluationLoading } from "@/components/game/EvaluationLoading";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -584,6 +585,7 @@ function StopReveal({ ctx, actions }: { ctx: PartyCtx; actions: PartyActions }) 
         )}
       </section>
 
+      <CrowdReactions roomId={ctx.room.id} />
       <StopScoreboard ctx={ctx} />
 
       <div className="mobile-bottom-bar fixed inset-x-0 bottom-0 mx-auto w-full max-w-md border-t border-border bg-background/95 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
