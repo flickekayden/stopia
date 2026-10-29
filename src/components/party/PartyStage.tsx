@@ -387,7 +387,9 @@ export function PartyLobby({ ctx, actions }: { ctx: LobbyCtx; actions: PartyActi
 
 /* --------------------------------- Round ---------------------------------- */
 
-function PhaseHeader({ ctx, now }: { ctx: PartyCtx; now: number }) {
+/** Only this header ticks every half second, so the rest of the round screen never repaints for the clock. */
+function PhaseHeader({ ctx }: { ctx: PartyCtx }) {
+  const now = useNow(Boolean(ctx.room.phase_ends_at));
   const phase = ctx.room.phase as PartyPhaseId;
   const endsAt = ctx.room.phase_ends_at ? new Date(ctx.room.phase_ends_at).getTime() : null;
   const seconds = endsAt ? Math.max(0, Math.ceil((endsAt - now) / 1000)) : null;
@@ -713,22 +715,33 @@ function AutorGuess({ ctx, actions }: { ctx: PartyCtx; actions: PartyActions }) 
   );
 }
 
+/** Deadline: any player may ask the server to close the step; the server re-checks time and versions. */
+function DeadlineWatcher({ round, phase, endsAtIso, actions }: { round: number; phase: string; endsAtIso: string | null; actions: PartyActions }) {
+  const endsAt = endsAtIso ? new Date(endsAtIso).getTime() : null;
+  const fired = useRef<{ key: string; at: number } | null>(null);
+  const actionsRef = useRef(actions);
+  actionsRef.current = actions;
+  useEffect(() => {
+    if (!endsAt) return;
+    const key = `${round}:${phase}:${endsAtIso}`;
+    const check = () => {
+      const now = Date.now();
+      if (now < endsAt + 400) return;
+      const last = fired.current;
+      if (last && last.key === key && now - last.at < 5_000) return;
+      fired.current = { key, at: now };
+      void actionsRef.current.advance(false);
+    };
+    check();
+    const id = window.setInterval(check, 500);
+    return () => window.clearInterval(id);
+  }, [round, phase, endsAt, endsAtIso]);
+  return null;
+}
+
 export function PartyPlay({ ctx, actions }: { ctx: PartyCtx; actions: PartyActions }) {
   const phase = ctx.room.phase as PartyPhaseId;
-  const now = useNow(Boolean(ctx.room.phase_ends_at));
   const eligible = (ctx.state.eligible ?? []).includes(ctx.me.id);
-  const fired = useRef<{ key: string; at: number } | null>(null);
-  const phaseKey = `${ctx.room.round_number}:${phase}:${ctx.room.phase_ends_at ?? ""}`;
-
-  // Deadline: any player may ask the server to close the step; the server re-checks time and versions.
-  useEffect(() => {
-    const endsAt = ctx.room.phase_ends_at ? new Date(ctx.room.phase_ends_at).getTime() : null;
-    if (!endsAt || now < endsAt + 400) return;
-    const last = fired.current;
-    if (last && last.key === phaseKey && now - last.at < 5_000) return;
-    fired.current = { key: phaseKey, at: now };
-    void actions.advance(false);
-  }, [now, phaseKey, ctx.room.phase_ends_at, actions]);
 
   if (phase === "reveal") return <PartyReveal ctx={ctx} actions={actions} />;
 
@@ -779,7 +792,8 @@ export function PartyPlay({ ctx, actions }: { ctx: PartyCtx; actions: PartyActio
 
   return (
     <div className="dock-clearance space-y-4 pb-10">
-      <PhaseHeader ctx={ctx} now={now} />
+      <DeadlineWatcher round={ctx.room.round_number} phase={phase} endsAtIso={ctx.room.phase_ends_at} actions={actions} />
+      <PhaseHeader ctx={ctx} />
       <PromptCard ctx={ctx} />
       {phase === "vote" && ctx.state.ai?.status === "failed" && ctx.state.ai.text && <p role="status" className="party-panel text-sm text-muted-foreground">{ctx.state.ai.text}</p>}
       {(phase === "clues" || phase === "vote" || phase === "last_guess") && <SecretCard ctx={ctx} />}
