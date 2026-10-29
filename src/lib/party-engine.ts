@@ -156,6 +156,30 @@ export function scoreDebate(sides: Record<string, "A" | "B">, votes: Record<stri
   return { counts, sideTotals, winnerSide, deltas };
 }
 
+/** Debate judged by the AI: best argument +2 (+0..2 bonus), every member of its side +1. Unknown winner = no points. */
+export function scoreDebateJudge(sides: Record<string, "A" | "B">, winnerId: string | null, bonus: number) {
+  const deltas: Deltas = {};
+  const winnerSide = winnerId ? sides[winnerId] ?? null : null;
+  if (!winnerId || !winnerSide) return { winnerSide: null, deltas };
+  const extra = Math.max(0, Math.min(2, Math.round(Number.isFinite(bonus) ? bonus : 0)));
+  add(deltas, winnerId, 2 + extra);
+  for (const [id, side] of Object.entries(sides)) if (side === winnerSide) add(deltas, id, 1);
+  return { winnerSide, deltas };
+}
+
+/** Roleta judged by the AI: 0–3 points per answer, multiplied by the round's chaos event. */
+export function scoreRoletaJudge(points: Record<string, number>, allowedTargets: readonly string[], multiplier: number) {
+  const counts: Record<string, number> = {};
+  const deltas: Deltas = {};
+  for (const id of allowedTargets) {
+    const raw = Number(points[id]);
+    const value = Math.max(0, Math.min(3, Math.round(Number.isFinite(raw) ? raw : 0)));
+    counts[id] = value;
+    if (value > 0) add(deltas, id, value * multiplier);
+  }
+  return { counts, deltas };
+}
+
 export function scoreRoleta(votes: Record<string, string>, allowedTargets: readonly string[], multiplier: number) {
   const counts = tallyVotes(votes, allowedTargets);
   const deltas: Deltas = {};
