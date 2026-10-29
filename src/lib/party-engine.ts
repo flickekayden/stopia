@@ -52,6 +52,36 @@ export function scoreTribunal(defendantId: string, votes: Record<string, Verdict
   return { verdict, guilty, innocent, deltas };
 }
 
+/**
+ * Tribunal judged by the AI. Innocent: the defendant gets 3 (+0..2 bonus).
+ * Guilty: every accuser who wrote gets 2 and the best accusation 1 more (+0..2 bonus); in a duel the
+ * prosecutor is the only accuser, so it gets 3 (+bonus). No verdict (AI undecided) = 2 each, no bonus.
+ */
+export function scoreTribunalJudge(params: {
+  defendantId: string;
+  accuserIds: readonly string[];
+  verdict: Verdict | null;
+  bestAccuserId?: string | null;
+  bonus: number;
+}) {
+  const deltas: Deltas = {};
+  const extra = Math.max(0, Math.min(2, Math.round(Number.isFinite(params.bonus) ? params.bonus : 0)));
+  const accusers = params.accuserIds.filter((id) => id !== params.defendantId);
+  if (params.verdict === null) {
+    add(deltas, params.defendantId, 2);
+    for (const id of accusers) add(deltas, id, 2);
+    return { deltas, bestAccuserId: null };
+  }
+  if (params.verdict === "inocente") {
+    add(deltas, params.defendantId, 3 + extra);
+    return { deltas, bestAccuserId: null };
+  }
+  const best = params.bestAccuserId && accusers.includes(params.bestAccuserId) ? params.bestAccuserId : accusers.length === 1 ? accusers[0]! : null;
+  for (const id of accusers) add(deltas, id, 2);
+  if (best) add(deltas, best, 1 + extra);
+  return { deltas, bestAccuserId: best };
+}
+
 /** Counts votes keyed by voter, ignoring self-votes and targets outside the allowed set. */
 export function tallyVotes(votes: Record<string, string>, allowedTargets?: readonly string[]) {
   const counts: Record<string, number> = {};
