@@ -27,6 +27,8 @@ export const updatePartySettings = createServerFn({ method: "POST" })
           ai: z.boolean().optional(),
           intensity: z.enum(["leve", "media", "caotica"]).optional(),
           skips: z.number().int().optional(),
+          tribunalSeconds: z.number().int().optional(),
+          tribunalJudge: z.enum(["auto", "ia", "voto"]).optional(),
           debateSeconds: z.number().int().optional(),
           debateJudge: z.enum(["auto", "ia", "voto"]).optional(),
           roletaSeconds: z.number().int().optional(),

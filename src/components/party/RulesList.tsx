@@ -12,6 +12,10 @@ export function RulesList({ game }: { game: PartyGameId }) {
         <p className="section-label mb-2">Pontuação</p>
         <ul className="list-disc space-y-1.5 pl-5">{meta.scoring.map((rule) => <li key={rule}>{rule}</li>)}</ul>
       </div>
+      <div>
+        <p className="section-label mb-2">Dupla ou grupo</p>
+        <p>{meta.players}</p>
+      </div>
       <p className="text-xs text-muted-foreground">Mínimo de {meta.minPlayers} jogadores · tudo é escrito no app.</p>
     </div>
   );
