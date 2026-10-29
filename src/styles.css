@@ -170,7 +170,7 @@ html, body { overflow-x: clip; }
 @keyframes stop-letter-in { from { opacity: 0; transform: scale(.6); } to { opacity: 1; transform: scale(1); } }
 @keyframes stop-count-pop { from { opacity: 0; transform: scale(1.5); } to { opacity: 1; transform: scale(1); } }
 /* Crowd reactions on result screens float up and fade. */
-.crowd-float { position: fixed; bottom: calc(9rem + env(safe-area-inset-bottom)); font-size: 2.25rem; pointer-events: none; z-index: 45; animation: crowd-float 1.8s ease-out forwards; }
+.crowd-float { position: absolute; bottom: calc(9rem + env(safe-area-inset-bottom)); font-size: 2.25rem; pointer-events: none; z-index: 45; animation: crowd-float 1.8s ease-out forwards; }
 @keyframes crowd-float { 0% { opacity: 0; transform: translateY(0) scale(.6); } 15% { opacity: 1; transform: translateY(-2rem) scale(1.1); } 100% { opacity: 0; transform: translateY(-16rem) scale(1); } }
 @media (prefers-reduced-motion: reduce) { .stop-countdown-letter, .stop-countdown-number { animation: none; } .crowd-float { animation-duration: 1.2s; } }
 .top-actions-clear { padding-right: var(--top-actions-space); }
