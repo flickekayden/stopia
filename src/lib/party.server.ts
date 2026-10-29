@@ -449,7 +449,7 @@ async function buildPrompt(room: RoomRow, players: PlayerRow[], round: number, s
     data.infiltradoId = shuffle(players.map((p) => p.id))[0] ?? players[0]!.id;
     data.prompt = { title: `Categoria: ${item.category}`, text: "Escreva uma pista curta sobre a palavra secreta, sem entregá-la.", category: item.category, source: "banco" };
   } else if (game === "debate") {
-    const judge = effectiveJudge(settings.debateJudge, players.length) === "ia" ? "o juiz" : "a galera";
+    const judge = effectiveJudgeFor("debate", settings, players.length) === "ia" ? "o juiz" : "a galera";
     const debateHelp = `Apresente seus melhores argumentos (lógicos, dramáticos ou absurdos) para convencer ${judge}!`;
     let prompt: PartyPrompt | null = null;
     if (ai) {
@@ -534,7 +534,15 @@ export async function nextPartyRound(input: { roomId: string; playerId: string; 
   const settings = readPartySettings(room.settings);
   const state = readPublicState(room.public_state);
   if (room.round_number >= settings.rounds) {
-    await guardedUpdate(room, { status: "ended", phase: "final", phase_ends_at: null });
+    // Debate with AI on: the podium shows right away and the AI awards fill in when ready.
+    const withAwards = room.game === "debate" && settings.ai;
+    const ended = await guardedUpdate(room, {
+      status: "ended",
+      phase: "final",
+      phase_ends_at: null,
+      ...(withAwards ? { public_state: asJson({ ...state, finalCommentary: { status: "pending" } }) } : {}),
+    });
+    if (ended && withAwards) await buildDebateCommentary(ended);
     return { ok: true };
   }
   const players = await loadPlayers(room.id);
@@ -574,10 +582,10 @@ export async function skipRoletaChallenge(input: { roomId: string; playerId: str
 
 /* -------------------------------- Submissions ------------------------------ */
 
-function textPayload(payload: unknown) {
+function textPayload(payload: unknown, max: number) {
   const text = typeof (payload as { text?: unknown })?.text === "string" ? (payload as { text: string }).text.replace(/\s+/g, " ").trim() : "";
   if (!text) throw new Error("Escreva alguma coisa antes de enviar.");
-  return { text: text.slice(0, PARTY_TEXT_MAX) };
+  return { text: text.slice(0, max) };
 }
 
 function targetPayload(payload: unknown, voterId: string, allowed: readonly string[]) {
@@ -607,7 +615,7 @@ export async function submitPartyAction(input: { roomId: string; playerId: strin
     const raw = input.payload as { answers?: unknown; done?: unknown };
     payload = { answers: sanitizeStopAnswers(raw?.answers, state.stop.categories), done: raw?.done === true };
   } else if (TEXT_PHASES.includes(phase)) {
-    payload = textPayload(input.payload);
+    payload = textPayload(input.payload, textMaxFor(game));
   } else if (phase === "vote" && game === "tribunal") {
     const verdict = (input.payload as { verdict?: unknown })?.verdict;
     if (verdict !== "culpado" && verdict !== "inocente") throw new Error("Voto inválido.");
@@ -772,15 +780,16 @@ async function advanceOnce(room: RoomRow): Promise<boolean> {
     if (room.phase_ends_at !== null && Date.now() < Date.parse(room.phase_ends_at)) return false;
     return claimJudge({});
   }
-  const judgedByAi = (() => {
-    const mode = judgeModeFor(game, settings);
-    return mode !== null && effectiveJudge(mode, presentIds.length) === "ia";
-  })();
+  const judgedByAi = effectiveJudgeFor(game, settings, presentIds.length) === "ia";
 
   if (game === "tribunal") {
     if (phase === "defense") {
       const entries = textEntries(subs, present).sort((a, b) => (a.playerId === state.defendantId ? -1 : b.playerId === state.defendantId ? 1 : 0));
       const voters = presentIds.filter((id) => id !== state.defendantId);
+      if (judgedByAi) {
+        if (entries.length === 0) return reveal({ notice: "Ninguém escreveu nada: o tribunal foi adiado sem pontos." }, {}, null);
+        return claimJudge({ entries, eligible: [] });
+      }
       return toPhase("vote", { entries, eligible: voters });
     }
     const votes: Record<string, Verdict> = {};
