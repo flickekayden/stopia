@@ -477,10 +477,10 @@ export const STOP_LOBBY_META: LobbyGameMeta = {
 };
 
 export const STOP_RULES = [
-  "Cada rodada sorteia uma letra (sem repetir na partida) e até 8 categorias, priorizando as que ainda não saíram.",
-  "Escreva uma resposta com a letra para cada categoria antes do tempo acabar.",
-  "Quem preencher tudo pode gritar STOP!: as respostas de todo mundo travam em 3 segundos.",
-  "O juiz de IA avalia na pontuação e na intensidade escolhidas pelo mestre, e os pontos vão para o placar da sala.",
+  "Cada rodada sorteia uma letra e até 8 categorias (as que ainda não saíram vêm primeiro).",
+  "Escreva uma palavra com essa letra para cada categoria antes do tempo acabar.",
+  "Preencheu tudo? Grite STOP!: as respostas de todo mundo travam em 3 segundos.",
+  "O juiz de IA dá de 0 a 20 pontos por resposta, na pontuação e na intensidade (leve, zoeira ou ácida) escolhidas pelo mestre.",
 ];
 
 const DURATIONS: Record<PartyGameId, string> = {
@@ -516,7 +516,7 @@ export function missingPlayers(id: LobbyGameId, players: number) {
 
 /* ------------------------- Developer settings per game ------------------------- */
 
-/** Timed phases the developer can tune; Debate's argument and Roleta's answer times belong to the host. */
+/** Timed phases the developer can tune; the writing time of Tribunal, Debate and Roleta belongs to the host. */
 export const GAME_PHASES: Record<PartyGameId, PartyPhaseId[]> = {
   tribunal: ["vote"],
   autor: ["write", "guess"],
