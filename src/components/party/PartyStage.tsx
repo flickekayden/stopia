@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { Check, Clock, Copy, Crown, EyeOff, Eye, Gavel, LayoutGrid, Loader2, LogOut, RefreshCw, Share2, SkipForward, Sparkles, Trophy, Users } from "lucide-react";
+import { Check, Clock, Copy, Crown, EyeOff, Eye, Gavel, LayoutGrid, Loader2, LogOut, RefreshCw, Share2, SkipForward, Sparkles, Swords, Trophy, Users } from "lucide-react";
 import { toast } from "sonner";
 
 import { PartyIcon } from "@/components/party/PartyIcon";
@@ -11,6 +11,9 @@ import { Textarea } from "@/components/ui/textarea";
 import type { PartyPlayer, PartyPrivateView, PartyRoom } from "@/hooks/use-party-room";
 import { rankPlayers } from "@/lib/ranking";
 import {
+  DEBATE_SECONDS_OPTIONS,
+  effectiveJudge,
+  judgeModeFor,
   LOBBY_GAMES,
   lobbyGameMeta,
   missingPlayers,
@@ -19,6 +22,7 @@ import {
   PARTY_SKIP_OPTIONS,
   PARTY_TEXT_MAX,
   PHASE_LABELS,
+  ROLETA_SECONDS_OPTIONS,
   type LobbyGameId,
   type LobbyGameMeta,
   type PartyEntry,
@@ -140,6 +144,7 @@ function GamePicker({ ctx, actions }: { ctx: LobbyCtx; actions: PartyActions }) 
             >
               <span className="party-icon size-10"><PartyIcon name={game.icon} className="size-5" /></span>
               <span className="text-balance-safe font-bold leading-tight">{game.name}</span>
+              <span className="text-xs font-semibold leading-snug party-accent">{game.tagline}</span>
               <span className="mt-auto"><GameMetaLine game={game} /></span>
               {active && <span className="inline-flex items-center gap-1 text-xs font-bold party-accent"><Check className="size-3.5" aria-hidden="true" /> Escolhido</span>}
             </button>
@@ -150,13 +155,63 @@ function GamePicker({ ctx, actions }: { ctx: LobbyCtx; actions: PartyActions }) 
   );
 }
 
+const JUDGE_LABELS = { ia: "Juiz de IA", voto: "Votação da galera" } as const;
+
+/** Debate/Roleta: writing time and who judges, chosen by the host and shown to everyone. */
+function JudgeSettings({ ctx, actions, game }: { ctx: LobbyCtx; actions: PartyActions; game: "debate" | "roleta" }) {
+  const { settings } = ctx;
+  const option = (active: boolean) => (active ? "selected" : "secondary") as "selected" | "secondary";
+  const seconds = game === "debate" ? settings.debateSeconds : settings.roletaSeconds;
+  const secondOptions = game === "debate" ? DEBATE_SECONDS_OPTIONS : ROLETA_SECONDS_OPTIONS;
+  const mode = judgeModeFor(game, settings) ?? "auto";
+  const judge = effectiveJudge(mode, ctx.players.length);
+  const duo = ctx.players.length <= 2;
+  const setSeconds = (n: number) => actions.updateSettings(game === "debate" ? { debateSeconds: n } : { roletaSeconds: n });
+  const setJudge = (value: "ia" | "voto") => actions.updateSettings(game === "debate" ? { debateJudge: value } : { roletaJudge: value });
+  return (
+    <>
+      <div>
+        <p className="mb-2 text-sm font-semibold text-muted-foreground">{game === "debate" ? "Tempo de argumentação" : "Tempo por desafio"}</p>
+        <div className="grid grid-cols-3 gap-2">
+          {secondOptions.map((n) => (
+            <Button key={n} variant={option(seconds === n)} aria-label={`${n} segundos`} aria-pressed={seconds === n} disabled={ctx.busy !== null} onClick={() => void setSeconds(n)}>{n}s</Button>
+          ))}
+        </div>
+      </div>
+      <div>
+        <p className="mb-2 text-sm font-semibold text-muted-foreground">{game === "debate" ? "Quem julga" : "Quem avalia"}</p>
+        <div className="grid grid-cols-2 gap-2">
+          {(["ia", "voto"] as const).map((value) => (
+            <Button key={value} variant={option(judge === value)} aria-pressed={judge === value} disabled={ctx.busy !== null} className="h-auto min-h-11 whitespace-normal py-2" onClick={() => void setJudge(value)}>
+              {value === "ia" ? <Sparkles /> : <Users />} {JUDGE_LABELS[value]}
+            </Button>
+          ))}
+        </div>
+        <p className="mt-2 text-xs text-muted-foreground">
+          {duo && judge === "ia"
+            ? game === "debate" ? "Em 2 jogadores, a IA atua como juiz para desempatar o duelo!" : "Em 2 jogadores, a IA dá a nota de cada resposta."
+            : duo ? "Atenção: em 2 jogadores a votação tende a empatar." : judge === "ia" ? "A IA lê tudo e decide os pontos." : "Todos votam na melhor (não vale a própria)."}
+        </p>
+      </div>
+    </>
+  );
+}
+
+function judgeSummary(game: PartyGameId, settings: PartySettings, players: number) {
+  const mode = judgeModeFor(game, settings);
+  if (!mode) return "";
+  const seconds = game === "debate" ? settings.debateSeconds : settings.roletaSeconds;
+  return ` · ${seconds}s · ${JUDGE_LABELS[effectiveJudge(mode, players)]}`;
+}
+
 function PartySettingsPanel({ ctx, actions, game }: { ctx: LobbyCtx; actions: PartyActions; game: PartyGameId }) {
   const { settings } = ctx;
   const option = (active: boolean) => (active ? "selected" : "secondary") as "selected" | "secondary";
   if (!ctx.isHost) {
     return (
-      <p className="party-panel text-center text-sm text-muted-foreground">
+      <p className="party-panel text-center text-sm text-muted-foreground" aria-live="polite">
         {settings.rounds} rodadas · IA {settings.ai && game !== "infiltrado" ? "ligada" : "desligada"}
+        {judgeSummary(game, settings, ctx.players.length)}
         {game === "roleta" ? ` · intensidade ${settings.intensity === "media" ? "média" : settings.intensity === "caotica" ? "caótica" : "leve"} · ${settings.skips} pulo(s)` : ""}
       </p>
     );
@@ -175,10 +230,11 @@ function PartySettingsPanel({ ctx, actions, game }: { ctx: LobbyCtx; actions: Pa
       <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4">
         <div className="min-w-0">
           <p className="font-semibold">IA no jogo</p>
-          <p className="text-sm text-muted-foreground">{game === "infiltrado" ? "O Infiltrado usa só a lista do jogo." : "Gera conteúdos novos e comenta os resultados. Sem IA, usa a lista do jogo."}</p>
+          <p className="text-sm text-muted-foreground">{game === "infiltrado" ? "O Infiltrado usa só a lista do jogo." : game === "debate" || game === "roleta" ? "Cria temas novos e comenta os resultados. Sem IA, usa a lista do jogo (o juiz é escolhido abaixo)." : "Gera conteúdos novos e comenta os resultados. Sem IA, usa a lista do jogo."}</p>
         </div>
         <Switch aria-label="IA no jogo" checked={settings.ai} disabled={ctx.busy !== null || game === "infiltrado"} onCheckedChange={(ai) => void actions.updateSettings({ ai })} />
       </div>
+      {(game === "debate" || game === "roleta") && <JudgeSettings ctx={ctx} actions={actions} game={game} />}
       {game === "roleta" && (
         <>
           <div>
