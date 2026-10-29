@@ -461,13 +461,13 @@ export function missingPlayers(id: LobbyGameId, players: number) {
 
 /* ------------------------- Developer settings per game ------------------------- */
 
-/** Timed phases each party game uses; only these can be tuned by the developer. */
+/** Timed phases the developer can tune; Debate's argument and Roleta's answer times belong to the host. */
 export const GAME_PHASES: Record<PartyGameId, PartyPhaseId[]> = {
   tribunal: ["defense", "vote"],
   autor: ["write", "guess"],
   infiltrado: ["clues", "vote", "last_guess"],
-  debate: ["argue", "vote"],
-  roleta: ["respond", "vote"],
+  debate: ["vote"],
+  roleta: ["vote"],
 };
 
 export const PARTY_TONES = ["padrao", "leve", "acido", "teatral"] as const;
