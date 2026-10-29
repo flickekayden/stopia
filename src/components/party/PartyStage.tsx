@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { Check, Clock, Copy, Crown, EyeOff, Eye, Gavel, LayoutGrid, Loader2, LogOut, RefreshCw, Share2, SkipForward, Sparkles, Swords, Trophy, Users } from "lucide-react";
+import { Award, Check, Clock, Copy, Crown, EyeOff, Eye, Gavel, LayoutGrid, Loader2, LogOut, RefreshCw, Share2, SkipForward, Sparkles, Swords, Trophy, Users } from "lucide-react";
 import { toast } from "sonner";
 
 import { PartyIcon } from "@/components/party/PartyIcon";
@@ -12,8 +12,8 @@ import type { PartyPlayer, PartyPrivateView, PartyRoom } from "@/hooks/use-party
 import { rankPlayers } from "@/lib/ranking";
 import {
   DEBATE_SECONDS_OPTIONS,
-  effectiveJudge,
-  judgeModeFor,
+  effectiveJudgeFor,
+  isPartyGame,
   LOBBY_GAMES,
   lobbyGameMeta,
   missingPlayers,
@@ -23,6 +23,8 @@ import {
   PARTY_TEXT_MAX,
   PHASE_LABELS,
   ROLETA_SECONDS_OPTIONS,
+  TRIBUNAL_SECONDS_OPTIONS,
+  textMaxFor,
   type LobbyGameId,
   type LobbyGameMeta,
   type PartyEntry,
@@ -156,51 +158,69 @@ function GamePicker({ ctx, actions }: { ctx: LobbyCtx; actions: PartyActions }) 
 
 const JUDGE_LABELS = { ia: "Juiz de IA", voto: "Votação da galera" } as const;
 
-/** Debate/Roleta: writing time and who judges, chosen by the host and shown to everyone. */
-function JudgeSettings({ ctx, actions, game }: { ctx: LobbyCtx; actions: PartyActions; game: "debate" | "roleta" }) {
+type JudgedGame = "tribunal" | "debate" | "roleta";
+
+const SECONDS_KEY = { tribunal: "tribunalSeconds", debate: "debateSeconds", roleta: "roletaSeconds" } as const;
+const JUDGE_KEY = { tribunal: "tribunalJudge", debate: "debateJudge", roleta: "roletaJudge" } as const;
+const SECONDS_OPTIONS = { tribunal: TRIBUNAL_SECONDS_OPTIONS, debate: DEBATE_SECONDS_OPTIONS, roleta: ROLETA_SECONDS_OPTIONS } as const;
+const SECONDS_TITLE = { tribunal: "Tempo de defesa e acusação", debate: "Tempo de argumentação", roleta: "Tempo por desafio" } as const;
+
+function secondsLabel(n: number) {
+  return n >= 60 && n % 60 === 0 ? `${n / 60} min` : n > 60 ? `${Math.floor(n / 60)}m${n % 60}s` : `${n}s`;
+}
+
+function judgeHint(game: JudgedGame, duo: boolean, judge: "ia" | "voto") {
+  if (game === "tribunal") {
+    if (duo) return "Em dupla: Juiz de IA obrigatório. Um é o Réu, o outro é o Promotor.";
+    return judge === "ia" ? "A IA lê a defesa e as acusações e decreta o veredito." : "Todos menos o réu votam: culpado ou inocente.";
+  }
+  if (duo && judge === "ia") return game === "debate" ? "Em 2 jogadores, a IA atua como juiz para desempatar o duelo!" : "Em 2 jogadores, a IA dá a nota de cada resposta.";
+  if (duo) return "Atenção: em 2 jogadores a votação tende a empatar.";
+  return judge === "ia" ? "A IA lê tudo e decide os pontos." : "Todos votam na melhor (não vale a própria).";
+}
+
+/** Tribunal/Debate/Roleta: writing time and who judges, chosen by the host and shown to everyone. */
+function JudgeSettings({ ctx, actions, game }: { ctx: LobbyCtx; actions: PartyActions; game: JudgedGame }) {
   const { settings } = ctx;
   const option = (active: boolean) => (active ? "selected" : "secondary") as "selected" | "secondary";
-  const seconds = game === "debate" ? settings.debateSeconds : settings.roletaSeconds;
-  const secondOptions = game === "debate" ? DEBATE_SECONDS_OPTIONS : ROLETA_SECONDS_OPTIONS;
-  const mode = judgeModeFor(game, settings) ?? "auto";
-  const judge = effectiveJudge(mode, ctx.players.length);
+  const seconds = settings[SECONDS_KEY[game]];
+  const secondOptions = SECONDS_OPTIONS[game];
+  const judge = effectiveJudgeFor(game, settings, ctx.players.length) ?? "voto";
   const duo = ctx.players.length <= 2;
-  const setSeconds = (n: number) => actions.updateSettings(game === "debate" ? { debateSeconds: n } : { roletaSeconds: n });
-  const setJudge = (value: "ia" | "voto") => actions.updateSettings(game === "debate" ? { debateJudge: value } : { roletaJudge: value });
+  const locked = game === "tribunal" && duo;
+  const setSeconds = (n: number) => actions.updateSettings({ [SECONDS_KEY[game]]: n });
+  const setJudge = (value: "ia" | "voto") => actions.updateSettings({ [JUDGE_KEY[game]]: value });
   return (
     <>
       <div>
-        <p className="mb-2 text-sm font-semibold text-muted-foreground">{game === "debate" ? "Tempo de argumentação" : "Tempo por desafio"}</p>
-        <div className="grid grid-cols-3 gap-2">
+        <p className="mb-2 text-sm font-semibold text-muted-foreground">{SECONDS_TITLE[game]}</p>
+        <div className={cn("grid gap-2", secondOptions.length > 3 ? "grid-cols-4" : "grid-cols-3")}>
           {secondOptions.map((n) => (
-            <Button key={n} variant={option(seconds === n)} aria-label={`${n} segundos`} aria-pressed={seconds === n} disabled={ctx.busy !== null} onClick={() => void setSeconds(n)}>{n}s</Button>
+            <Button key={n} variant={option(seconds === n)} aria-label={`${n} segundos`} aria-pressed={seconds === n} disabled={ctx.busy !== null} className="px-2" onClick={() => void setSeconds(n)}>{secondsLabel(n)}</Button>
           ))}
         </div>
       </div>
       <div>
-        <p className="mb-2 text-sm font-semibold text-muted-foreground">{game === "debate" ? "Quem julga" : "Quem avalia"}</p>
+        <p className="mb-2 text-sm font-semibold text-muted-foreground">{game === "roleta" ? "Quem avalia" : game === "tribunal" ? "Quem dá o veredito" : "Quem julga"}</p>
         <div className="grid grid-cols-2 gap-2">
           {(["ia", "voto"] as const).map((value) => (
-            <Button key={value} variant={option(judge === value)} aria-pressed={judge === value} disabled={ctx.busy !== null} className="h-auto min-h-11 whitespace-normal py-2" onClick={() => void setJudge(value)}>
-              {value === "ia" ? <Sparkles /> : <Users />} {JUDGE_LABELS[value]}
+            <Button key={value} variant={option(judge === value)} aria-pressed={judge === value} disabled={ctx.busy !== null || (locked && value === "voto")} className="h-auto min-h-11 whitespace-normal py-2" onClick={() => void setJudge(value)}>
+              {value === "ia" ? <Sparkles /> : <Users />} {game === "tribunal" && value === "voto" ? "Júri da galera" : JUDGE_LABELS[value]}
             </Button>
           ))}
         </div>
-        <p className="mt-2 text-xs text-muted-foreground">
-          {duo && judge === "ia"
-            ? game === "debate" ? "Em 2 jogadores, a IA atua como juiz para desempatar o duelo!" : "Em 2 jogadores, a IA dá a nota de cada resposta."
-            : duo ? "Atenção: em 2 jogadores a votação tende a empatar." : judge === "ia" ? "A IA lê tudo e decide os pontos." : "Todos votam na melhor (não vale a própria)."}
-        </p>
+        <p className="mt-2 text-xs text-muted-foreground">{judgeHint(game, duo, judge)}</p>
       </div>
     </>
   );
 }
 
 function judgeSummary(game: PartyGameId, settings: PartySettings, players: number) {
-  const mode = judgeModeFor(game, settings);
-  if (!mode) return "";
-  const seconds = game === "debate" ? settings.debateSeconds : settings.roletaSeconds;
-  return ` · ${seconds}s · ${JUDGE_LABELS[effectiveJudge(mode, players)]}`;
+  const judge = effectiveJudgeFor(game, settings, players);
+  if (!judge) return "";
+  const seconds = game === "tribunal" ? settings.tribunalSeconds : game === "debate" ? settings.debateSeconds : settings.roletaSeconds;
+  const label = game === "tribunal" && judge === "voto" ? "Júri da galera" : JUDGE_LABELS[judge];
+  return ` · ${secondsLabel(seconds)} · ${label}`;
 }
 
 function PartySettingsPanel({ ctx, actions, game }: { ctx: LobbyCtx; actions: PartyActions; game: PartyGameId }) {
@@ -229,11 +249,11 @@ function PartySettingsPanel({ ctx, actions, game }: { ctx: LobbyCtx; actions: Pa
       <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4">
         <div className="min-w-0">
           <p className="font-semibold">IA no jogo</p>
-          <p className="text-sm text-muted-foreground">{game === "infiltrado" ? "O Infiltrado usa só a lista do jogo." : game === "debate" || game === "roleta" ? "Cria temas novos e comenta os resultados. Sem IA, usa a lista do jogo (o juiz é escolhido abaixo)." : "Gera conteúdos novos e comenta os resultados. Sem IA, usa a lista do jogo."}</p>
+          <p className="text-sm text-muted-foreground">{game === "infiltrado" ? "O Infiltrado usa só a lista do jogo." : game === "debate" ? "Cria temas novos, comenta e entrega troféus no fim. Sem IA, usa a lista do jogo (o juiz é escolhido abaixo)." : game === "tribunal" || game === "roleta" ? "Cria casos novos e comenta os resultados. Sem IA, usa a lista do jogo (o juiz é escolhido abaixo)." : "Gera conteúdos novos e comenta os resultados. Sem IA, usa a lista do jogo."}</p>
         </div>
         <Switch aria-label="IA no jogo" checked={settings.ai} disabled={ctx.busy !== null || game === "infiltrado"} onCheckedChange={(ai) => void actions.updateSettings({ ai })} />
       </div>
-      {(game === "debate" || game === "roleta") && <JudgeSettings ctx={ctx} actions={actions} game={game} />}
+      {(game === "tribunal" || game === "debate" || game === "roleta") && <JudgeSettings ctx={ctx} actions={actions} game={game} />}
       {game === "roleta" && (
         <>
           <div>
@@ -521,6 +541,23 @@ function SecretCard({ ctx }: { ctx: PartyCtx }) {
   );
 }
 
+/** Tribunal: who you are in this case and who decides, so nobody has to guess their job. */
+function TribunalRole({ ctx, isDefendant, duel }: { ctx: PartyCtx; isDefendant: boolean; duel: boolean }) {
+  const byAi = duel || effectiveJudgeFor("tribunal", ctx.settings, (ctx.state.eligible ?? []).length) === "ia";
+  const role = isDefendant ? "RÉU" : duel ? "PROMOTOR" : "ACUSADOR";
+  const mission = isDefendant
+    ? "Convença o juiz da sua inocência."
+    : `Convença o juiz de que @${nick(ctx.players, ctx.state.defendantId)} é culpado.`;
+  return (
+    <div className="rounded-xl border-2 border-[var(--game-accent)] bg-background p-4" role="note" aria-label={`Seu papel: ${role}`}>
+      <p className="section-label inline-flex items-center gap-1.5 party-accent"><Gavel className="size-3.5" aria-hidden="true" /> Seu papel</p>
+      <p className="font-display text-3xl leading-tight party-accent">{role}</p>
+      <p className="mt-1 font-semibold">{mission}</p>
+      <p className="mt-1 text-xs text-muted-foreground">{byAi ? "Quem decide: o Juiz de IA, lendo os dois lados." : "Quem decide: o júri da galera, votando culpado ou inocente."}</p>
+    </div>
+  );
+}
+
 function TextSubmit({ ctx, actions, label, placeholder }: { ctx: PartyCtx; actions: PartyActions; label: string; placeholder: string }) {
   const phaseKey = `${ctx.room.round_number}:${ctx.room.phase}`;
   const [text, setText] = useState("");
@@ -544,6 +581,7 @@ function TextSubmit({ ctx, actions, label, placeholder }: { ctx: PartyCtx; actio
   }, [saved, touched]);
   const sending = ctx.busy === "submit";
   const dirty = text.trim() !== (sentText ?? "");
+  const max = isPartyGame(ctx.game) ? textMaxFor(ctx.game) : PARTY_TEXT_MAX;
   return (
     <form
       className="space-y-2"
@@ -558,15 +596,15 @@ function TextSubmit({ ctx, actions, label, placeholder }: { ctx: PartyCtx; actio
       <Textarea
         id="party-text"
         value={text}
-        maxLength={PARTY_TEXT_MAX}
-        rows={3}
+        maxLength={max}
+        rows={max > PARTY_TEXT_MAX ? 6 : 3}
         placeholder={placeholder}
         autoComplete="off"
         onChange={(event) => { setText(event.target.value); setTouched(true); }}
-        className="min-h-24 rounded-xl text-base"
+        className={cn("rounded-xl text-base", max > PARTY_TEXT_MAX ? "min-h-40" : "min-h-24")}
       />
       <div className="flex items-center justify-between gap-3">
-        <span className="text-xs tabular-nums text-muted-foreground">{text.length}/{PARTY_TEXT_MAX}</span>
+        <span className={cn("text-xs tabular-nums", text.length >= max ? "font-bold party-accent" : "text-muted-foreground")} aria-live="polite">{text.length} / {max}</span>
         {sentText && !dirty && <span className="inline-flex items-center gap-1 text-sm font-semibold text-success"><Check className="size-4" aria-hidden="true" /> Enviado</span>}
       </div>
       <Button type="submit" className="party-accent-button h-14 w-full text-base font-bold shadow-none" disabled={!text.trim() || sending || (!!sentText && !dirty)} aria-busy={sending}>
@@ -755,7 +793,7 @@ export function PartyPlay({ ctx, actions }: { ctx: PartyCtx; actions: PartyActio
       <div className="space-y-3">
         <section className="party-panel flex items-center gap-3" role="status" aria-live="polite">
           <Loader2 className="size-5 shrink-0 animate-spin party-accent" aria-hidden="true" />
-          <p className="font-semibold">{ctx.game === "debate" ? "O juiz de IA está lendo os argumentos e decidindo o vencedor…" : "O juiz de IA está dando as notas…"}</p>
+          <p className="font-semibold">{ctx.game === "tribunal" ? "O Juiz de IA está lendo a defesa e a acusação para dar o veredito…" : ctx.game === "debate" ? "O juiz de IA está lendo os argumentos e decidindo o vencedor…" : "O juiz de IA está dando as notas…"}</p>
         </section>
         <EntryList ctx={ctx} entries={ctx.state.entries ?? []} showAuthor />
       </div>
@@ -763,7 +801,13 @@ export function PartyPlay({ ctx, actions }: { ctx: PartyCtx; actions: PartyActio
   } else if (!eligible && phase !== "vote") {
     body = <p className="party-panel text-center text-sm text-muted-foreground">{phase === "last_guess" ? `@${accusedName} foi o mais votado e é mesmo o infiltrado! Esperando o palpite da palavra…` : "Você entrou no meio desta etapa. Acompanhe e participe na próxima."}</p>;
   } else if (phase === "defense") {
-    body = <TextSubmit ctx={ctx} actions={actions} label={isDefendant ? "Você é o réu! Escreva sua defesa." : `Acuse ou testemunhe contra @${nick(ctx.players, defendant)}.`} placeholder={isDefendant ? "Excelência, eu posso explicar…" : "Eu vi tudo, excelência…"} />;
+    const duel = (ctx.state.eligible ?? []).length <= 2;
+    body = (
+      <div className="space-y-3">
+        <TribunalRole ctx={ctx} isDefendant={isDefendant} duel={duel} />
+        <TextSubmit ctx={ctx} actions={actions} label={isDefendant ? "Sua defesa" : duel ? `Sua acusação contra @${nick(ctx.players, defendant)}` : `Acuse ou testemunhe contra @${nick(ctx.players, defendant)}`} placeholder={isDefendant ? "Excelência, eu posso explicar…" : "Excelência, as provas são claras…"} />
+      </div>
+    );
   } else if (phase === "write") {
     body = <TextSubmit ctx={ctx} actions={actions} label="Sua resposta (ninguém vai saber que foi você… até a revelação)" placeholder="Capricha na desgraça" />;
   } else if (phase === "clues") {
@@ -859,15 +903,48 @@ function RevealBody({ ctx }: { ctx: PartyCtx }) {
 
   if (ctx.game === "tribunal") {
     const verdict = results.verdict;
+    const judge = results.judge;
+    const byAi = judge?.by === "ia";
     return (
       <div className="space-y-3">
-        <section className="party-prompt text-center">
-          <p className="section-label">Veredito para @{nick(ctx.players, ctx.state.defendantId)}</p>
-          <p className={cn("font-display text-5xl", verdict === "culpado" ? "text-destructive" : "text-success")}>{verdict === "culpado" ? "CULPADO" : "INOCENTE"}</p>
-          <p className="text-sm tabular-nums text-muted-foreground">{String(results.guilty ?? 0)} culpado · {String(results.innocent ?? 0)} inocente{verdict === "inocente" && Number(results.guilty) === Number(results.innocent) ? " · empate absolve" : ""}</p>
-        </section>
-        <AiCard ctx={ctx} title="Sentença do juiz" />
-        <EntryList ctx={ctx} entries={ctx.state.entries ?? []} showAuthor />
+        {notice && <p className="party-panel text-sm text-muted-foreground">{notice}</p>}
+        {verdict && (
+          <section className="party-prompt space-y-2 text-center">
+            <span className="party-icon mx-auto size-12"><Gavel className="size-6" aria-hidden="true" /></span>
+            <p className="section-label">Veredito para @{nick(ctx.players, ctx.state.defendantId)}</p>
+            <p className={cn("font-display text-5xl", verdict === "culpado" ? "text-destructive" : "text-success")}>{verdict === "culpado" ? "CULPADO" : "INOCENTE"}</p>
+            {byAi ? (
+              <>
+                {judge?.sentence && (
+                  <p className="text-balance-safe rounded-xl border border-border/60 bg-background px-3 py-2 text-base font-semibold">
+                    <span className="section-label block party-accent">{verdict === "culpado" ? "Pena" : "Absolvição"}</span>
+                    {judge.sentence}
+                  </p>
+                )}
+                <p className="text-xs text-muted-foreground">Decisão do Juiz de IA{judge?.bonus ? ` · bônus +${judge.bonus}` : ""}</p>
+              </>
+            ) : (
+              <p className="text-sm tabular-nums text-muted-foreground">{String(results.guilty ?? 0)} culpado · {String(results.innocent ?? 0)} inocente{verdict === "inocente" && Number(results.guilty) === Number(results.innocent) ? " · empate absolve" : ""}</p>
+            )}
+          </section>
+        )}
+        <AiCard ctx={ctx} title={byAi ? "Por que o juiz decidiu assim" : "Sentença do juiz"} />
+        <ul className="space-y-2">
+          {(ctx.state.entries ?? []).map((entry, index) => {
+            const id = entry.playerId ?? "";
+            const isDefendant = id === ctx.state.defendantId;
+            const best = byAi && id === judge?.bestId;
+            return (
+              <li key={entry.id} className={cn("party-panel answer-card", best && "ring-2 ring-[var(--game-accent)]")} style={{ "--enter-index": index } as CSSProperties}>
+                <p className="text-xs font-semibold text-muted-foreground">
+                  {best && <Trophy className="mr-1 inline size-3.5 party-accent" aria-label="Melhor acusação" />}
+                  {nick(ctx.players, id)}{id === ctx.me.id ? " (você)" : ""} · {isDefendant ? "Defesa" : (ctx.state.eligible ?? []).length <= 2 ? "Promotor" : "Acusação"}
+                </p>
+                <p className="text-balance-safe mt-0.5 font-semibold">“{entry.text}”</p>
+              </li>
+            );
+          })}
+        </ul>
       </div>
     );
   }
@@ -992,6 +1069,40 @@ function PartyReveal({ ctx, actions }: { ctx: PartyCtx; actions: PartyActions })
 
 /* ---------------------------------- Final --------------------------------- */
 
+/** Debate podium: the AI's comic awards for the match; never blocks the ranking. */
+function FinalCommentaryCard({ ctx }: { ctx: PartyCtx }) {
+  const commentary = ctx.state.finalCommentary;
+  if (!commentary) return null;
+  return (
+    <section className="party-prompt space-y-3" aria-live="polite" aria-label="Sentença final da IA">
+      <p className="section-label inline-flex items-center gap-1.5 party-accent"><Sparkles className="size-3.5" aria-hidden="true" /> {commentary.title ?? "Sentença Final da Corte"}</p>
+      {commentary.status === "pending" && <p className="inline-flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="size-4 animate-spin" aria-hidden="true" /> A IA está escolhendo os troféus da partida…</p>}
+      {commentary.status === "failed" && <p className="text-sm text-muted-foreground">A IA não conseguiu entregar os troféus desta vez. O placar vale normalmente.</p>}
+      {commentary.status === "ready" && (
+        <>
+          {(commentary.highlights ?? []).length > 0 && (
+            <ul className="grid gap-2">
+              {(commentary.highlights ?? []).map((h) => (
+                <li key={h.title} className="rounded-xl border border-border/60 bg-background p-3">
+                  <p className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide party-accent"><Award className="size-3.5" aria-hidden="true" /> {h.title}</p>
+                  <p className="font-bold">{nick(ctx.players, h.playerId)}{h.playerId === ctx.me.id ? " (você)" : ""}</p>
+                  <p className="text-balance-safe text-sm text-muted-foreground">{h.text}</p>
+                </li>
+              ))}
+            </ul>
+          )}
+          {commentary.summary && (
+            <div>
+              <p className="section-label mb-1">Palavra final da corte</p>
+              <p className="text-balance-safe text-base font-semibold italic">“{commentary.summary}”</p>
+            </div>
+          )}
+        </>
+      )}
+    </section>
+  );
+}
+
 export function PartyFinal({ ctx, actions, onHub }: { ctx: PartyCtx; actions: PartyActions; onHub: () => void }) {
   const scores = ctx.state.scores ?? {};
   const ranked = useMemo(() => rankPlayers(ctx.players.map((p) => ({ ...p, score: scores[p.id] ?? 0 }))), [ctx.players, scores]);
@@ -1016,6 +1127,7 @@ export function PartyFinal({ ctx, actions, onHub }: { ctx: PartyCtx; actions: Pa
           ))}
         </div>
       )}
+      <FinalCommentaryCard ctx={ctx} />
       <ol className="space-y-2" aria-label="Classificação final">
         {ranked.map((row, index) => (
           <li key={row.player.id} className="ranking-row flex items-center gap-3 p-3" data-first={row.place === 1} style={{ "--enter-index": index } as CSSProperties}>

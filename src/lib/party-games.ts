@@ -28,90 +28,102 @@ export type PartyGameMeta = {
   icon: "gavel" | "feather" | "eye" | "mic" | "dices";
   rules: string[];
   scoring: string[];
+  /** How the game changes with 2 players vs a bigger group (shown with the rules). */
+  players: string;
 };
 
 export const PARTY_GAMES: Record<PartyGameId, PartyGameMeta> = {
   tribunal: {
     id: "tribunal",
     name: "Tribunal dos Amigos",
-    short: "Acusações absurdas, defesas desesperadas e um veredito.",
-    description: "A cada rodada um amigo vira réu de um caso fictício. Ele se defende, o resto acusa, e o júri decide.",
-    minPlayers: 3,
+    short: "Um amigo no banco dos réus por um crime fictício e hilário.",
+    description: "A cada rodada um amigo vira réu de um caso inventado. Ele se defende, os outros acusam, e o juiz decide.",
+    minPlayers: 2,
     icon: "gavel",
     rules: [
-      "Cada rodada sorteia um réu (todo mundo passa pelo banco dos réus) e um caso fictício e absurdo.",
-      "O réu escreve a defesa; os outros escrevem uma acusação ou testemunho.",
-      "Todos menos o réu votam: culpado ou inocente. Empate = inocente.",
+      "Cada rodada sorteia um réu (todo mundo passa pelo banco) e um crime fictício e absurdo.",
+      "O réu escreve a defesa. Os outros escrevem a acusação.",
+      "Juiz de IA: lê os dois lados e decreta CULPADO ou INOCENTE, com uma pena absurda.",
+      "Júri da galera: todos menos o réu votam culpado ou inocente. Empate absolve.",
       "É tudo brincadeira: nenhuma acusação é um fato real.",
     ],
-    scoring: ["Réu absolvido: +3 para o réu.", "Quem votou com a maioria: +1."],
+    scoring: [
+      "Juiz de IA: inocente dá +3 ao réu; culpado dá +2 a cada acusador e +1 extra à melhor acusação. A IA pode dar até +2 de bônus por um caso brilhante.",
+      "Júri da galera: réu absolvido ganha +3; quem votou com a maioria ganha +1.",
+    ],
+    players: "Em dupla: duelo entre Réu e Promotor, e o Juiz de IA sempre decide. Com 3 ou mais: o mestre escolhe Juiz de IA ou Júri da galera.",
   },
   autor: {
     id: "autor",
     name: "Quem Escreveu Essa Desgraça?",
-    short: "Respostas anônimas. Descubra quem escreveu cada uma.",
-    description: "Todos respondem a mesma pergunta. As respostas aparecem sem nome e a galera tenta adivinhar o autor.",
+    short: "Respostas anônimas para perguntas absurdas. Descubra o autor.",
+    description: "Todos respondem a mesma pergunta. As respostas aparecem sem nome e a galera tenta adivinhar quem escreveu cada pérola.",
     minPlayers: 3,
     icon: "feather",
     rules: [
       "Todo mundo responde a mesma pergunta engraçada.",
-      "As respostas aparecem embaralhadas e sem nome — nem o servidor conta quem é quem antes da revelação.",
-      "Para cada resposta, chute quem escreveu. Você não chuta a sua nem vota em si mesmo.",
-      "Depois da revelação, a resposta não pode mais ser alterada.",
+      "As respostas aparecem embaralhadas e sem nome.",
+      "Para cada resposta, chute quem escreveu (a sua não conta).",
+      "No final da rodada, os autores são revelados.",
     ],
     scoring: ["Acertou o autor: +1.", "Enganou alguém com a sua resposta: +1 por pessoa enganada."],
+    players: "Precisa de 3 ou mais: em dupla, cada um saberia na hora quem escreveu.",
   },
   infiltrado: {
     id: "infiltrado",
     name: "Infiltrado",
     short: "Todos sabem a palavra secreta. Menos um.",
-    description: "Um jogador não recebe a palavra secreta. Dê pistas sem entregar a palavra e descubra quem está blefando.",
+    description: "Um jogador não recebe a palavra secreta. Dê pistas sem entregar a palavra e descubra quem está fingindo.",
     minPlayers: 3,
     icon: "eye",
     rules: [
       "Todos veem a categoria. Só os cidadãos recebem a palavra secreta; o infiltrado não.",
-      "Cada um escreve uma pista curta. As pistas só aparecem quando todos enviarem.",
+      "Cada um escreve uma pista curta, sem dizer a palavra.",
       "Votem em quem parece ser o infiltrado (não vale votar em si mesmo).",
-      "Se o infiltrado for o mais votado, ele ainda tem uma chance de adivinhar a palavra.",
+      "Se o infiltrado for pego, ele ainda tem uma chance de adivinhar a palavra.",
     ],
     scoring: [
-      "Infiltrado escapou (não foi o mais votado ou houve empate): +3 para ele.",
+      "Infiltrado escapou: +3 para ele.",
       "Pego, mas adivinhou a palavra: +2 para ele.",
       "Pego e errou: +1 para cada cidadão e +1 extra para quem votou nele.",
     ],
+    players: "Precisa de 3 ou mais: com 2 não há quem descobrir.",
   },
   debate: {
     id: "debate",
     name: "Debate Impossível",
     short: "Defenda o indefensável. O melhor argumento vence.",
-    description: "Um tema absurdo, dois lados sorteados. Cada um defende o seu lado e o juiz de IA (ou a galera) decide quem convenceu mais.",
+    description: "Um tema polêmico e dois lados opostos sorteados. Cada um defende o seu lado, concordando ou não, e o juiz decide quem convenceu mais.",
     minPlayers: 2,
     icon: "mic",
     rules: [
-      "A rodada traz um tema com dois lados opostos: A e B. Você recebe um deles, concordando ou não.",
-      "Escreva o seu argumento antes do tempo acabar.",
-      "Juiz de IA: a IA lê tudo, escolhe o melhor argumento e explica o veredito.",
+      "Cada rodada traz um tema com dois lados opostos (A e B). Você recebe um deles, concordando ou não.",
+      "Escreva sua melhor defesa (lógica, cômica ou absurda) antes do tempo acabar.",
+      "Juiz de IA: lê tudo, escolhe o melhor argumento e explica o veredito.",
       "Votação da galera: todos votam no melhor argumento (não vale o próprio).",
+      "No fim da partida, a IA entrega troféus cômicos aos debatedores.",
     ],
     scoring: [
-      "Juiz de IA: melhor argumento +2 (até +2 extra se a vitória for esmagadora); o lado vencedor ganha +1.",
-      "Votação: +1 por voto recebido; time com mais votos: +1 para cada membro.",
+      "Juiz de IA: melhor argumento +2 (até +2 extra se for um massacre); o lado vencedor ganha +1.",
+      "Votação: +1 por voto recebido; o lado com mais votos ganha +1 para cada membro.",
     ],
+    players: "Em dupla: duelo direto com o Juiz de IA decidindo. Com 3 ou mais: o mestre escolhe Juiz de IA ou votação.",
   },
   roleta: {
     id: "roleta",
     name: "Roleta do Caos",
     short: "Desafios aleatórios, eventos malucos e julgamento rápido.",
-    description: "A roleta sorteia um desafio e um evento do caos. Todos cumprem por escrito e o juiz de IA (ou a galera) avalia.",
+    description: "A roleta sorteia um desafio e um evento do caos. Todos respondem por escrito antes do tempo acabar.",
     minPlayers: 2,
     icon: "dices",
     rules: [
-      "A roleta sorteia um desafio da intensidade escolhida e um evento do caos (pontos em dobro, triplo...).",
-      "Todos respondem por escrito. Nada perigoso, ilegal ou que exponha dados pessoais.",
+      "A roleta sorteia um desafio e um evento do caos (pontos em dobro, triplo...).",
+      "Responda por escrito antes do tempo acabar.",
       "O mestre pode pular desafios até o limite configurado.",
       "Juiz de IA: dá de 0 a 3 pontos por resposta. Votação: todos votam na melhor (não vale a própria).",
     ],
     scoring: ["Pontos da IA ou votos recebidos, multiplicados pelo evento da rodada."],
+    players: "Em dupla: o Juiz de IA dá as notas. Com 3 ou mais: o mestre escolhe Juiz de IA ou votação.",
   },
 };
 
@@ -138,10 +150,11 @@ export const STOP_CATEGORY_MAX_LENGTH = 160;
 export const STOP_CATEGORY_LIMIT = 250;
 export const STOP_ANSWER_MAX = 80;
 
-/** Who decides Debate/Roleta rounds. "auto": AI judge with 2 players, group vote with 3+. */
+/** Who decides Tribunal/Debate/Roleta rounds. "auto": AI judge with 2 players, group vote with 3+. */
 export type JudgeMode = "auto" | "ia" | "voto";
 export const JUDGE_MODES: readonly JudgeMode[] = ["auto", "ia", "voto"];
-export const DEBATE_SECONDS_OPTIONS = [60, 90, 120] as const;
+export const DEBATE_SECONDS_OPTIONS = [60, 90, 120, 180] as const;
+export const TRIBUNAL_SECONDS_OPTIONS = [60, 90, 120, 180] as const;
 export const ROLETA_SECONDS_OPTIONS = [45, 60, 90] as const;
 
 export type PartySettings = {
@@ -149,6 +162,9 @@ export type PartySettings = {
   ai: boolean;
   intensity: "leve" | "media" | "caotica";
   skips: number;
+  /** Tribunal dos Amigos: defense/accusation time and who decides the verdict. */
+  tribunalSeconds: number;
+  tribunalJudge: JudgeMode;
   /** Debate Impossível: argument time and who judges. */
   debateSeconds: number;
   debateJudge: JudgeMode;
@@ -167,6 +183,8 @@ export const DEFAULT_PARTY_SETTINGS: PartySettings = {
   ai: true,
   intensity: "media",
   skips: 1,
+  tribunalSeconds: 90,
+  tribunalJudge: "auto",
   debateSeconds: 90,
   debateJudge: "auto",
   roletaSeconds: 60,
@@ -178,7 +196,20 @@ export const DEFAULT_PARTY_SETTINGS: PartySettings = {
 };
 export const PARTY_ROUND_OPTIONS = [3, 5, 8] as const;
 export const PARTY_SKIP_OPTIONS = [0, 1, 3] as const;
+/** Default limit for typed answers; games with longer arguments override it in GAME_TEXT_MAX. */
 export const PARTY_TEXT_MAX = 220;
+export const GAME_TEXT_MAX: Record<PartyGameId, number> = {
+  tribunal: 350,
+  autor: PARTY_TEXT_MAX,
+  infiltrado: PARTY_TEXT_MAX,
+  debate: 500,
+  roleta: PARTY_TEXT_MAX,
+};
+
+/** Character limit for a typed answer in this game. */
+export function textMaxFor(game: PartyGameId) {
+  return GAME_TEXT_MAX[game] ?? PARTY_TEXT_MAX;
+}
 
 /** Trimmed, de-duplicated (case-insensitive) category list; falls back to the defaults when empty. */
 export function readStopCategories(raw: unknown): string[] {
@@ -209,6 +240,8 @@ export function readPartySettings(raw: unknown): PartySettings {
     ai: typeof value.ai === "boolean" ? value.ai : DEFAULT_PARTY_SETTINGS.ai,
     intensity: value.intensity === "leve" || value.intensity === "caotica" || value.intensity === "media" ? value.intensity : DEFAULT_PARTY_SETTINGS.intensity,
     skips: PARTY_SKIP_OPTIONS.includes(value.skips as 0) ? (value.skips as number) : DEFAULT_PARTY_SETTINGS.skips,
+    tribunalSeconds: pick<number>(TRIBUNAL_SECONDS_OPTIONS, value.tribunalSeconds, DEFAULT_PARTY_SETTINGS.tribunalSeconds),
+    tribunalJudge: pick(JUDGE_MODES, value.tribunalJudge, DEFAULT_PARTY_SETTINGS.tribunalJudge),
     debateSeconds: pick<number>(DEBATE_SECONDS_OPTIONS, value.debateSeconds, DEFAULT_PARTY_SETTINGS.debateSeconds),
     debateJudge: pick(JUDGE_MODES, value.debateJudge, DEFAULT_PARTY_SETTINGS.debateJudge),
     roletaSeconds: pick<number>(ROLETA_SECONDS_OPTIONS, value.roletaSeconds, DEFAULT_PARTY_SETTINGS.roletaSeconds),
@@ -228,13 +261,26 @@ export function effectiveJudge(mode: JudgeMode, players: number): "ia" | "voto" 
   return mode;
 }
 
-/** Judge mode setting for a judged game (Debate or Roleta); other games have none. */
+/** Judge mode setting for a judged game (Tribunal, Debate or Roleta); other games have none. */
 export function judgeModeFor(game: PartyGameId, settings: PartySettings): JudgeMode | null {
+  if (game === "tribunal") return settings.tribunalJudge;
   return game === "debate" ? settings.debateJudge : game === "roleta" ? settings.roletaJudge : null;
 }
 
-/** Host-chosen seconds for the writing step of Debate/Roleta; null for everything else. */
+/** Games where a 2-player match always uses the AI judge (a one-person jury would be pointless). */
+export const DUO_AI_GAMES: readonly PartyGameId[] = ["tribunal"];
+
+/** The judge a game really uses with this many players, honouring games that force the AI in duos. */
+export function effectiveJudgeFor(game: PartyGameId, settings: PartySettings, players: number): "ia" | "voto" | null {
+  const mode = judgeModeFor(game, settings);
+  if (mode === null) return null;
+  if (players <= 2 && DUO_AI_GAMES.includes(game)) return "ia";
+  return effectiveJudge(mode, players);
+}
+
+/** Host-chosen seconds for the writing step of Tribunal/Debate/Roleta; null for everything else. */
 export function hostPhaseSeconds(game: PartyGameId, phase: PartyPhaseId, settings: PartySettings): number | null {
+  if (game === "tribunal" && phase === "defense") return settings.tribunalSeconds;
   if (game === "debate" && phase === "argue") return settings.debateSeconds;
   if (game === "roleta" && phase === "respond") return settings.roletaSeconds;
   return null;
@@ -302,7 +348,7 @@ export type PartyResults = {
   winnerSide?: "A" | "B" | null;
   multiplier?: number;
   /** Debate/Roleta judged by the AI: the chosen best entry and a short note per player. */
-  judge?: { by: "ia"; bestId: string | null; bonus?: number; notes?: Record<string, string> };
+  judge?: { by: "ia"; bestId: string | null; bonus?: number; notes?: Record<string, string>; sentence?: string };
   /** Stop: the judge's result for every player x category of the round. */
   stop?: StopJudgedAnswer[];
 };
@@ -336,6 +382,15 @@ export type PartyPublicState = {
   stop?: StopRoundState;
   /** DEPRECATED: Stop used to run in a separate linked room; kept so old links still read. */
   stopCode?: string;
+  /** Final podium: AI awards for the match (Debate). Absent when the AI is off for the room. */
+  finalCommentary?: FinalCommentary;
+};
+
+export type FinalCommentary = {
+  status: "pending" | "ready" | "failed";
+  title?: string;
+  highlights?: { playerId: string; title: string; text: string }[];
+  summary?: string;
 };
 
 export type StopRoundState = {
@@ -422,10 +477,10 @@ export const STOP_LOBBY_META: LobbyGameMeta = {
 };
 
 export const STOP_RULES = [
-  "Cada rodada sorteia uma letra (sem repetir na partida) e até 8 categorias, priorizando as que ainda não saíram.",
-  "Escreva uma resposta com a letra para cada categoria antes do tempo acabar.",
-  "Quem preencher tudo pode gritar STOP!: as respostas de todo mundo travam em 3 segundos.",
-  "O juiz de IA avalia na pontuação e na intensidade escolhidas pelo mestre, e os pontos vão para o placar da sala.",
+  "Cada rodada sorteia uma letra e até 8 categorias (as que ainda não saíram vêm primeiro).",
+  "Escreva uma palavra com essa letra para cada categoria antes do tempo acabar.",
+  "Preencheu tudo? Grite STOP!: as respostas de todo mundo travam em 3 segundos.",
+  "O juiz de IA dá de 0 a 20 pontos por resposta, na pontuação e na intensidade (leve, zoeira ou ácida) escolhidas pelo mestre.",
 ];
 
 const DURATIONS: Record<PartyGameId, string> = {
@@ -437,7 +492,7 @@ const DURATIONS: Record<PartyGameId, string> = {
 };
 
 const TAGLINES: Record<PartyGameId, string> = {
-  tribunal: "3+ jogadores · Exige grupo",
+  tribunal: "2+ jogadores · Duelo ou Júri da galera",
   autor: "3+ jogadores · Exige grupo",
   infiltrado: "3+ jogadores · Exige grupo",
   debate: "2+ jogadores · Duelo com Juiz de IA",
@@ -461,9 +516,9 @@ export function missingPlayers(id: LobbyGameId, players: number) {
 
 /* ------------------------- Developer settings per game ------------------------- */
 
-/** Timed phases the developer can tune; Debate's argument and Roleta's answer times belong to the host. */
+/** Timed phases the developer can tune; the writing time of Tribunal, Debate and Roleta belongs to the host. */
 export const GAME_PHASES: Record<PartyGameId, PartyPhaseId[]> = {
-  tribunal: ["defense", "vote"],
+  tribunal: ["vote"],
   autor: ["write", "guess"],
   infiltrado: ["clues", "vote", "last_guess"],
   debate: ["vote"],

@@ -178,6 +178,82 @@ export async function aiJudgeRoleta(input: { desafio: string; respostas: { rotul
   return { notes, summary: clean(result.resumo, 300) };
 }
 
+/**
+ * Tribunal judge: the defense and accusations arrive with neutral labels; the AI decides the verdict,
+ * may pick the best accusation and gives a 0–2 bonus. Scoring stays in the deterministic engine.
+ */
+export async function aiJudgeTribunal(input: { caso: string; defesa: string; acusacoes: { rotulo: string; texto: string }[] }, tone?: PartyTone) {
+  const labels = input.acusacoes.map((a) => a.rotulo);
+  const result = await withTimeout(
+    generateJsonGemini<{ veredito: "culpado" | "inocente"; melhor_acusacao: string; bonus: number; sentenca: string; raciocinio: string }>({
+      instructions: `Você é o Juiz Supremo do "Tribunal dos Amigos", teatral e sarcástico. O caso é fictício e absurdo. Leia a defesa do réu e as acusações e decida com justiça cômica: "culpado" se a acusação convenceu mais, "inocente" se a defesa convenceu mais. Avalie criatividade, lógica absurda bem usada, humor e convicção; texto vazio ou fora do caso perde. "melhor_acusacao": o rótulo da acusação mais convincente (ou "nenhuma" se não houver). "bonus": 0 decisão apertada, 1 clara, 2 massacre. "sentenca": se culpado, uma pena fictícia, absurda e inofensiva; se inocente, a absolvição com pompa (até 30 palavras). "raciocinio": o porquê do veredito com humor (até 40 palavras). Refira-se só a "a defesa" e "a acusação", nunca a rótulos ou números. ${SAFETY}${toneLine(tone)}`,
+      input: JSON.stringify(input),
+      schemaName: "tribunal_judge",
+      schema: {
+        type: "object",
+        additionalProperties: false,
+        required: ["veredito", "melhor_acusacao", "bonus", "sentenca", "raciocinio"],
+        properties: {
+          veredito: { type: "string", enum: ["culpado", "inocente"] },
+          melhor_acusacao: { type: "string", enum: [...labels, "nenhuma"] },
+          bonus: { type: "integer", minimum: 0, maximum: 2 },
+          sentenca: { type: "string" },
+          raciocinio: { type: "string" },
+        },
+      },
+    }),
+    JUDGE_TIMEOUT_MS,
+  );
+  const verdict = result.veredito === "culpado" || result.veredito === "inocente" ? result.veredito : null;
+  const sentence = clean(result.sentenca, 300);
+  const reasoning = clean(result.raciocinio, 360);
+  if (!verdict || (!sentence && !reasoning)) throw new Error("vazio");
+  return {
+    verdict,
+    bestLabel: labels.includes(result.melhor_acusacao) ? result.melhor_acusacao : null,
+    bonus: Number(result.bonus) || 0,
+    sentence,
+    reasoning,
+  };
+}
+
+/**
+ * Debate podium: comic awards for the whole match. Players arrive as labels with their nickname so the
+ * text can name them; the AI never changes scores, it only comments on the final ranking.
+ */
+export async function aiMatchSummaryDebate(input: {
+  rodadas: { tema: string; lado_a: string; lado_b: string; argumentos: { rotulo: string; lado: "A" | "B"; texto: string }[] }[];
+  jogadores: { rotulo: string; apelido: string; pontos: number }[];
+}, tone?: PartyTone) {
+  const labels = input.jogadores.map((j) => j.rotulo);
+  const result = await withTimeout(
+    generateJsonGemini<{ advogado_do_diabo: { rotulo: string; texto: string }; mestre_do_malabarismo: { rotulo: string; texto: string }; palavra_final: string }>({
+      instructions: `Você é a Corte Suprema do "Debate Impossível" e vai encerrar a partida com troféus cômicos, lendo os argumentos de todas as rodadas. "advogado_do_diabo": quem usou os argumentos mais perigosamente convincentes. "mestre_do_malabarismo": quem defendeu o lado mais impossível com mais cara de pau (de preferência outra pessoa; em dupla pode ser qualquer um). Em cada troféu, "texto" com até 20 palavras citando o apelido e algo que a pessoa escreveu. "palavra_final": comentário ácido e divertido sobre o embate de toda a partida, até 50 palavras, citando apelidos. Não altere pontos nem o ranking. ${SAFETY}${toneLine(tone)}`,
+      input: JSON.stringify(input),
+      schemaName: "debate_match_summary",
+      schema: {
+        type: "object",
+        additionalProperties: false,
+        required: ["advogado_do_diabo", "mestre_do_malabarismo", "palavra_final"],
+        properties: {
+          advogado_do_diabo: { type: "object", additionalProperties: false, required: ["rotulo", "texto"], properties: { rotulo: { type: "string", enum: labels }, texto: { type: "string" } } },
+          mestre_do_malabarismo: { type: "object", additionalProperties: false, required: ["rotulo", "texto"], properties: { rotulo: { type: "string", enum: labels }, texto: { type: "string" } } },
+          palavra_final: { type: "string" },
+        },
+      },
+    }),
+    JUDGE_TIMEOUT_MS,
+  );
+  const highlights: { label: string; title: string; text: string }[] = [];
+  const devil = result.advogado_do_diabo;
+  const juggler = result.mestre_do_malabarismo;
+  if (devil && labels.includes(devil.rotulo) && clean(devil.texto, 200)) highlights.push({ label: devil.rotulo, title: "Advogado do Diabo", text: clean(devil.texto, 200) });
+  if (juggler && labels.includes(juggler.rotulo) && clean(juggler.texto, 200)) highlights.push({ label: juggler.rotulo, title: "Mestre do Malabarismo", text: clean(juggler.texto, 200) });
+  const summary = clean(result.palavra_final, 420);
+  if (highlights.length === 0 && !summary) throw new Error("vazio");
+  return { highlights, summary };
+}
+
 export async function aiDebateComment(input: { tema: string; lado_a: string; lado_b: string; argumentos: { lado: string; autor: string; texto: string; votos: number }[] }, tone?: PartyTone) {
   const result = await generateJsonGemini<{ comentario: string }>({
     instructions: `Você é o mediador irônico do "Debate Impossível". Comente o debate destacando o argumento mais cara de pau. A votação já definiu o resultado; não mude pontos. ${SAFETY} Máximo de 45 palavras.${toneLine(tone)}`,

@@ -22,8 +22,9 @@ describe("group room", () => {
   });
 
   test("start is blocked until the chosen game's minimum players are present", () => {
-    expect(missingPlayers("tribunal", 2)).toBe(1);
-    expect(missingPlayers("tribunal", 3)).toBe(0);
+    expect(missingPlayers("tribunal", 1)).toBe(1);
+    expect(missingPlayers("tribunal", 2)).toBe(0);
+    expect(missingPlayers("autor", 2)).toBe(1);
     expect(missingPlayers("stop", 1)).toBe(1);
     expect(missingPlayers("roleta", 2)).toBe(0);
   });
@@ -31,8 +32,8 @@ describe("group room", () => {
 
 describe("developer settings per game", () => {
   test("a game's timing override applies only to that game", () => {
-    const admin = readPartyAdmin({ tribunal: { seconds: { defense: 120, vote: 30 } } });
-    expect(phaseSecondsFor("tribunal", "defense", admin)).toBe(120);
+    const admin = readPartyAdmin({ tribunal: { seconds: { vote: 30 } }, autor: { seconds: { write: 120 } } });
+    expect(phaseSecondsFor("autor", "write", admin)).toBe(120);
     expect(phaseSecondsFor("tribunal", "vote", admin)).toBe(30);
     expect(phaseSecondsFor("infiltrado", "vote", admin)).toBe(PHASE_SECONDS.vote!);
   });
