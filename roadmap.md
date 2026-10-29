@@ -107,8 +107,8 @@
 - [x] Testes e partida real com dois jogadores (3 rodadas, STOP, pódio, Trocar de Jogo)
 
 ## Debate e regras do mestre (prompt-10)
-- [ ] Temas de debate com lados neutros; missão do jogador em destaque; ajuda simples
-- [ ] Mestre define tempo e julgamento (IA ou votação) no Debate e na Roleta
-- [ ] Juiz de IA no Debate (pula votação) e na Roleta; 2 jogadores → IA por padrão
-- [ ] Cartões de jogos com número de jogadores
-- [ ] Testes e partida real em dupla
+- [x] Temas de debate com lados neutros; missão do jogador em destaque; ajuda simples
+- [x] Mestre define tempo e julgamento (IA ou votação) no Debate e na Roleta
+- [x] Juiz de IA no Debate (pula votação) e na Roleta; 2 jogadores → IA por padrão
+- [x] Cartões de jogos com número de jogadores
+- [x] Testes e partida real em dupla
