@@ -16,7 +16,7 @@ import { PARTY_GAMES, readPartySettings } from "../src/lib/party-games";
 
 describe("party games rules", () => {
   test("minimum players per game", () => {
-    expect(PARTY_GAMES.tribunal.minPlayers).toBe(3);
+    expect(PARTY_GAMES.tribunal.minPlayers).toBe(2);
     expect(PARTY_GAMES.autor.minPlayers).toBe(3);
     expect(PARTY_GAMES.infiltrado.minPlayers).toBe(3);
     expect(PARTY_GAMES.debate.minPlayers).toBe(2);
