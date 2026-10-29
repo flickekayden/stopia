@@ -110,6 +110,9 @@ export function uniqueTop(counts: Record<string, number>) {
   return tied || bestCount === 0 ? null : best;
 }
 
+/** Quem Escreveu: extra points when at least one guess was made and nobody found the author. */
+export const AUTOR_BLUFF_BONUS = 2;
+
 export function scoreAutor(
   entries: readonly { id: string; authorId: string }[],
   guesses: Record<string, Record<string, string>>,
@@ -130,7 +133,10 @@ export function scoreAutor(
       }
     }
     add(deltas, entry.authorId, fooled);
-    return { id: entry.id, authorId: entry.authorId, correct, fooled };
+    // Bluff bonus: someone tried, nobody found the author.
+    const bluff = correct.length === 0 && fooled > 0;
+    if (bluff) add(deltas, entry.authorId, AUTOR_BLUFF_BONUS);
+    return { id: entry.id, authorId: entry.authorId, correct, fooled, bluff };
   });
   return { deltas, perEntry };
 }
