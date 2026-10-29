@@ -99,7 +99,7 @@ export async function aiAutorComment(input: { pergunta: string; respostas: { tex
 export async function aiDebateTopic(previous: string[], tone?: PartyTone) {
   const result = await withTimeout(
     generateJsonGemini<{ tema: string; lado_a: string; lado_b: string }>({
-      instructions: `Você cria dilemas para o jogo "Debate Impossível": um tema absurdo e dois lados opostos, ambos defensáveis de forma cômica. ${SAFETY} Tema com até 8 palavras; cada lado com até 12 palavras.${toneLine(tone)}`,
+      instructions: `Você cria temas para o jogo "Debate Impossível": um tema absurdo e cotidiano e dois lados opostos. ${SAFETY} O tema tem até 6 palavras. Cada lado é só uma POSIÇÃO curta e neutra (até 5 palavras), como "A favor (aconchego total)" ou "Contra (aberração nos pés)". Nunca escreva um argumento pronto nos lados: quem joga é que vai argumentar.${toneLine(tone)}`,
       input: JSON.stringify({ evitar_parecidos_com: previous.slice(-10) }),
       schemaName: "debate_topic",
       schema: { type: "object", additionalProperties: false, required: ["tema", "lado_a", "lado_b"], properties: { tema: { type: "string" }, lado_a: { type: "string" }, lado_b: { type: "string" } } },
@@ -107,10 +107,75 @@ export async function aiDebateTopic(previous: string[], tone?: PartyTone) {
     PROMPT_TIMEOUT_MS,
   );
   const title = clean(result.tema, 80);
-  const sideA = clean(result.lado_a, 120);
-  const sideB = clean(result.lado_b, 120);
+  const sideA = clean(result.lado_a, 60);
+  const sideB = clean(result.lado_b, 60);
   if (!title || !sideA || !sideB) throw new Error("vazio");
   return { title, sideA, sideB };
+}
+
+const JUDGE_TIMEOUT_MS = 20_000;
+
+/**
+ * Debate judge: arguments arrive under neutral labels (no nicknames) so the AI judges the text only.
+ * Returns the winning label, a 0–2 bonus for how decisive the win was and a short verdict.
+ */
+export async function aiJudgeDebate(input: { tema: string; lado_a: string; lado_b: string; argumentos: { rotulo: string; lado: "A" | "B"; texto: string }[] }, tone?: PartyTone) {
+  const labels = input.argumentos.map((a) => a.rotulo);
+  const result = await withTimeout(
+    generateJsonGemini<{ vencedor: string; bonus: number; veredito: string }>({
+      instructions: `Você é o juiz de um tribunal de debates cômico e rigoroso no jogo "Debate Impossível". Cada argumento defende o lado sorteado (A ou B), concordando ou não. Avalie oratória, convicção, criatividade, nível de absurdo bem usado e humor; ignore erros de digitação. Argumento vazio ou fora do tema perde. Escolha UM vencedor pelo rótulo. "bonus": 0 vitória apertada, 1 vitória clara, 2 massacre. "veredito": anuncie o vencedor com humor sarcástico citando o porquê, sem humilhar ninguém. ${SAFETY} Máximo de 45 palavras no veredito.${toneLine(tone)}`,
+      input: JSON.stringify(input),
+      schemaName: "debate_judge",
+      schema: {
+        type: "object",
+        additionalProperties: false,
+        required: ["vencedor", "bonus", "veredito"],
+        properties: { vencedor: { type: "string", enum: labels }, bonus: { type: "integer", minimum: 0, maximum: 2 }, veredito: { type: "string" } },
+      },
+    }),
+    JUDGE_TIMEOUT_MS,
+  );
+  const winner = labels.includes(result.vencedor) ? result.vencedor : null;
+  const verdict = clean(result.veredito, 400);
+  if (!winner || !verdict) throw new Error("vazio");
+  return { winner, bonus: Number(result.bonus) || 0, verdict };
+}
+
+/** Roleta judge: 0–3 points per answer for meeting the challenge with wit, plus a one-line note each. */
+export async function aiJudgeRoleta(input: { desafio: string; respostas: { rotulo: string; texto: string }[] }, tone?: PartyTone) {
+  const labels = input.respostas.map((r) => r.rotulo);
+  const result = await withTimeout(
+    generateJsonGemini<{ notas: { rotulo: string; pontos: number; comentario: string }[]; resumo: string }>({
+      instructions: `Você é o juiz da "Roleta do Caos". Para cada resposta, dê de 0 a 3 pontos: 0 não cumpriu o desafio, 1 cumpriu sem graça, 2 cumpriu com criatividade, 3 genial e hilária. "comentario" com até 12 palavras por resposta. "resumo": eleja a melhor com humor, até 35 palavras. ${SAFETY}${toneLine(tone)}`,
+      input: JSON.stringify(input),
+      schemaName: "roleta_judge",
+      schema: {
+        type: "object",
+        additionalProperties: false,
+        required: ["notas", "resumo"],
+        properties: {
+          notas: {
+            type: "array",
+            items: {
+              type: "object",
+              additionalProperties: false,
+              required: ["rotulo", "pontos", "comentario"],
+              properties: { rotulo: { type: "string", enum: labels }, pontos: { type: "integer", minimum: 0, maximum: 3 }, comentario: { type: "string" } },
+            },
+          },
+          resumo: { type: "string" },
+        },
+      },
+    }),
+    JUDGE_TIMEOUT_MS,
+  );
+  const notes: Record<string, { points: number; comment: string }> = {};
+  for (const row of result.notas ?? []) {
+    if (!labels.includes(row.rotulo)) continue;
+    notes[row.rotulo] = { points: Math.max(0, Math.min(3, Math.round(Number(row.pontos) || 0))), comment: clean(row.comentario, 120) };
+  }
+  if (Object.keys(notes).length === 0) throw new Error("vazio");
+  return { notes, summary: clean(result.resumo, 300) };
 }
 
 export async function aiDebateComment(input: { tema: string; lado_a: string; lado_b: string; argumentos: { lado: string; autor: string; texto: string; votos: number }[] }, tone?: PartyTone) {
