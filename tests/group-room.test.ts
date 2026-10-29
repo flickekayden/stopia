@@ -32,8 +32,10 @@ describe("group room", () => {
 
 describe("developer settings per game", () => {
   test("a game's timing override applies only to that game", () => {
-    const admin = readPartyAdmin({ tribunal: { seconds: { vote: 30 } }, autor: { seconds: { write: 120 } } });
-    expect(phaseSecondsFor("autor", "write", admin)).toBe(120);
+    const admin = readPartyAdmin({ tribunal: { seconds: { vote: 30 } }, autor: { seconds: { guess: 120, write: 200 } } });
+    expect(phaseSecondsFor("autor", "guess", admin)).toBe(120);
+    // Writing time in Quem Escreveu is a host rule now, so the developer value is ignored.
+    expect(admin.autor?.seconds?.write).toBeUndefined();
     expect(phaseSecondsFor("tribunal", "vote", admin)).toBe(30);
     expect(phaseSecondsFor("infiltrado", "vote", admin)).toBe(PHASE_SECONDS.vote!);
   });
