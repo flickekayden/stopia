@@ -137,7 +137,7 @@ export function RoundResults({
           {categoryCards.map((data, cardIndex) => <div key={data.playerId} style={{ "--enter-index": cardIndex } as CSSProperties}><AnswerCard data={data} highlighted={highlightedAnswer === answerCardId(data)} onQuote={onQuote} /></div>)}
       </section>
 
-      <div className="mobile-bottom-bar fixed inset-x-0 bottom-0 mx-auto w-full max-w-md border-t border-border bg-background/95 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] backdrop-blur">
+      <div className="mobile-bottom-bar fixed inset-x-0 bottom-0 mx-auto w-full max-w-md border-t border-border bg-background/95 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
         <p className="mb-2 text-center text-xs tabular-nums text-muted-foreground" role="timer">{secondsLeft > 0 ? `Leitura · ${secondsLeft}s` : "Leitura concluída"}</p>
         
         <div className="flex gap-2">

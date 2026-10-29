@@ -369,7 +369,7 @@ export function PartyLobby({ ctx, actions }: { ctx: LobbyCtx; actions: PartyActi
 
       {selected && <SelectedGame ctx={ctx} actions={actions} selected={selected} />}
 
-      <div data-game={selected ?? undefined} className="mobile-bottom-bar fixed inset-x-0 bottom-0 mx-auto w-full max-w-md border-t border-border bg-background/95 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] backdrop-blur">
+      <div data-game={selected ?? undefined} className="mobile-bottom-bar fixed inset-x-0 bottom-0 mx-auto w-full max-w-md border-t border-border bg-background/95 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
         {ctx.isHost ? (
           <div className="space-y-2">
             {selected && missing > 0 && <p role="status" className="text-center text-sm text-muted-foreground">Necessário mínimo de {meta!.minPlayers} jogadores. Compartilhe o código!</p>}
@@ -387,12 +387,14 @@ export function PartyLobby({ ctx, actions }: { ctx: LobbyCtx; actions: PartyActi
 
 /* --------------------------------- Round ---------------------------------- */
 
-function PhaseHeader({ ctx, now }: { ctx: PartyCtx; now: number }) {
+/** Only this header ticks every half second, so the rest of the round screen never repaints for the clock. */
+function PhaseHeader({ ctx }: { ctx: PartyCtx }) {
+  const now = useNow(Boolean(ctx.room.phase_ends_at));
   const phase = ctx.room.phase as PartyPhaseId;
   const endsAt = ctx.room.phase_ends_at ? new Date(ctx.room.phase_ends_at).getTime() : null;
   const seconds = endsAt ? Math.max(0, Math.ceil((endsAt - now) / 1000)) : null;
   return (
-    <div className="round-hud sticky top-0 z-20 -mx-4 flex items-center gap-3 border-b border-border/70 pb-3 pl-4 pr-[calc(var(--top-actions-space)+0.5rem)] pt-[calc(0.75rem+env(safe-area-inset-top))] backdrop-blur-md">
+    <div className="round-hud sticky top-0 z-20 -mx-4 flex items-center gap-3 border-b border-border/70 pb-3 pl-4 pr-[calc(var(--top-actions-space)+0.5rem)] pt-[calc(0.75rem+env(safe-area-inset-top))]">
       <span className="party-icon size-11"><PartyIcon name={lobbyGameMeta(ctx.game).icon} className="size-5" /></span>
       <div className="min-w-0 flex-1">
         <p className="section-label">Rodada <span className="tabular-nums text-foreground">{ctx.room.round_number}</span> de {ctx.settings.rounds}</p>
@@ -713,22 +715,33 @@ function AutorGuess({ ctx, actions }: { ctx: PartyCtx; actions: PartyActions }) 
   );
 }
 
+/** Deadline: any player may ask the server to close the step; the server re-checks time and versions. */
+function DeadlineWatcher({ round, phase, endsAtIso, actions }: { round: number; phase: string; endsAtIso: string | null; actions: PartyActions }) {
+  const endsAt = endsAtIso ? new Date(endsAtIso).getTime() : null;
+  const fired = useRef<{ key: string; at: number } | null>(null);
+  const actionsRef = useRef(actions);
+  actionsRef.current = actions;
+  useEffect(() => {
+    if (!endsAt) return;
+    const key = `${round}:${phase}:${endsAtIso}`;
+    const check = () => {
+      const now = Date.now();
+      if (now < endsAt + 400) return;
+      const last = fired.current;
+      if (last && last.key === key && now - last.at < 5_000) return;
+      fired.current = { key, at: now };
+      void actionsRef.current.advance(false);
+    };
+    check();
+    const id = window.setInterval(check, 500);
+    return () => window.clearInterval(id);
+  }, [round, phase, endsAt, endsAtIso]);
+  return null;
+}
+
 export function PartyPlay({ ctx, actions }: { ctx: PartyCtx; actions: PartyActions }) {
   const phase = ctx.room.phase as PartyPhaseId;
-  const now = useNow(Boolean(ctx.room.phase_ends_at));
   const eligible = (ctx.state.eligible ?? []).includes(ctx.me.id);
-  const fired = useRef<{ key: string; at: number } | null>(null);
-  const phaseKey = `${ctx.room.round_number}:${phase}:${ctx.room.phase_ends_at ?? ""}`;
-
-  // Deadline: any player may ask the server to close the step; the server re-checks time and versions.
-  useEffect(() => {
-    const endsAt = ctx.room.phase_ends_at ? new Date(ctx.room.phase_ends_at).getTime() : null;
-    if (!endsAt || now < endsAt + 400) return;
-    const last = fired.current;
-    if (last && last.key === phaseKey && now - last.at < 5_000) return;
-    fired.current = { key: phaseKey, at: now };
-    void actions.advance(false);
-  }, [now, phaseKey, ctx.room.phase_ends_at, actions]);
 
   if (phase === "reveal") return <PartyReveal ctx={ctx} actions={actions} />;
 
@@ -779,7 +792,8 @@ export function PartyPlay({ ctx, actions }: { ctx: PartyCtx; actions: PartyActio
 
   return (
     <div className="dock-clearance space-y-4 pb-10">
-      <PhaseHeader ctx={ctx} now={now} />
+      <DeadlineWatcher round={ctx.room.round_number} phase={phase} endsAtIso={ctx.room.phase_ends_at} actions={actions} />
+      <PhaseHeader ctx={ctx} />
       <PromptCard ctx={ctx} />
       {phase === "vote" && ctx.state.ai?.status === "failed" && ctx.state.ai.text && <p role="status" className="party-panel text-sm text-muted-foreground">{ctx.state.ai.text}</p>}
       {(phase === "clues" || phase === "vote" || phase === "last_guess") && <SecretCard ctx={ctx} />}
@@ -963,7 +977,7 @@ function PartyReveal({ ctx, actions }: { ctx: PartyCtx; actions: PartyActions })
       <PromptCard ctx={ctx} />
       <RevealBody ctx={ctx} />
       <Deltas ctx={ctx} />
-      <div className="mobile-bottom-bar fixed inset-x-0 bottom-0 mx-auto w-full max-w-md border-t border-border bg-background/95 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] backdrop-blur">
+      <div className="mobile-bottom-bar fixed inset-x-0 bottom-0 mx-auto w-full max-w-md border-t border-border bg-background/95 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
         {ctx.isHost ? (
           <Button className="party-accent-button h-14 w-full text-lg font-bold shadow-none" disabled={ctx.busy !== null} aria-busy={ctx.busy === "next"} onClick={() => void actions.next()}>
             {ctx.busy === "next" ? <><Loader2 className="animate-spin" /> Preparando…</> : last ? "Ver resultado final" : "Próxima rodada"}
@@ -1011,7 +1025,7 @@ export function PartyFinal({ ctx, actions, onHub }: { ctx: PartyCtx; actions: Pa
           </li>
         ))}
       </ol>
-      <div className="mobile-bottom-bar fixed inset-x-0 bottom-0 mx-auto w-full max-w-md space-y-2 border-t border-border bg-background/95 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] backdrop-blur">
+      <div className="mobile-bottom-bar fixed inset-x-0 bottom-0 mx-auto w-full max-w-md space-y-2 border-t border-border bg-background/95 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
         {ctx.isHost ? (
           <div className="grid grid-cols-2 gap-2">
             <Button className="party-accent-button h-14 text-base font-bold shadow-none" disabled={ctx.busy !== null} aria-busy={ctx.busy === "replay"} onClick={() => void actions.replay()}>

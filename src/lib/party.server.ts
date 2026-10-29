@@ -191,15 +191,18 @@ async function loadPlayers(roomId: string) {
 }
 
 async function requireSession(roomId: string, playerId: string, sessionId: string) {
-  const { data } = await db()
-    .from("party_sessions")
-    .select("player_id")
-    .eq("room_id", roomId)
-    .eq("player_id", playerId)
-    .eq("session_hash", hashSession(sessionId))
-    .maybeSingle();
+  // Both lookups use ids the caller already sent, so they run in one round-trip.
+  const [{ data }, { data: player }] = await Promise.all([
+    db()
+      .from("party_sessions")
+      .select("player_id")
+      .eq("room_id", roomId)
+      .eq("player_id", playerId)
+      .eq("session_hash", hashSession(sessionId))
+      .maybeSingle(),
+    db().from("party_players").select("*").eq("id", playerId).eq("room_id", roomId).maybeSingle(),
+  ]);
   if (!data) throw new Error("Sessão inválida. Entre novamente na sala.");
-  const { data: player } = await db().from("party_players").select("*").eq("id", playerId).maybeSingle();
   if (!player) throw new Error("Você não está mais nesta sala.");
   return player;
 }
@@ -327,8 +330,7 @@ async function clearRoundData(roomId: string) {
 
 /** Host picks (or changes) the game while the group waits in the lobby. */
 export async function selectPartyGame(input: { roomId: string; playerId: string; sessionId: string; game: PartyGameId | "stop" }) {
-  await requireHost(input.roomId, input.playerId, input.sessionId);
-  const room = await loadRoom(input.roomId);
+  const [, room] = await Promise.all([requireHost(input.roomId, input.playerId, input.sessionId), loadRoom(input.roomId)]);
   if (room.status !== "lobby") throw new Error("Termine ou encerre a partida antes de trocar de jogo.");
   if (room.game === input.game) return { ok: true };
   const updated = await guardedUpdate(room, { game: input.game });
@@ -338,8 +340,7 @@ export async function selectPartyGame(input: { roomId: string; playerId: string;
 
 /** Host sends everyone back to the group lobby, keeping the room code and every player. */
 export async function returnPartyToLobby(input: { roomId: string; playerId: string; sessionId: string }) {
-  await requireHost(input.roomId, input.playerId, input.sessionId);
-  const room = await loadRoom(input.roomId);
+  const [, room] = await Promise.all([requireHost(input.roomId, input.playerId, input.sessionId), loadRoom(input.roomId)]);
   if (room.game === "lobby" && room.status === "lobby") return { ok: true };
   await clearRoundData(room.id);
   const updated = await guardedUpdate(room, { ...RESET_TO_LOBBY, game: "lobby" });
@@ -358,8 +359,7 @@ export async function replayPartyGame(input: { roomId: string; playerId: string;
 }
 
 export async function updatePartySettings(input: { roomId: string; playerId: string; sessionId: string; settings: Partial<PartySettings> }) {
-  await requireHost(input.roomId, input.playerId, input.sessionId);
-  const room = await loadRoom(input.roomId);
+  const [, room] = await Promise.all([requireHost(input.roomId, input.playerId, input.sessionId), loadRoom(input.roomId)]);
   if (room.status === "playing") throw new Error("As regras só mudam antes da partida começar.");
   const settings = readPartySettings({ ...readPartySettings(room.settings), ...input.settings });
   const updated = await guardedUpdate(room, { settings: asJson(settings) });
@@ -368,8 +368,7 @@ export async function updatePartySettings(input: { roomId: string; playerId: str
 }
 
 export async function startPartyGame(input: { roomId: string; playerId: string; sessionId: string }) {
-  await requireHost(input.roomId, input.playerId, input.sessionId);
-  const room = await loadRoom(input.roomId);
+  const [, room] = await Promise.all([requireHost(input.roomId, input.playerId, input.sessionId), loadRoom(input.roomId)]);
   if (room.status === "playing") return { ok: true };
   if (!isPartyGame(room.game) && room.game !== "stop") throw new Error("Escolha um jogo primeiro.");
   const game = room.game;
@@ -387,8 +386,7 @@ export async function startPartyGame(input: { roomId: string; playerId: string; 
 }
 
 export async function restartPartyRoom(input: { roomId: string; playerId: string; sessionId: string }) {
-  await requireHost(input.roomId, input.playerId, input.sessionId);
-  const room = await loadRoom(input.roomId);
+  const [, room] = await Promise.all([requireHost(input.roomId, input.playerId, input.sessionId), loadRoom(input.roomId)]);
   await clearRoundData(room.id);
   const updated = await guardedUpdate(room, RESET_TO_LOBBY);
   if (!updated) throw new Error("A sala mudou ao mesmo tempo. Tente de novo.");
@@ -531,8 +529,7 @@ async function startRound(room: RoomRow, players: PlayerRow[], round: number, sc
 }
 
 export async function nextPartyRound(input: { roomId: string; playerId: string; sessionId: string; round: number }) {
-  await requireHost(input.roomId, input.playerId, input.sessionId);
-  const room = await loadRoom(input.roomId);
+  const [, room] = await Promise.all([requireHost(input.roomId, input.playerId, input.sessionId), loadRoom(input.roomId)]);
   if (room.phase !== "reveal" || room.round_number !== input.round) return { ok: true };
   const settings = readPartySettings(room.settings);
   const state = readPublicState(room.public_state);
@@ -549,8 +546,7 @@ export async function nextPartyRound(input: { roomId: string; playerId: string; 
 }
 
 export async function skipRoletaChallenge(input: { roomId: string; playerId: string; sessionId: string; round: number }) {
-  await requireHost(input.roomId, input.playerId, input.sessionId);
-  const room = await loadRoom(input.roomId);
+  const [, room] = await Promise.all([requireHost(input.roomId, input.playerId, input.sessionId), loadRoom(input.roomId)]);
   const state = readPublicState(room.public_state);
   if (gameOf(room) !== "roleta" || room.phase !== "respond" || room.round_number !== input.round) return { ok: true };
   if ((state.skipsLeft ?? 0) <= 0) throw new Error("Não há mais pulos disponíveis nesta partida.");
@@ -592,8 +588,7 @@ function targetPayload(payload: unknown, voterId: string, allowed: readonly stri
 }
 
 export async function submitPartyAction(input: { roomId: string; playerId: string; sessionId: string; round: number; phase: string; payload: unknown }) {
-  const player = await requireSession(input.roomId, input.playerId, input.sessionId);
-  const room = await loadRoom(input.roomId);
+  const [player, room] = await Promise.all([requireSession(input.roomId, input.playerId, input.sessionId), loadRoom(input.roomId)]);
   if (room.status !== "playing" || room.round_number !== input.round || room.phase !== input.phase) {
     throw new Error("Essa etapa já foi encerrada.");
   }
@@ -675,8 +670,7 @@ async function syncSubmitted(roomId: string) {
 }
 
 export async function advancePartyPhase(input: { roomId: string; playerId: string; sessionId: string; round: number; phase: string }) {
-  const player = await requireSession(input.roomId, input.playerId, input.sessionId);
-  const room = await loadRoom(input.roomId);
+  const [player, room] = await Promise.all([requireSession(input.roomId, input.playerId, input.sessionId), loadRoom(input.roomId)]);
   if (room.status !== "playing" || room.round_number !== input.round || room.phase !== input.phase) return { ok: true };
   const expired = room.phase_ends_at !== null && Date.now() >= new Date(room.phase_ends_at).getTime() - 500;
   if (!expired && !player.is_host) throw new Error("Ainda há tempo nesta etapa.");
@@ -718,13 +712,16 @@ async function advanceOnce(room: RoomRow): Promise<boolean> {
   const phase = room.phase as PartyPhaseId;
   const state = readPublicState(room.public_state);
   const settings = readPartySettings(room.settings);
-  const admin = await loadPartyAdmin();
+  // Independent reads in one round-trip (four requests, under the per-batch budget).
+  const [admin, players, roundPrivate, subs] = await Promise.all([
+    loadPartyAdmin(),
+    loadPlayers(room.id),
+    readPrivate<RoundPrivate>(room.id, room.round_number),
+    submissionsFor(room, phase),
+  ]);
   const tone = admin[game]?.tone;
-  const players = await loadPlayers(room.id);
   const present = new Set(players.map((p) => p.id));
   const presentIds = players.map((p) => p.id);
-  const roundPrivate = await readPrivate<RoundPrivate>(room.id, room.round_number);
-  const subs = await submissionsFor(room, phase);
   const nickname = (id: string | undefined) => players.find((p) => p.id === id)?.nickname ?? "Alguém";
 
   const toPhase = async (next: PartyPhaseId, extra: PartyPublicState) =>
@@ -1085,8 +1082,7 @@ async function judgeStop(room: RoomRow) {
 /* ------------------------------- Private view ------------------------------ */
 
 export async function getPartyPrivateView(input: { roomId: string; playerId: string; sessionId: string }): Promise<PartyPrivateViewData> {
-  const player = await requireSession(input.roomId, input.playerId, input.sessionId);
-  const room = await loadRoom(input.roomId);
+  const [player, room] = await Promise.all([requireSession(input.roomId, input.playerId, input.sessionId), loadRoom(input.roomId)]);
   const empty: PartyPrivateViewData = { role: null, word: null, myEntryId: null, mine: null };
   if (room.status !== "playing" || room.round_number < 1) return empty;
   const [roundPrivate, { data: mine }] = await Promise.all([

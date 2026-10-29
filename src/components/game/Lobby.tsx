@@ -337,7 +337,7 @@ export function Lobby({
             </div>
           </section>
 
-          <div className="mobile-bottom-bar fixed inset-x-0 bottom-0 mx-auto w-full max-w-md border-t border-border bg-background/95 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] backdrop-blur"><Button
+          <div className="mobile-bottom-bar fixed inset-x-0 bottom-0 mx-auto w-full max-w-md border-t border-border bg-background/95 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]"><Button
             onClick={onStart}
             disabled={starting || updatingSettings || players.length === 0}
             aria-busy={starting || updatingSettings}

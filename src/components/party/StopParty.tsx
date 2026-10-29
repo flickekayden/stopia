@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Check, ChevronLeft, ChevronRight, Loader2, Pencil, Plus, RefreshCw, ShieldAlert, X } from "lucide-react";
 import { toast } from "sonner";
 
@@ -16,7 +16,6 @@ import {
   STOP_CATEGORY_MAX_LENGTH,
   STOP_INTENSITIES,
   STOP_INTENSITY_LABELS,
-  STOP_RULES,
   STOP_SCORINGS,
   STOP_SCORING_LABELS,
   STOP_SECONDS_OPTIONS,
@@ -33,6 +32,53 @@ function useNow(intervalMs: number) {
   }, [intervalMs]);
   return now;
 }
+
+type StopFieldProps = {
+  category: string;
+  index: number;
+  last: boolean;
+  value: string;
+  disabled: boolean;
+  placeholder: string;
+  onValue: (category: string, value: string) => void;
+  onEnter: (index: number, input: HTMLInputElement) => void;
+  register: (index: number, input: HTMLInputElement | null) => void;
+};
+
+/** One answer row; memoized so the 4×/s countdown only repaints rows whose value or lock changed. */
+const StopField = memo(function StopField({ category, index, last, value, disabled, placeholder, onValue, onEnter, register }: StopFieldProps) {
+  const filled = value.trim().length > 0;
+  return (
+    <div className="game-field" data-filled={filled ? "true" : "false"}>
+      <label htmlFor={`stop-party-${index}`} className="flex items-center gap-2.5 text-sm font-bold"><span className="field-index" aria-hidden="true">{filled ? <Check className="size-3.5" /> : String(index + 1).padStart(2, "0")}</span><span className="text-balance-safe">{category}</span></label>
+      <Input
+        id={`stop-party-${index}`}
+        ref={(input) => register(index, input)}
+        value={value}
+        disabled={disabled}
+        maxLength={STOP_ANSWER_MAX}
+        onChange={(e) => onValue(category, e.target.value)}
+        placeholder={placeholder}
+        autoComplete="off"
+        autoCorrect="off"
+        autoCapitalize="sentences"
+        spellCheck={false}
+        inputMode="text"
+        enterKeyHint={last ? "done" : "next"}
+        onKeyDown={(event) => {
+          if (event.key !== "Enter" || event.nativeEvent.isComposing) return;
+          event.preventDefault();
+          onEnter(index, event.currentTarget);
+        }}
+        name={`stop-party-answer-${index}`}
+        data-form-type="other"
+        data-lpignore="true"
+        data-1p-ignore="true"
+        className="mt-2.5 h-12 rounded-lg text-base font-semibold"
+      />
+    </div>
+  );
+});
 
 function nick(players: PartyCtx["players"], id: string | undefined) {
   return players.find((p) => p.id === id)?.nickname ?? "Alguém que saiu";
@@ -57,13 +103,8 @@ export function StopRulesSummary({ settings, className }: { settings: PartySetti
   );
 }
 
-export function StopRules() {
-  return (
-    <ul className="space-y-1.5 text-sm text-muted-foreground">
-      {STOP_RULES.map((rule) => <li key={rule} className="flex gap-2"><span className="party-accent" aria-hidden="true">•</span><span>{rule}</span></li>)}
-    </ul>
-  );
-}
+/* StopRules lives in RulesList so the home page never loads the Stop round code. */
+export { StopRules } from "@/components/party/RulesList";
 
 function OptionButton({ active, disabled, onClick, title, detail, label }: { active: boolean; disabled: boolean; onClick: () => void; title: string; detail?: string; label?: string }) {
   return (
@@ -312,6 +353,17 @@ function StopBoard({ ctx, actions }: { ctx: PartyCtx; actions: PartyActions }) {
     inputs.current[0]?.focus({ preventScroll: true });
   }, [starting, locked, round]);
 
+  // Stable handlers keep the memoized answer fields from repainting on every clock tick.
+  const setValueRef = useRef(setValue);
+  setValueRef.current = setValue;
+  const onValue = useCallback((category: string, value: string) => setValueRef.current(category, value), []);
+  const register = useCallback((index: number, input: HTMLInputElement | null) => { inputs.current[index] = input; }, []);
+  const onEnter = useCallback((index: number, input: HTMLInputElement) => {
+    const next = inputs.current[index + 1];
+    if (next) { next.focus({ preventScroll: true }); next.scrollIntoView({ behavior: "smooth", block: "center" }); }
+    else { input.blur(); window.setTimeout(() => actionsBar.current?.scrollIntoView({ behavior: "smooth", block: "end" }), 120); }
+  }, []);
+
   async function finish() {
     if (sending || locked) return;
     vibrate(15);
@@ -339,7 +391,7 @@ function StopBoard({ ctx, actions }: { ctx: PartyCtx; actions: PartyActions }) {
 
   return (
     <div className="dock-clearance space-y-4" data-game="stop">
-      <div className="round-hud sticky top-0 z-20 -mx-4 flex items-center gap-3 border-b border-border/70 pb-3 pl-4 pr-[calc(var(--top-actions-space)+0.5rem)] pt-[calc(0.75rem+env(safe-area-inset-top))] backdrop-blur-md">
+      <div className="round-hud sticky top-0 z-20 -mx-4 flex items-center gap-3 border-b border-border/70 pb-3 pl-4 pr-[calc(var(--top-actions-space)+0.5rem)] pt-[calc(0.75rem+env(safe-area-inset-top))]">
         <div className="letter-tile flex size-14 shrink-0 items-center justify-center rounded-xl" aria-label={`Letra ${starting ? "a ser revelada" : stop.letter}`}>
           <span className="font-display text-4xl leading-none">{starting ? "?" : stop.letter}</span>
         </div>
@@ -393,36 +445,18 @@ function StopBoard({ ctx, actions }: { ctx: PartyCtx; actions: PartyActions }) {
       {eligible && (
         <div className="space-y-2.5">
           {categories.map((category, index) => (
-            <div key={category} className="game-field" data-filled={(values[category] ?? "").trim() ? "true" : "false"}>
-              <label htmlFor={`stop-party-${index}`} className="flex items-center gap-2.5 text-sm font-bold"><span className="field-index" aria-hidden="true">{(values[category] ?? "").trim() ? <Check className="size-3.5" /> : String(index + 1).padStart(2, "0")}</span><span className="text-balance-safe">{category}</span></label>
-              <Input
-                id={`stop-party-${index}`}
-                ref={(input) => { inputs.current[index] = input; }}
-                value={values[category] ?? ""}
-                disabled={locked}
-                maxLength={STOP_ANSWER_MAX}
-                onChange={(e) => setValue(category, e.target.value)}
-                placeholder={starting ? "Prepare-se…" : `Com ${stop.letter}...`}
-                autoComplete="off"
-                autoCorrect="off"
-                autoCapitalize="sentences"
-                spellCheck={false}
-                inputMode="text"
-                enterKeyHint={index < categories.length - 1 ? "next" : "done"}
-                onKeyDown={(event) => {
-                  if (event.key !== "Enter" || event.nativeEvent.isComposing) return;
-                  event.preventDefault();
-                  const next = inputs.current[index + 1];
-                  if (next) { next.focus({ preventScroll: true }); next.scrollIntoView({ behavior: "smooth", block: "center" }); }
-                  else { event.currentTarget.blur(); window.setTimeout(() => actionsBar.current?.scrollIntoView({ behavior: "smooth", block: "end" }), 120); }
-                }}
-                name={`stop-party-answer-${index}`}
-                data-form-type="other"
-                data-lpignore="true"
-                data-1p-ignore="true"
-                className="mt-2.5 h-12 rounded-lg text-base font-semibold"
-              />
-            </div>
+            <StopField
+              key={category}
+              category={category}
+              index={index}
+              last={index === categories.length - 1}
+              value={values[category] ?? ""}
+              disabled={locked}
+              placeholder={starting ? "Prepare-se…" : `Com ${stop.letter}...`}
+              onValue={onValue}
+              onEnter={onEnter}
+              register={register}
+            />
           ))}
         </div>
       )}
@@ -538,7 +572,7 @@ function StopReveal({ ctx, actions }: { ctx: PartyCtx; actions: PartyActions }) 
 
       <StopScoreboard ctx={ctx} />
 
-      <div className="mobile-bottom-bar fixed inset-x-0 bottom-0 mx-auto w-full max-w-md border-t border-border bg-background/95 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] backdrop-blur">
+      <div className="mobile-bottom-bar fixed inset-x-0 bottom-0 mx-auto w-full max-w-md border-t border-border bg-background/95 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
         {ctx.isHost ? (
           <Button className="party-accent-button h-14 w-full text-lg font-bold shadow-none" disabled={ctx.busy !== null} aria-busy={ctx.busy === "next"} onClick={() => void actions.next()}>
             {ctx.busy === "next" ? <><Loader2 className="animate-spin" /> Preparando…</> : last ? "Ver resultado final" : "Próxima rodada"}

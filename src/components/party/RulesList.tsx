@@ -1,4 +1,4 @@
-import { PARTY_GAMES, type PartyGameId } from "@/lib/party-games";
+import { PARTY_GAMES, STOP_RULES, type PartyGameId } from "@/lib/party-games";
 
 export function RulesList({ game }: { game: PartyGameId }) {
   const meta = PARTY_GAMES[game];
@@ -14,5 +14,14 @@ export function RulesList({ game }: { game: PartyGameId }) {
       </div>
       <p className="text-xs text-muted-foreground">Mínimo de {meta.minPlayers} jogadores · tudo é escrito no app.</p>
     </div>
+  );
+}
+
+/** Stop's rules; kept here (not in StopParty) so the home page never loads the Stop round code. */
+export function StopRules() {
+  return (
+    <ul className="space-y-1.5 text-sm text-muted-foreground">
+      {STOP_RULES.map((rule) => <li key={rule} className="flex gap-2"><span className="party-accent" aria-hidden="true">•</span><span>{rule}</span></li>)}
+    </ul>
   );
 }
