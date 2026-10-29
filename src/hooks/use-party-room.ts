@@ -56,7 +56,8 @@ export function usePartyRoom(code: string, identity: { playerId: string; session
         return;
       }
       const { party_players: playerRows, ...roomRow } = data;
-      setRoom(roomRow);
+      // A realtime event may have landed while this read was in flight: keep the newer version.
+      setRoom((current) => (current && current.id === roomRow.id && current.version > roomRow.version ? current : roomRow));
       setPlayers(playerRows ?? []);
       setMissing(false);
       setError(null);
