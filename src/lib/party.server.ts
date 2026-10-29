@@ -17,8 +17,10 @@ import {
   pickUnused,
   scoreAutor,
   scoreDebate,
+  scoreDebateJudge,
   scoreInfiltrado,
   scoreRoleta,
+  scoreRoletaJudge,
   scoreTribunal,
   shuffle,
   tribunalDefendant,
@@ -36,7 +38,10 @@ import {
   PARTY_GAME_IDS,
   PARTY_TEXT_MAX,
   PHASE_SECONDS,
+  effectiveJudge,
+  hostPhaseSeconds,
   isPartyGame,
+  judgeModeFor,
   missingPlayers,
   phaseSecondsFor,
   readPartyAdmin,
@@ -95,6 +100,8 @@ const TEXT_PHASES: PartyPhaseId[] = ["defense", "write", "clues", "argue", "resp
 /** Stop: STOP! locks everyone's answers after this delay; the judge gets this long before anyone may retry. */
 const STOP_LOCK_MS = 3_000;
 const STOP_EVAL_MS = 90_000;
+/** Debate/Roleta AI judge: the claim expires after this long so a dead request can be retried. */
+const JUDGE_EVAL_MS = 30_000;
 
 const db = () => supabaseAdmin;
 
@@ -110,8 +117,9 @@ function gameOf(room: RoomRow): PartyGameId {
   return (PARTY_GAME_IDS as readonly string[]).includes(room.game) ? (room.game as PartyGameId) : "tribunal";
 }
 
-function deadline(game: PartyGameId, phase: PartyPhaseId, admin: PartyAdminConfig) {
-  const seconds = phaseSecondsFor(game, phase, admin);
+/** Host-chosen times (Debate argument, Roleta answer) win over developer timings. */
+function deadline(game: PartyGameId, phase: PartyPhaseId, admin: PartyAdminConfig, settings: PartySettings) {
+  const seconds = hostPhaseSeconds(game, phase, settings) ?? phaseSecondsFor(game, phase, admin);
   return seconds ? new Date(Date.now() + seconds * 1000).toISOString() : null;
 }
 
@@ -443,18 +451,20 @@ async function buildPrompt(room: RoomRow, players: PlayerRow[], round: number, s
     data.infiltradoId = shuffle(players.map((p) => p.id))[0] ?? players[0]!.id;
     data.prompt = { title: `Categoria: ${item.category}`, text: "Escreva uma pista curta sobre a palavra secreta, sem entregá-la.", category: item.category, source: "banco" };
   } else if (game === "debate") {
+    const judge = effectiveJudge(settings.debateJudge, players.length) === "ia" ? "o juiz" : "a galera";
+    const debateHelp = `Apresente seus melhores argumentos (lógicos, dramáticos ou absurdos) para convencer ${judge}!`;
     let prompt: PartyPrompt | null = null;
     if (ai) {
       try {
         const made = await (await import("./party-ai.server")).aiDebateTopic(history, tone);
-        prompt = { title: made.title, text: "Defenda o lado sorteado para você, concordando ou não.", sideA: made.sideA, sideB: made.sideB, source: "ai" };
+        prompt = { title: made.title, text: debateHelp, sideA: made.sideA, sideB: made.sideB, source: "ai" };
       } catch { prompt = null; }
     }
     if (!prompt) {
       const index = pickUnused(DEBATE_TOPICS.length, used.debate ?? []);
       remember("debate", index);
       const item = DEBATE_TOPICS[index]!;
-      prompt = { title: item.title, text: "Defenda o lado sorteado para você, concordando ou não.", sideA: item.sideA, sideB: item.sideB, source: "banco" };
+      prompt = { title: item.title, text: debateHelp, sideA: item.sideA, sideB: item.sideB, source: "banco" };
     }
     data.prompt = prompt;
     data.sides = assignSides(players.map((p) => p.id));
@@ -514,7 +524,7 @@ async function startRound(room: RoomRow, players: PlayerRow[], round: number, sc
     round_number: round,
     phase,
     phase_started_at: new Date().toISOString(),
-    phase_ends_at: deadline(game, phase, admin),
+    phase_ends_at: deadline(game, phase, admin, settings),
     public_state: asJson(state),
   });
   return updated;
@@ -554,7 +564,7 @@ export async function skipRoletaChallenge(input: { roomId: string; playerId: str
   const roundPrivate = await readPrivate<RoundPrivate>(room.id, room.round_number);
   const updated = await guardedUpdate(room, {
     phase_started_at: new Date().toISOString(),
-    phase_ends_at: deadline("roleta", "respond", admin),
+    phase_ends_at: deadline("roleta", "respond", admin, settings),
     public_state: asJson({ ...state, prompt, submitted: [], skipsLeft: (state.skipsLeft ?? 1) - 1 }),
   });
   if (!updated) throw new Error("A rodada mudou ao mesmo tempo. Tente de novo.");
@@ -721,7 +731,7 @@ async function advanceOnce(room: RoomRow): Promise<boolean> {
     Boolean(await guardedUpdate(room, {
       phase: next,
       phase_started_at: new Date().toISOString(),
-      phase_ends_at: deadline(game, next, admin),
+      phase_ends_at: deadline(game, next, admin, settings),
       public_state: asJson({ ...state, ...extra, submitted: [] }),
     }));
 
