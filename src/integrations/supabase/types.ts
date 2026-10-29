@@ -137,6 +137,48 @@ export type Database = {
           },
         ]
       }
+      party_chat: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          nickname: string
+          player_id: string | null
+          room_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          nickname: string
+          player_id?: string | null
+          room_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          nickname?: string
+          player_id?: string | null
+          room_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "party_chat_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "party_players"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "party_chat_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "party_rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       party_players: {
         Row: {
           created_at: string
