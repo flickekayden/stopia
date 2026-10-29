@@ -254,6 +254,40 @@ export async function aiMatchSummaryDebate(input: {
   return { highlights, summary };
 }
 
+/**
+ * Tribunal podium: comic awards for the whole match. Players arrive as labels with their nickname; the AI
+ * only comments on the final ranking and never changes scores.
+ */
+export async function aiMatchSummaryTribunal(input: {
+  casos: { caso: string; reu: string; defesa: string; acusacoes: { rotulo: string; texto: string }[] }[];
+  jogadores: { rotulo: string; apelido: string; pontos: number }[];
+}, tone?: PartyTone) {
+  const labels = input.jogadores.map((j) => j.rotulo);
+  const award = { type: "object", additionalProperties: false, required: ["rotulo", "texto"], properties: { rotulo: { type: "string", enum: labels }, texto: { type: "string" } } };
+  const result = await withTimeout(
+    generateJsonGemini<{ inocente_de_taubate: { rotulo: string; texto: string }; promotor_implacavel: { rotulo: string; texto: string }; veredito_da_historia: string }>({
+      instructions: `Você é o Juiz Supremo do "Tribunal dos Amigos" e vai encerrar a partida com troféus cômicos, lendo todos os casos fictícios. "inocente_de_taubate": quem deu o álibi mais criativo ou cara de pau quando foi réu. "promotor_implacavel": quem fez a acusação mais afiada (de preferência outra pessoa; em dupla pode ser qualquer um). Em cada troféu, "texto" com até 20 palavras citando o apelido e algo que a pessoa escreveu. "veredito_da_historia": um resumo cômico da "ficha criminal" do grupo na partida, até 50 palavras, citando apelidos. Os jogadores aparecem como rótulos (J1, J2…) nos casos; use os apelidos da lista de jogadores no texto. Não altere pontos nem o ranking. ${SAFETY}${toneLine(tone)}`,
+      input: JSON.stringify(input),
+      schemaName: "tribunal_match_summary",
+      schema: {
+        type: "object",
+        additionalProperties: false,
+        required: ["inocente_de_taubate", "promotor_implacavel", "veredito_da_historia"],
+        properties: { inocente_de_taubate: award, promotor_implacavel: award, veredito_da_historia: { type: "string" } },
+      },
+    }),
+    JUDGE_TIMEOUT_MS,
+  );
+  const highlights: { label: string; title: string; text: string }[] = [];
+  const alibi = result.inocente_de_taubate;
+  const prosecutor = result.promotor_implacavel;
+  if (alibi && labels.includes(alibi.rotulo) && clean(alibi.texto, 200)) highlights.push({ label: alibi.rotulo, title: "O Inocente de Taubaté", text: clean(alibi.texto, 200) });
+  if (prosecutor && labels.includes(prosecutor.rotulo) && clean(prosecutor.texto, 200)) highlights.push({ label: prosecutor.rotulo, title: "Promotor Implacável", text: clean(prosecutor.texto, 200) });
+  const summary = clean(result.veredito_da_historia, 420);
+  if (highlights.length === 0 && !summary) throw new Error("vazio");
+  return { highlights, summary };
+}
+
 export async function aiDebateComment(input: { tema: string; lado_a: string; lado_b: string; argumentos: { lado: string; autor: string; texto: string; votos: number }[] }, tone?: PartyTone) {
   const result = await generateJsonGemini<{ comentario: string }>({
     instructions: `Você é o mediador irônico do "Debate Impossível". Comente o debate destacando o argumento mais cara de pau. A votação já definiu o resultado; não mude pontos. ${SAFETY} Máximo de 45 palavras.${toneLine(tone)}`,

@@ -118,3 +118,11 @@
 - [x] Tribunal: 2+ jogadores, Réu x Promotor com Juiz de IA obrigatório em dupla; mestre escolhe tempo e juiz
 - [x] Regras de todos os jogos revisadas ("Dupla ou grupo")
 - [x] Testes e partidas reais em dupla (Tribunal e Debate de 3 rodadas)
+
+## Chat global, Tribunal/Roleta longos, Stop imersivo e extras (prompt-13)
+- [x] Chat da galera fixo no topo em todas as telas da sala, com reações rápidas
+- [x] Tribunal: 500 caracteres e troféus da IA no pódio
+- [x] Roleta: 3 e 5 min, 500 caracteres
+- [x] Stop: letra gigante com contagem 3-2-1 e alarme de STOP para todos
+- [x] Extras: dado de apelidos, Rei da Noite, tempo e bônus do blefe no Quem Escreveu, tema do Infiltrado, reações da plateia nos resultados
+- [x] Testes e partidas reais (Stop com STOP, Tribunal em dupla de 3 rodadas)

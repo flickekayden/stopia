@@ -1,10 +1,11 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Copy, Loader2, LogOut } from "lucide-react";
+import { ArrowLeft, Copy, Dices, Loader2, LogOut } from "lucide-react";
 import { toast } from "sonner";
 
 import { PartyFinal, PartyLobby, PartyPlay, type LobbyCtx, type PartyActions, type PartyCtx } from "@/components/party/PartyStage";
+import { PartyChat } from "@/components/party/PartyChat";
 import { StopPartyPlay } from "@/components/party/StopParty";
 import { useSound } from "@/components/SoundProvider";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -12,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { usePartyRoom } from "@/hooks/use-party-room";
 import { vibrate } from "@/lib/haptics";
+import { randomNickname } from "@/lib/nicknames";
 import { setDevGameContext } from "@/lib/dev-settings";
 import {
   advancePartyPhase,
@@ -207,7 +209,12 @@ function PartyRoomPage() {
         <p className="text-muted-foreground">Entre e jogue com a galera: o mestre escolhe o jogo e todo mundo começa junto.</p>
         <form onSubmit={handleJoin} className="space-y-3">
           <label htmlFor="party-apelido" className="section-label block">Seu apelido</label>
-          <Input id="party-apelido" value={nickname} maxLength={20} autoComplete="nickname" placeholder="Ex.: Juninho" onChange={(e) => setNickname(e.target.value)} className="h-14 text-lg" />
+          <div className="flex gap-2">
+            <Input id="party-apelido" value={nickname} maxLength={20} autoComplete="nickname" placeholder="Ex.: Juninho" onChange={(e) => setNickname(e.target.value)} className="h-14 text-lg" />
+            <Button type="button" variant="secondary" size="icon" className="size-14 shrink-0" aria-label="Sortear apelido engraçado" title="Sortear apelido" onClick={() => { setNickname((current) => randomNickname(Math.random, current)); vibrate(10); }}>
+              <Dices className="size-6" />
+            </Button>
+          </div>
           <Button type="submit" className="party-accent-button h-14 w-full text-lg font-bold shadow-none" disabled={busy !== null} aria-busy={busy === "join"}>
             {busy === "join" ? <Loader2 className="animate-spin" /> : null} Entrar na sala
           </Button>
@@ -254,6 +261,8 @@ function PartyRoomPage() {
       ) : (
         <PartyPlay ctx={ctx} actions={actions} />
       )}
+
+      <PartyChat roomId={room.id} playerId={identity.playerId} sessionId={identity.sessionId} players={players} quickOnly={game === "stop" && room.status === "playing" && room.phase === "write"} />
 
       <AlertDialog open={leaveOpen} onOpenChange={setLeaveOpen}>
         <AlertDialogContent className="w-[calc(100%_-_2rem)] rounded-2xl border-border bg-card">

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
 import { Award, Check, Clock, Copy, Crown, EyeOff, Eye, Gavel, LayoutGrid, Loader2, LogOut, RefreshCw, Share2, SkipForward, Sparkles, Swords, Trophy, Users } from "lucide-react";
 import { toast } from "sonner";
 
+import { CrowdReactions } from "@/components/party/CrowdReactions";
 import { PartyIcon } from "@/components/party/PartyIcon";
 import { RulesList } from "@/components/party/RulesList";
 import { StopLobbySettings, StopRules } from "@/components/party/StopParty";
@@ -11,7 +12,9 @@ import { Textarea } from "@/components/ui/textarea";
 import type { PartyPlayer, PartyPrivateView, PartyRoom } from "@/hooks/use-party-room";
 import { rankPlayers } from "@/lib/ranking";
 import {
+  AUTOR_SECONDS_OPTIONS,
   DEBATE_SECONDS_OPTIONS,
+  INFILTRADO_THEMES,
   effectiveJudgeFor,
   isPartyGame,
   LOBBY_GAMES,
@@ -92,7 +95,16 @@ export type LobbyCtx = {
   busy: string | null;
 };
 
+/** "Rei da Noite": points from every finished match in this room (party_players.score). */
+function nightLeaderId(players: PartyPlayer[]) {
+  const top = Math.max(0, ...players.map((p) => p.score));
+  const leaders = players.filter((p) => p.score === top && top > 0);
+  return leaders.length === 1 ? leaders[0]!.id : null;
+}
+
 function PlayersPanel({ players, me }: { players: PartyPlayer[]; me: PartyPlayer }) {
+  const king = nightLeaderId(players);
+  const anyNight = players.some((p) => p.score > 0);
   return (
     <section className="party-panel" aria-labelledby="lobby-players">
       <div className="mb-3 flex items-center justify-between gap-3">
@@ -105,8 +117,12 @@ function PlayersPanel({ players, me }: { players: PartyPlayer[]; me: PartyPlayer
             <span className="party-icon size-10 font-display text-lg" aria-hidden="true">{p.nickname.charAt(0).toUpperCase()}</span>
             <span className="min-w-0 flex-1">
               <span className="block font-semibold text-balance-safe">{p.nickname}{p.id === me.id && <span className="text-muted-foreground"> (você)</span>}</span>
-              {p.is_host && <span className="inline-flex items-center gap-1 text-xs font-bold party-accent"><Crown className="size-3.5" aria-hidden="true" /> Mestre da sala</span>}
+              <span className="flex flex-wrap gap-x-2">
+                {p.is_host && <span className="inline-flex items-center gap-1 text-xs font-bold party-accent"><Crown className="size-3.5" aria-hidden="true" /> Mestre da sala</span>}
+                {p.id === king && <span className="inline-flex items-center gap-1 text-xs font-bold text-primary">👑 Rei da Noite</span>}
+              </span>
             </span>
+            {anyNight && <span className="shrink-0 text-right font-display text-lg tabular-nums" aria-label={`${p.score} pontos na noite`}>{p.score}<span className="block font-sans text-[0.625rem] font-semibold text-muted-foreground">na noite</span></span>}
           </li>
         ))}
       </ul>
@@ -194,9 +210,9 @@ function JudgeSettings({ ctx, actions, game }: { ctx: LobbyCtx; actions: PartyAc
     <>
       <div>
         <p className="mb-2 text-sm font-semibold text-muted-foreground">{SECONDS_TITLE[game]}</p>
-        <div className={cn("grid gap-2", secondOptions.length > 3 ? "grid-cols-4" : "grid-cols-3")}>
+        <div className={cn("grid gap-2", secondOptions.length > 4 ? "grid-cols-5" : secondOptions.length > 3 ? "grid-cols-4" : "grid-cols-3")}>
           {secondOptions.map((n) => (
-            <Button key={n} variant={option(seconds === n)} aria-label={`${n} segundos`} aria-pressed={seconds === n} disabled={ctx.busy !== null} className="px-2" onClick={() => void setSeconds(n)}>{secondsLabel(n)}</Button>
+            <Button key={n} variant={option(seconds === n)} aria-label={`${n} segundos`} aria-pressed={seconds === n} disabled={ctx.busy !== null} className={secondOptions.length > 4 ? "px-1 text-sm" : "px-2"} onClick={() => void setSeconds(n)}>{secondsLabel(n)}</Button>
           ))}
         </div>
       </div>
@@ -231,6 +247,8 @@ function PartySettingsPanel({ ctx, actions, game }: { ctx: LobbyCtx; actions: Pa
       <p className="party-panel text-center text-sm text-muted-foreground" aria-live="polite">
         {settings.rounds} rodadas · IA {settings.ai && game !== "infiltrado" ? "ligada" : "desligada"}
         {judgeSummary(game, settings, ctx.players.length)}
+        {game === "autor" ? ` · ${secondsLabel(settings.autorSeconds)} para escrever` : ""}
+        {game === "infiltrado" ? ` · tema: ${settings.infiltradoTheme === "todas" ? "tudo misturado" : settings.infiltradoTheme}` : ""}
         {game === "roleta" ? ` · intensidade ${settings.intensity === "media" ? "média" : settings.intensity === "caotica" ? "caótica" : "leve"} · ${settings.skips} pulo(s)` : ""}
       </p>
     );
@@ -254,6 +272,26 @@ function PartySettingsPanel({ ctx, actions, game }: { ctx: LobbyCtx; actions: Pa
         <Switch aria-label="IA no jogo" checked={settings.ai} disabled={ctx.busy !== null || game === "infiltrado"} onCheckedChange={(ai) => void actions.updateSettings({ ai })} />
       </div>
       {(game === "tribunal" || game === "debate" || game === "roleta") && <JudgeSettings ctx={ctx} actions={actions} game={game} />}
+      {game === "autor" && (
+        <div>
+          <p className="mb-2 text-sm font-semibold text-muted-foreground">Tempo para escrever</p>
+          <div className="grid grid-cols-4 gap-2">
+            {AUTOR_SECONDS_OPTIONS.map((n) => (
+              <Button key={n} variant={option(settings.autorSeconds === n)} aria-label={`${n} segundos`} aria-pressed={settings.autorSeconds === n} disabled={ctx.busy !== null} className="px-2" onClick={() => void actions.updateSettings({ autorSeconds: n })}>{secondsLabel(n)}</Button>
+            ))}
+          </div>
+        </div>
+      )}
+      {game === "infiltrado" && (
+        <div>
+          <p className="mb-2 text-sm font-semibold text-muted-foreground">Tema das palavras</p>
+          <div className="flex flex-wrap gap-2">
+            {INFILTRADO_THEMES.map((theme) => (
+              <Button key={theme} size="sm" variant={option(settings.infiltradoTheme === theme)} aria-pressed={settings.infiltradoTheme === theme} disabled={ctx.busy !== null} onClick={() => void actions.updateSettings({ infiltradoTheme: theme })}>{theme === "todas" ? "Tudo misturado" : theme}</Button>
+            ))}
+          </div>
+        </div>
+      )}
       {game === "roleta" && (
         <>
           <div>
@@ -961,6 +999,7 @@ function RevealBody({ ctx }: { ctx: PartyCtx }) {
               <p className="text-balance-safe text-lg font-bold">“{entry.text}”</p>
               <p className="text-sm">Escrita por <strong className="party-accent">{nick(ctx.players, entry.authorId)}</strong></p>
               <p className="text-xs text-muted-foreground">{entry.correct.length > 0 ? `Acertaram: ${entry.correct.map((id) => nick(ctx.players, id)).join(", ")}` : "Ninguém acertou"} · enganou {entry.fooled}</p>
+              {entry.bluff && <p className="text-xs font-bold party-accent">🎭 Blefe perfeito: +2 de bônus</p>}
             </li>
           ))}
         </ul>
@@ -1053,6 +1092,7 @@ function PartyReveal({ ctx, actions }: { ctx: PartyCtx; actions: PartyActions })
       </div>
       <PromptCard ctx={ctx} />
       <RevealBody ctx={ctx} />
+      <CrowdReactions roomId={ctx.room.id} />
       <Deltas ctx={ctx} />
       <div className="mobile-bottom-bar fixed inset-x-0 bottom-0 mx-auto w-full max-w-md border-t border-border bg-background/95 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
         {ctx.isHost ? (
@@ -1073,9 +1113,10 @@ function PartyReveal({ ctx, actions }: { ctx: PartyCtx; actions: PartyActions })
 function FinalCommentaryCard({ ctx }: { ctx: PartyCtx }) {
   const commentary = ctx.state.finalCommentary;
   if (!commentary) return null;
+  const tribunal = ctx.game === "tribunal";
   return (
     <section className="party-prompt space-y-3" aria-live="polite" aria-label="Sentença final da IA">
-      <p className="section-label inline-flex items-center gap-1.5 party-accent"><Sparkles className="size-3.5" aria-hidden="true" /> {commentary.title ?? "Sentença Final da Corte"}</p>
+      <p className="section-label inline-flex items-center gap-1.5 party-accent"><Sparkles className="size-3.5" aria-hidden="true" /> {commentary.title ?? (tribunal ? "Veredito da História" : "Sentença Final da Corte")}</p>
       {commentary.status === "pending" && <p className="inline-flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="size-4 animate-spin" aria-hidden="true" /> A IA está escolhendo os troféus da partida…</p>}
       {commentary.status === "failed" && <p className="text-sm text-muted-foreground">A IA não conseguiu entregar os troféus desta vez. O placar vale normalmente.</p>}
       {commentary.status === "ready" && (
@@ -1093,12 +1134,32 @@ function FinalCommentaryCard({ ctx }: { ctx: PartyCtx }) {
           )}
           {commentary.summary && (
             <div>
-              <p className="section-label mb-1">Palavra final da corte</p>
+              <p className="section-label mb-1">{tribunal ? "Ficha criminal da galera" : "Palavra final da corte"}</p>
               <p className="text-balance-safe text-base font-semibold italic">“{commentary.summary}”</p>
             </div>
           )}
         </>
       )}
+    </section>
+  );
+}
+
+/** Room-wide tally across every game played tonight; the leader is the "Rei da Noite". */
+export function NightBoard({ players, me }: { players: PartyPlayer[]; me: PartyPlayer }) {
+  if (!players.some((p) => p.score > 0)) return null;
+  const king = nightLeaderId(players);
+  const rows = [...players].sort((a, b) => b.score - a.score);
+  return (
+    <section className="party-panel space-y-2" aria-label="Placar da noite">
+      <p className="section-label">👑 Rei da Noite · todos os jogos da sala</p>
+      <ul className="space-y-1">
+        {rows.map((p) => (
+          <li key={p.id} className="flex items-center justify-between gap-3 text-sm">
+            <span className="min-w-0 truncate font-semibold">{p.id === king ? "👑 " : ""}{p.nickname}{p.id === me.id && <span className="text-muted-foreground"> (você)</span>}</span>
+            <span className="font-display text-lg tabular-nums">{p.score}</span>
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }
@@ -1128,6 +1189,7 @@ export function PartyFinal({ ctx, actions, onHub }: { ctx: PartyCtx; actions: Pa
         </div>
       )}
       <FinalCommentaryCard ctx={ctx} />
+      <NightBoard players={ctx.players} me={ctx.me} />
       <ol className="space-y-2" aria-label="Classificação final">
         {ranked.map((row, index) => (
           <li key={row.player.id} className="ranking-row flex items-center gap-3 p-3" data-first={row.place === 1} style={{ "--enter-index": index } as CSSProperties}>

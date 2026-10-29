@@ -158,6 +158,21 @@ html, body { overflow-x: clip; }
 /* Space kept free in headers for the fixed sound (and developer) buttons in the top-right corner. */
 :root { --top-actions-space: 4rem; }
 :root[data-dev-tools] { --top-actions-space: 7.25rem; }
+:root[data-room-chat] { --top-actions-space: 7.25rem; }
+:root[data-room-chat][data-dev-tools] { --top-actions-space: 10.5rem; }
+/* Fixed top-right controls, right to left: sound, room chat (group rooms only), developer gear. */
+.top-action-chat { right: max(4rem, calc((100vw - 28rem) / 2 + 4rem)); top: calc(0.75rem + env(safe-area-inset-top)); }
+.top-action-dev { right: max(4rem, calc((100vw - 28rem) / 2 + 4rem)); top: calc(0.75rem + env(safe-area-inset-top)); }
+:root[data-room-chat] .top-action-dev { right: max(7.25rem, calc((100vw - 28rem) / 2 + 7.25rem)); }
+/* Stop pre-round: giant drawn letter with the 3-2-1 below it. */
+.stop-countdown-letter { font-size: clamp(8rem, 48vw, 13rem); text-shadow: 0 0 2.5rem color-mix(in oklch, var(--primary) 55%, transparent), 0 0 0.6rem color-mix(in oklch, var(--primary) 70%, transparent); animation: stop-letter-in 420ms cubic-bezier(.2,.9,.3,1.3) both; }
+.stop-countdown-number { animation: stop-count-pop 320ms ease-out both; }
+@keyframes stop-letter-in { from { opacity: 0; transform: scale(.6); } to { opacity: 1; transform: scale(1); } }
+@keyframes stop-count-pop { from { opacity: 0; transform: scale(1.5); } to { opacity: 1; transform: scale(1); } }
+/* Crowd reactions on result screens float up and fade. */
+.crowd-float { position: absolute; bottom: calc(9rem + env(safe-area-inset-bottom)); font-size: 2.25rem; pointer-events: none; z-index: 45; animation: crowd-float 1.8s ease-out forwards; }
+@keyframes crowd-float { 0% { opacity: 0; transform: translateY(0) scale(.6); } 15% { opacity: 1; transform: translateY(-2rem) scale(1.1); } 100% { opacity: 0; transform: translateY(-16rem) scale(1); } }
+@media (prefers-reduced-motion: reduce) { .stop-countdown-letter, .stop-countdown-number { animation: none; } .crowd-float { animation-duration: 1.2s; } }
 .top-actions-clear { padding-right: var(--top-actions-space); }
 .mobile-app-frame main { min-width: 0; }
 .mobile-bottom-bar { z-index: 30; box-shadow: var(--shadow-dock); max-height: calc(100dvh - 4rem - var(--keyboard-inset, 0px)); overflow-y: auto; overscroll-behavior: contain; }

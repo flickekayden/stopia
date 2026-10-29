@@ -33,6 +33,8 @@ export const updatePartySettings = createServerFn({ method: "POST" })
           debateJudge: z.enum(["auto", "ia", "voto"]).optional(),
           roletaSeconds: z.number().int().optional(),
           roletaJudge: z.enum(["auto", "ia", "voto"]).optional(),
+          autorSeconds: z.number().int().optional(),
+          infiltradoTheme: z.string().max(40).optional(),
           stopSeconds: z.number().int().optional(),
           scoring: z.enum(["fixed", "free"]).optional(),
           aiIntensity: z.enum(["leve", "padrao", "acida"]).optional(),
@@ -118,3 +120,12 @@ export const listPartyRoomsAdmin = createServerFn({ method: "POST" })
 export const deletePartyRoomAdmin = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => z.object({ token: z.string().max(200).optional(), roomId: z.string().uuid() }).parse(input))
   .handler(async ({ data }) => (await server()).deletePartyRoomAdmin(data));
+
+/* Group-room chat: the caller's hashed room session is verified before reading or posting. */
+export const listPartyChat = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => z.object(session).parse(input))
+  .handler(async ({ data }) => (await server()).listPartyChat(data));
+
+export const sendPartyChat = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => z.object({ ...session, content: z.string().max(400) }).parse(input))
+  .handler(async ({ data }) => (await server()).sendPartyChat(data));

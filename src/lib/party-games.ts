@@ -50,6 +50,7 @@ export const PARTY_GAMES: Record<PartyGameId, PartyGameMeta> = {
     scoring: [
       "Juiz de IA: inocente dá +3 ao réu; culpado dá +2 a cada acusador e +1 extra à melhor acusação. A IA pode dar até +2 de bônus por um caso brilhante.",
       "Júri da galera: réu absolvido ganha +3; quem votou com a maioria ganha +1.",
+      "No fim da partida, com a IA ligada, o tribunal entrega troféus cômicos no pódio.",
     ],
     players: "Em dupla: duelo entre Réu e Promotor, e o Juiz de IA sempre decide. Com 3 ou mais: o mestre escolhe Juiz de IA ou Júri da galera.",
   },
@@ -61,12 +62,16 @@ export const PARTY_GAMES: Record<PartyGameId, PartyGameMeta> = {
     minPlayers: 3,
     icon: "feather",
     rules: [
-      "Todo mundo responde a mesma pergunta engraçada.",
+      "Todo mundo responde a mesma pergunta engraçada, no tempo escolhido pelo mestre.",
       "As respostas aparecem embaralhadas e sem nome.",
       "Para cada resposta, chute quem escreveu (a sua não conta).",
       "No final da rodada, os autores são revelados.",
     ],
-    scoring: ["Acertou o autor: +1.", "Enganou alguém com a sua resposta: +1 por pessoa enganada."],
+    scoring: [
+      "Acertou o autor: +1.",
+      "Enganou alguém com a sua resposta: +1 por pessoa enganada.",
+      "Bônus do blefe: se ninguém acertar que a resposta é sua, +2 extra.",
+    ],
     players: "Precisa de 3 ou mais: em dupla, cada um saberia na hora quem escreveu.",
   },
   infiltrado: {
@@ -77,6 +82,7 @@ export const PARTY_GAMES: Record<PartyGameId, PartyGameMeta> = {
     minPlayers: 3,
     icon: "eye",
     rules: [
+      "O mestre pode escolher um tema (Comida, Animal, Lugar…) ou deixar tudo misturado.",
       "Todos veem a categoria. Só os cidadãos recebem a palavra secreta; o infiltrado não.",
       "Cada um escreve uma pista curta, sem dizer a palavra.",
       "Votem em quem parece ser o infiltrado (não vale votar em si mesmo).",
@@ -118,7 +124,7 @@ export const PARTY_GAMES: Record<PartyGameId, PartyGameMeta> = {
     icon: "dices",
     rules: [
       "A roleta sorteia um desafio e um evento do caos (pontos em dobro, triplo...).",
-      "Responda por escrito antes do tempo acabar.",
+      "Responda por escrito (até 500 caracteres) no tempo escolhido pelo mestre: de 45s a 5 min.",
       "O mestre pode pular desafios até o limite configurado.",
       "Juiz de IA: dá de 0 a 3 pontos por resposta. Votação: todos votam na melhor (não vale a própria).",
     ],
@@ -155,7 +161,18 @@ export type JudgeMode = "auto" | "ia" | "voto";
 export const JUDGE_MODES: readonly JudgeMode[] = ["auto", "ia", "voto"];
 export const DEBATE_SECONDS_OPTIONS = [60, 90, 120, 180] as const;
 export const TRIBUNAL_SECONDS_OPTIONS = [60, 90, 120, 180] as const;
-export const ROLETA_SECONDS_OPTIONS = [45, 60, 90] as const;
+export const ROLETA_SECONDS_OPTIONS = [45, 60, 90, 180, 300] as const;
+export const AUTOR_SECONDS_OPTIONS = [60, 75, 90, 120] as const;
+
+/** Infiltrado word themes the host can pick; "todas" mixes every theme. */
+export const INFILTRADO_THEMES = ["todas", "Comida", "Animal", "Lugar", "Objeto", "Profissão", "Esporte", "Transporte", "Festa", "Natureza", "Instrumento"] as const;
+export type InfiltradoTheme = (typeof INFILTRADO_THEMES)[number];
+
+/** Group-room chat: message size and one-tap reactions (the only messages allowed while Stop answers are open). */
+export const PARTY_CHAT_MAX = 160;
+export const PARTY_CHAT_QUICK = ["😂 KKKK", "🔥 Boa!", "❌ Mentira!", "⏳ Corre!"] as const;
+/** Floating crowd reactions on result screens (ephemeral, never stored). */
+export const CROWD_REACTIONS = ["👏", "🍅", "😂", "🔥"] as const;
 
 export type PartySettings = {
   rounds: number;
@@ -171,6 +188,10 @@ export type PartySettings = {
   /** Roleta do Caos: answer time per challenge and who judges. */
   roletaSeconds: number;
   roletaJudge: JudgeMode;
+  /** Quem Escreveu: writing time. */
+  autorSeconds: number;
+  /** Infiltrado: secret-word theme. */
+  infiltradoTheme: InfiltradoTheme;
   /** Stop only. */
   stopSeconds: number;
   scoring: StopScoring;
@@ -189,6 +210,8 @@ export const DEFAULT_PARTY_SETTINGS: PartySettings = {
   debateJudge: "auto",
   roletaSeconds: 60,
   roletaJudge: "auto",
+  autorSeconds: 75,
+  infiltradoTheme: "todas",
   stopSeconds: 90,
   scoring: "fixed",
   aiIntensity: "padrao",
@@ -199,11 +222,11 @@ export const PARTY_SKIP_OPTIONS = [0, 1, 3] as const;
 /** Default limit for typed answers; games with longer arguments override it in GAME_TEXT_MAX. */
 export const PARTY_TEXT_MAX = 220;
 export const GAME_TEXT_MAX: Record<PartyGameId, number> = {
-  tribunal: 350,
+  tribunal: 500,
   autor: PARTY_TEXT_MAX,
   infiltrado: PARTY_TEXT_MAX,
   debate: 500,
-  roleta: PARTY_TEXT_MAX,
+  roleta: 500,
 };
 
 /** Character limit for a typed answer in this game. */
@@ -246,6 +269,8 @@ export function readPartySettings(raw: unknown): PartySettings {
     debateJudge: pick(JUDGE_MODES, value.debateJudge, DEFAULT_PARTY_SETTINGS.debateJudge),
     roletaSeconds: pick<number>(ROLETA_SECONDS_OPTIONS, value.roletaSeconds, DEFAULT_PARTY_SETTINGS.roletaSeconds),
     roletaJudge: pick(JUDGE_MODES, value.roletaJudge, DEFAULT_PARTY_SETTINGS.roletaJudge),
+    autorSeconds: pick<number>(AUTOR_SECONDS_OPTIONS, value.autorSeconds, DEFAULT_PARTY_SETTINGS.autorSeconds),
+    infiltradoTheme: pick(INFILTRADO_THEMES, value.infiltradoTheme, DEFAULT_PARTY_SETTINGS.infiltradoTheme),
     stopSeconds: Number.isFinite(seconds) && value.stopSeconds !== null && value.stopSeconds !== undefined
       ? Math.min(STOP_SECONDS_MAX, Math.max(STOP_SECONDS_MIN, Math.round(seconds)))
       : DEFAULT_PARTY_SETTINGS.stopSeconds,
@@ -283,6 +308,7 @@ export function hostPhaseSeconds(game: PartyGameId, phase: PartyPhaseId, setting
   if (game === "tribunal" && phase === "defense") return settings.tribunalSeconds;
   if (game === "debate" && phase === "argue") return settings.debateSeconds;
   if (game === "roleta" && phase === "respond") return settings.roletaSeconds;
+  if (game === "autor" && phase === "write") return settings.autorSeconds;
   return null;
 }
 
@@ -336,7 +362,7 @@ export type PartyResults = {
   verdict?: "culpado" | "inocente";
   guilty?: number;
   innocent?: number;
-  entries?: { id: string; text: string; authorId: string; correct: string[]; fooled: number }[];
+  entries?: { id: string; text: string; authorId: string; correct: string[]; fooled: number; bluff?: boolean }[];
   infiltradoId?: string;
   word?: string;
   category?: string;
@@ -382,7 +408,7 @@ export type PartyPublicState = {
   stop?: StopRoundState;
   /** DEPRECATED: Stop used to run in a separate linked room; kept so old links still read. */
   stopCode?: string;
-  /** Final podium: AI awards for the match (Debate). Absent when the AI is off for the room. */
+  /** Final podium: AI awards for the match (Debate, Tribunal). Absent when the AI is off for the room. */
   finalCommentary?: FinalCommentary;
 };
 
@@ -516,10 +542,10 @@ export function missingPlayers(id: LobbyGameId, players: number) {
 
 /* ------------------------- Developer settings per game ------------------------- */
 
-/** Timed phases the developer can tune; the writing time of Tribunal, Debate and Roleta belongs to the host. */
+/** Timed phases the developer can tune; the writing time of Tribunal, Debate, Roleta and Quem Escreveu belongs to the host. */
 export const GAME_PHASES: Record<PartyGameId, PartyPhaseId[]> = {
   tribunal: ["vote"],
-  autor: ["write", "guess"],
+  autor: ["guess"],
   infiltrado: ["clues", "vote", "last_guess"],
   debate: ["vote"],
   roleta: ["vote"],

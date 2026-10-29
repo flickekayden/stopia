@@ -4,12 +4,14 @@ import { toast } from "sonner";
 
 import { AnswerCard, type AnswerCardData } from "@/components/game/AnswerCard";
 import { CategoryPresets } from "@/components/game/CategoryPresets";
+import { CrowdReactions } from "@/components/party/CrowdReactions";
 import { EvaluationLoading } from "@/components/game/EvaluationLoading";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { LobbyCtx, PartyActions, PartyCtx } from "@/components/party/PartyStage";
 import { MAX_CATEGORIES_PER_ROUND } from "@/lib/game";
 import { vibrate } from "@/lib/haptics";
+import { soundManager } from "@/lib/sound-manager";
 import {
   PARTY_ROUND_OPTIONS,
   STOP_ANSWER_MAX,
@@ -287,6 +289,7 @@ function StopBoard({ ctx, actions }: { ctx: PartyCtx; actions: PartyActions }) {
   const startsAt = stop ? Date.parse(stop.startsAt) : 0;
   const starting = now < startsAt;
   const startCount = Math.max(1, Math.ceil((startsAt - now) / 1000));
+  const justStarted = !starting && now < startsAt + 600;
   const endsAt = ctx.room.phase_ends_at ? Date.parse(ctx.room.phase_ends_at) : null;
   const secondsLeft = endsAt !== null ? Math.max(0, Math.ceil((endsAt - Math.max(now, startsAt)) / 1000)) : null;
   const eligible = (ctx.state.eligible ?? []).includes(ctx.me.id);
@@ -294,6 +297,16 @@ function StopBoard({ ctx, actions }: { ctx: PartyCtx; actions: PartyActions }) {
   const locked = evaluating || !eligible || starting || (endsAt !== null && now >= endsAt);
   const stopBy = stop?.stopBy;
   const stopCountdown = stopBy && endsAt ? Math.max(0, Math.ceil((endsAt - now) / 1000)) : null;
+  // Everyone hears the STOP alarm (and feels it) the moment somebody shouts it.
+  const alarmFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (!stopBy || phase !== "write") return;
+    const key = `${round}:${stopBy}`;
+    if (alarmFor.current === key) return;
+    alarmFor.current = key;
+    soundManager.playStopAlarm();
+    vibrate([60, 40, 60, 40, 120]);
+  }, [stopBy, phase, round]);
   const filled = categories.filter((c) => (values[c] ?? "").trim()).length;
   const complete = stopAnswersComplete(values, categories);
 
@@ -392,8 +405,8 @@ function StopBoard({ ctx, actions }: { ctx: PartyCtx; actions: PartyActions }) {
   return (
     <div className="dock-clearance space-y-4" data-game="stop">
       <div className="round-hud sticky top-0 z-20 -mx-4 flex items-center gap-3 border-b border-border/70 pb-3 pl-4 pr-[calc(var(--top-actions-space)+0.5rem)] pt-[calc(0.75rem+env(safe-area-inset-top))]">
-        <div className="letter-tile flex size-14 shrink-0 items-center justify-center rounded-xl" aria-label={`Letra ${starting ? "a ser revelada" : stop.letter}`}>
-          <span className="font-display text-4xl leading-none">{starting ? "?" : stop.letter}</span>
+        <div className="letter-tile flex size-14 shrink-0 items-center justify-center rounded-xl" aria-label={`Letra ${stop.letter}`}>
+          <span className="font-display text-4xl leading-none">{stop.letter}</span>
         </div>
         <div className="min-w-0 flex-1">
           <p className="section-label">Rodada <span className="tabular-nums text-foreground">{round}</span> de {ctx.settings.rounds}</p>
@@ -410,9 +423,11 @@ function StopBoard({ ctx, actions }: { ctx: PartyCtx; actions: PartyActions }) {
         )}
       </div>
 
-      {starting && (
-        <div className="pointer-events-none fixed inset-y-0 left-1/2 z-30 grid w-full max-w-md -translate-x-1/2 place-items-center bg-background/70 backdrop-blur-sm" role="status" aria-live="assertive" aria-label={`Começa em ${startCount}`}>
-          <span key={startCount} className="evaluation-phrase font-display text-7xl text-primary">{startCount}</span>
+      {(starting || justStarted) && (
+        <div className="stop-countdown pointer-events-none fixed inset-y-0 left-1/2 z-30 flex w-full max-w-md -translate-x-1/2 flex-col items-center justify-center gap-4 bg-background/90" role="status" aria-live="assertive" aria-label={starting ? `Letra ${stop.letter}. Começa em ${startCount}` : "Valendo!"}>
+          <p className="section-label">Rodada {round} · a letra é</p>
+          <span className="stop-countdown-letter font-display leading-none text-primary" aria-hidden="true">{stop.letter}</span>
+          <span key={starting ? startCount : "go"} className="stop-countdown-number font-display text-6xl leading-none" aria-hidden="true">{starting ? startCount : "VAI!"}</span>
         </div>
       )}
 
@@ -570,6 +585,7 @@ function StopReveal({ ctx, actions }: { ctx: PartyCtx; actions: PartyActions }) 
         )}
       </section>
 
+      <CrowdReactions roomId={ctx.room.id} />
       <StopScoreboard ctx={ctx} />
 
       <div className="mobile-bottom-bar fixed inset-x-0 bottom-0 mx-auto w-full max-w-md border-t border-border bg-background/95 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
