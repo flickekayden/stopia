@@ -150,10 +150,11 @@ export const STOP_CATEGORY_MAX_LENGTH = 160;
 export const STOP_CATEGORY_LIMIT = 250;
 export const STOP_ANSWER_MAX = 80;
 
-/** Who decides Debate/Roleta rounds. "auto": AI judge with 2 players, group vote with 3+. */
+/** Who decides Tribunal/Debate/Roleta rounds. "auto": AI judge with 2 players, group vote with 3+. */
 export type JudgeMode = "auto" | "ia" | "voto";
 export const JUDGE_MODES: readonly JudgeMode[] = ["auto", "ia", "voto"];
-export const DEBATE_SECONDS_OPTIONS = [60, 90, 120] as const;
+export const DEBATE_SECONDS_OPTIONS = [60, 90, 120, 180] as const;
+export const TRIBUNAL_SECONDS_OPTIONS = [60, 90, 120, 180] as const;
 export const ROLETA_SECONDS_OPTIONS = [45, 60, 90] as const;
 
 export type PartySettings = {
@@ -161,6 +162,9 @@ export type PartySettings = {
   ai: boolean;
   intensity: "leve" | "media" | "caotica";
   skips: number;
+  /** Tribunal dos Amigos: defense/accusation time and who decides the verdict. */
+  tribunalSeconds: number;
+  tribunalJudge: JudgeMode;
   /** Debate Impossível: argument time and who judges. */
   debateSeconds: number;
   debateJudge: JudgeMode;
@@ -179,6 +183,8 @@ export const DEFAULT_PARTY_SETTINGS: PartySettings = {
   ai: true,
   intensity: "media",
   skips: 1,
+  tribunalSeconds: 90,
+  tribunalJudge: "auto",
   debateSeconds: 90,
   debateJudge: "auto",
   roletaSeconds: 60,
@@ -190,7 +196,20 @@ export const DEFAULT_PARTY_SETTINGS: PartySettings = {
 };
 export const PARTY_ROUND_OPTIONS = [3, 5, 8] as const;
 export const PARTY_SKIP_OPTIONS = [0, 1, 3] as const;
+/** Default limit for typed answers; games with longer arguments override it in GAME_TEXT_MAX. */
 export const PARTY_TEXT_MAX = 220;
+export const GAME_TEXT_MAX: Record<PartyGameId, number> = {
+  tribunal: 350,
+  autor: PARTY_TEXT_MAX,
+  infiltrado: PARTY_TEXT_MAX,
+  debate: 500,
+  roleta: PARTY_TEXT_MAX,
+};
+
+/** Character limit for a typed answer in this game. */
+export function textMaxFor(game: PartyGameId) {
+  return GAME_TEXT_MAX[game] ?? PARTY_TEXT_MAX;
+}
 
 /** Trimmed, de-duplicated (case-insensitive) category list; falls back to the defaults when empty. */
 export function readStopCategories(raw: unknown): string[] {
@@ -221,6 +240,8 @@ export function readPartySettings(raw: unknown): PartySettings {
     ai: typeof value.ai === "boolean" ? value.ai : DEFAULT_PARTY_SETTINGS.ai,
     intensity: value.intensity === "leve" || value.intensity === "caotica" || value.intensity === "media" ? value.intensity : DEFAULT_PARTY_SETTINGS.intensity,
     skips: PARTY_SKIP_OPTIONS.includes(value.skips as 0) ? (value.skips as number) : DEFAULT_PARTY_SETTINGS.skips,
+    tribunalSeconds: pick<number>(TRIBUNAL_SECONDS_OPTIONS, value.tribunalSeconds, DEFAULT_PARTY_SETTINGS.tribunalSeconds),
+    tribunalJudge: pick(JUDGE_MODES, value.tribunalJudge, DEFAULT_PARTY_SETTINGS.tribunalJudge),
     debateSeconds: pick<number>(DEBATE_SECONDS_OPTIONS, value.debateSeconds, DEFAULT_PARTY_SETTINGS.debateSeconds),
     debateJudge: pick(JUDGE_MODES, value.debateJudge, DEFAULT_PARTY_SETTINGS.debateJudge),
     roletaSeconds: pick<number>(ROLETA_SECONDS_OPTIONS, value.roletaSeconds, DEFAULT_PARTY_SETTINGS.roletaSeconds),
@@ -240,13 +261,26 @@ export function effectiveJudge(mode: JudgeMode, players: number): "ia" | "voto" 
   return mode;
 }
 
-/** Judge mode setting for a judged game (Debate or Roleta); other games have none. */
+/** Judge mode setting for a judged game (Tribunal, Debate or Roleta); other games have none. */
 export function judgeModeFor(game: PartyGameId, settings: PartySettings): JudgeMode | null {
+  if (game === "tribunal") return settings.tribunalJudge;
   return game === "debate" ? settings.debateJudge : game === "roleta" ? settings.roletaJudge : null;
 }
 
-/** Host-chosen seconds for the writing step of Debate/Roleta; null for everything else. */
+/** Games where a 2-player match always uses the AI judge (a one-person jury would be pointless). */
+export const DUO_AI_GAMES: readonly PartyGameId[] = ["tribunal"];
+
+/** The judge a game really uses with this many players, honouring games that force the AI in duos. */
+export function effectiveJudgeFor(game: PartyGameId, settings: PartySettings, players: number): "ia" | "voto" | null {
+  const mode = judgeModeFor(game, settings);
+  if (mode === null) return null;
+  if (players <= 2 && DUO_AI_GAMES.includes(game)) return "ia";
+  return effectiveJudge(mode, players);
+}
+
+/** Host-chosen seconds for the writing step of Tribunal/Debate/Roleta; null for everything else. */
 export function hostPhaseSeconds(game: PartyGameId, phase: PartyPhaseId, settings: PartySettings): number | null {
+  if (game === "tribunal" && phase === "defense") return settings.tribunalSeconds;
   if (game === "debate" && phase === "argue") return settings.debateSeconds;
   if (game === "roleta" && phase === "respond") return settings.roletaSeconds;
   return null;
