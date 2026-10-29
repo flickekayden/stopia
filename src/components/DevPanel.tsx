@@ -93,7 +93,7 @@ export function DevPanel() {
         size="icon"
         aria-label={`Configurações Dev: ${CONTEXT_LABELS[context]}`}
         onClick={() => setOpen(true)}
-        className="fixed right-[max(4rem,calc((100vw-28rem)/2+4rem))] top-[calc(0.75rem+env(safe-area-inset-top))] z-40 size-12 rounded-full border border-border shadow-lg"
+        className="top-action-dev fixed z-40 size-12 rounded-full border border-border shadow-lg"
       >
         <Settings className="size-5" />
       </Button>
