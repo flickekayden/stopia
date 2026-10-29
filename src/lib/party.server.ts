@@ -892,8 +892,9 @@ async function advanceOnce(room: RoomRow): Promise<boolean> {
 }
 
 /**
- * AI judge for Debate/Roleta. Entries reach the AI under neutral labels (no nicknames); scoring stays in
- * the deterministic engine. If the AI fails, the round falls back to a group vote instead of stalling.
+ * AI judge for Tribunal/Debate/Roleta. Entries reach the AI under neutral labels (no nicknames); scoring
+ * stays in the deterministic engine. If the AI fails, the round falls back to a group vote instead of
+ * stalling — except a Tribunal duel, where a one-person jury makes no sense, so it ends in a draw.
  */
 async function runPartyJudge(room: RoomRow, presentIds: string[], settings: PartySettings, admin: PartyAdminConfig) {
   const game = gameOf(room);
@@ -902,12 +903,29 @@ async function runPartyJudge(room: RoomRow, presentIds: string[], settings: Part
   const labelled = entries.map((entry, index) => ({ label: String(index + 1), id: entry.playerId!, text: entry.text }));
   const idOf = (label: string) => labelled.find((l) => l.label === label)?.id ?? null;
   const tone = admin[game]?.tone;
+  const defendantId = state.defendantId ?? "";
   try {
     const ai = await import("./party-ai.server");
     let results: PartyResults;
     let deltas: Deltas;
     let text: string;
-    if (game === "debate") {
+    if (game === "tribunal") {
+      const defense = labelled.find((l) => l.id === defendantId)?.text ?? "(o réu ficou em silêncio)";
+      const accusations = labelled.filter((l) => l.id !== defendantId).map((l, index) => ({ ...l, label: String(index + 1) }));
+      const made = await ai.aiJudgeTribunal({
+        caso: state.prompt?.text ?? "",
+        defesa: defense,
+        acusacoes: accusations.map((a) => ({ rotulo: a.label, texto: a.text })),
+      }, tone);
+      const bestAccuserId = made.bestLabel ? accusations.find((a) => a.label === made.bestLabel)?.id ?? null : null;
+      const scored = scoreTribunalJudge({ defendantId, accuserIds: accusations.map((a) => a.id), verdict: made.verdict, bestAccuserId, bonus: made.bonus });
+      results = {
+        verdict: made.verdict,
+        judge: { by: "ia", bestId: scored.bestAccuserId, bonus: Math.max(0, Math.min(2, Math.round(made.bonus))), sentence: made.sentence },
+      };
+      deltas = scored.deltas;
+      text = made.reasoning;
+    } else if (game === "debate") {
       const sides = Object.fromEntries(Object.entries(state.sides ?? {}).filter(([id]) => labelled.some((l) => l.id === id)));
       const made = await ai.aiJudgeDebate({
         tema: state.prompt?.title ?? "",
@@ -943,13 +961,69 @@ async function runPartyJudge(room: RoomRow, presentIds: string[], settings: Part
       public_state: asJson({ ...state, submitted: [], results, deltas, scores: addScores(state.scores ?? {}, deltas), ai: text ? { status: "done", text } : { status: "off" } }),
     });
   } catch {
+    if (game === "tribunal" && presentIds.length <= 2) {
+      const scored = scoreTribunalJudge({ defendantId, accuserIds: presentIds.filter((id) => id !== defendantId), verdict: null, bonus: 0 });
+      await guardedUpdate(room, {
+        phase: "reveal",
+        phase_started_at: new Date().toISOString(),
+        phase_ends_at: null,
+        public_state: asJson({
+          ...state,
+          submitted: [],
+          results: { notice: "O Juiz de IA não respondeu a tempo. Empate técnico: +2 para cada um." },
+          deltas: scored.deltas,
+          scores: addScores(state.scores ?? {}, scored.deltas),
+          ai: { status: "off" },
+        }),
+      });
+      return;
+    }
+    const voters = game === "tribunal" ? presentIds.filter((id) => id !== defendantId) : presentIds;
     await guardedUpdate(room, {
       phase: "vote",
       phase_started_at: new Date().toISOString(),
       phase_ends_at: deadline(game, "vote", admin, settings),
-      public_state: asJson({ ...state, eligible: presentIds, submitted: [], ai: { status: "failed", text: "O juiz de IA não respondeu. Desta vez, votem vocês!" } }),
+      public_state: asJson({ ...state, eligible: voters, submitted: [], ai: { status: "failed", text: "O juiz de IA não respondeu. Desta vez, votem vocês!" } }),
     });
   }
+}
+
+/**
+ * Debate podium: the AI hands out comic awards for the whole match. Runs once, after the room reached
+ * "final"; a failure only marks the card as failed, the ranking is already final.
+ */
+async function buildDebateCommentary(room: RoomRow) {
+  const admin = await loadPartyAdmin();
+  const [players, { data: subs }, { data: rounds }] = await Promise.all([
+    loadPlayers(room.id),
+    db().from("party_submissions").select("round_number, player_id, payload").eq("room_id", room.id).eq("phase", "argue"),
+    db().from("party_private").select("round_number, data").eq("room_id", room.id).gt("round_number", 0).order("round_number"),
+  ]);
+  const state = readPublicState(room.public_state);
+  const scores = state.scores ?? {};
+  const label = new Map(players.map((p, index) => [p.id, `J${index + 1}`]));
+  const idOf = (value: string) => players.find((p) => label.get(p.id) === value)?.id ?? null;
+  let finalCommentary: PartyPublicState["finalCommentary"];
+  try {
+    const rodadas = (rounds ?? []).map((row) => {
+      const data = (row.data ?? {}) as RoundPrivate;
+      const args = (subs ?? [])
+        .filter((s) => s.round_number === row.round_number && label.has(s.player_id))
+        .map((s) => ({ rotulo: label.get(s.player_id)!, lado: data.sides?.[s.player_id] ?? ("A" as const), texto: String((s.payload as PartyMine | null)?.text ?? "").slice(0, 400) }))
+        .filter((a) => a.texto);
+      return { tema: data.prompt?.title ?? "", lado_a: data.prompt?.sideA ?? "", lado_b: data.prompt?.sideB ?? "", argumentos: args };
+    }).filter((r) => r.argumentos.length > 0);
+    if (rodadas.length === 0) throw new Error("sem argumentos");
+    const made = await (await import("./party-ai.server")).aiMatchSummaryDebate({
+      rodadas,
+      jogadores: players.map((p) => ({ rotulo: label.get(p.id)!, apelido: p.nickname, pontos: scores[p.id] ?? 0 })),
+    }, admin.debate?.tone);
+    const highlights = made.highlights.map((h) => ({ playerId: idOf(h.label) ?? "", title: h.title, text: h.text })).filter((h) => h.playerId);
+    finalCommentary = { status: "ready", title: "Sentença Final da Corte", highlights, summary: made.summary };
+  } catch {
+    finalCommentary = { status: "failed" };
+  }
+  await guardedUpdate(room, { public_state: asJson({ ...state, finalCommentary }) });
 }
 
 /* ----------------------------------- Stop ---------------------------------- */
