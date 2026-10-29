@@ -399,7 +399,7 @@ function PhaseHeader({ ctx, now }: { ctx: PartyCtx; now: number }) {
         <p className="section-label">Rodada <span className="tabular-nums text-foreground">{ctx.room.round_number}</span> de {ctx.settings.rounds}</p>
         <p className="text-balance-safe font-bold leading-tight">{PHASE_LABELS[phase]}</p>
       </div>
-      {seconds !== null && (
+      {seconds !== null && phase !== "evaluating" && (
         <p role="timer" aria-label={`${seconds} segundos restantes`} data-state={seconds <= 10 ? "critical" : seconds <= 20 ? "low" : "normal"} className="round-timer text-3xl">
           {Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, "0")}
         </p>
