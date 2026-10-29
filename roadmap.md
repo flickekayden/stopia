@@ -112,3 +112,9 @@
 - [x] Juiz de IA no Debate (pula votação) e na Roleta; 2 jogadores → IA por padrão
 - [x] Cartões de jogos com número de jogadores
 - [x] Testes e partida real em dupla
+
+## Debate longo, Tribunal em dupla e regras (prompt-12)
+- [x] Debate: 500 caracteres, opção de 3 min, troféus da IA no pódio final
+- [x] Tribunal: 2+ jogadores, Réu x Promotor com Juiz de IA obrigatório em dupla; mestre escolhe tempo e juiz
+- [x] Regras de todos os jogos revisadas ("Dupla ou grupo")
+- [x] Testes e partidas reais em dupla (Tribunal e Debate de 3 rodadas)
