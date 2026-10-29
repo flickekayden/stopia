@@ -408,9 +408,52 @@ function PhaseHeader({ ctx, now }: { ctx: PartyCtx; now: number }) {
   );
 }
 
+/** Debate: the topic up top, the player's own side as an unmistakable mission, the other side as contrast. */
+function DebatePrompt({ ctx }: { ctx: PartyCtx }) {
+  const prompt = ctx.state.prompt!;
+  const mySide = ctx.state.sides?.[ctx.me.id];
+  const arguing = ctx.room.phase === "argue";
+  const sideText = (side: "A" | "B") => (side === "A" ? prompt.sideA : prompt.sideB);
+  const other = mySide === "A" ? "B" : "A";
+  const opponents = Object.values(ctx.state.sides ?? {}).filter((side) => side === other).length;
+  return (
+    <section className="party-prompt space-y-3" aria-label="Tema do debate">
+      <div className="flex flex-wrap items-center gap-2">
+        <p className="section-label party-accent">Tema</p>
+        {prompt.source === "ai" && <span className="inline-flex items-center gap-1 rounded-full bg-secondary px-2 py-0.5 text-[0.6875rem] font-bold text-muted-foreground"><Sparkles className="size-3" aria-hidden="true" /> criado pela IA</span>}
+      </div>
+      <h2 className="text-balance-safe text-2xl font-bold leading-tight">{prompt.title}</h2>
+      {arguing && mySide ? (
+        <>
+          <div className="rounded-xl border-2 border-[var(--game-accent)] bg-background p-4" role="note" aria-label={`Sua missão: defender o lado ${mySide}`}>
+            <p className="section-label inline-flex items-center gap-1.5 party-accent"><Swords className="size-3.5" aria-hidden="true" /> Sua missão</p>
+            <p className="mt-1 text-sm font-semibold text-muted-foreground">Defenda com garra o</p>
+            <p className="text-balance-safe font-display text-3xl leading-tight party-accent">Lado {mySide}</p>
+            <p className="text-balance-safe mt-1 text-xl font-bold leading-snug">{sideText(mySide)}</p>
+          </div>
+          <p className="rounded-xl border border-border/60 px-3 py-2 text-sm text-muted-foreground">
+            {opponents > 1 ? "Seus adversários defendem" : "Seu adversário defende"}: <strong className="text-foreground">Lado {other} · {sideText(other)}</strong>
+          </p>
+          <p className="text-sm text-muted-foreground">{prompt.text}</p>
+        </>
+      ) : (
+        <div className="grid gap-2">
+          {(["A", "B"] as const).map((side) => (
+            <div key={side} className={cn("rounded-xl border p-3 text-sm", mySide === side ? "border-[var(--game-accent)] bg-background" : "border-border/60")}>
+              <span className="font-display text-base party-accent">Lado {side}</span>{mySide === side && <span className="ml-2 text-xs font-bold">← o seu</span>}
+              <p className="mt-0.5 font-semibold">{sideText(side)}</p>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
 function PromptCard({ ctx }: { ctx: PartyCtx }) {
   const prompt = ctx.state.prompt;
   if (!prompt) return null;
+  if (ctx.game === "debate" && prompt.sideA && prompt.sideB) return <DebatePrompt ctx={ctx} />;
   const mySide = ctx.state.sides?.[ctx.me.id];
   return (
     <section className="party-prompt space-y-2" aria-label="Desafio da rodada">
@@ -695,7 +738,17 @@ export function PartyPlay({ ctx, actions }: { ctx: PartyCtx; actions: PartyActio
   const accusedName = nick(ctx.players, ctx.state.accusedId);
 
   let body: React.ReactNode = null;
-  if (!eligible && phase !== "vote") {
+  if (phase === "evaluating") {
+    body = (
+      <div className="space-y-3">
+        <section className="party-panel flex items-center gap-3" role="status" aria-live="polite">
+          <Loader2 className="size-5 shrink-0 animate-spin party-accent" aria-hidden="true" />
+          <p className="font-semibold">{ctx.game === "debate" ? "O juiz de IA está lendo os argumentos e decidindo o vencedor…" : "O juiz de IA está dando as notas…"}</p>
+        </section>
+        <EntryList ctx={ctx} entries={ctx.state.entries ?? []} showAuthor />
+      </div>
+    );
+  } else if (!eligible && phase !== "vote") {
     body = <p className="party-panel text-center text-sm text-muted-foreground">{phase === "last_guess" ? `@${accusedName} foi o mais votado e é mesmo o infiltrado! Esperando o palpite da palavra…` : "Você entrou no meio desta etapa. Acompanhe e participe na próxima."}</p>;
   } else if (phase === "defense") {
     body = <TextSubmit ctx={ctx} actions={actions} label={isDefendant ? "Você é o réu! Escreva sua defesa." : `Acuse ou testemunhe contra @${nick(ctx.players, defendant)}.`} placeholder={isDefendant ? "Excelência, eu posso explicar…" : "Eu vi tudo, excelência…"} />;
@@ -705,7 +758,7 @@ export function PartyPlay({ ctx, actions }: { ctx: PartyCtx; actions: PartyActio
     body = <TextSubmit ctx={ctx} actions={actions} label="Sua pista (curta, sem dizer a palavra)" placeholder="Uma palavra ou frase curta" />;
   } else if (phase === "argue") {
     const side = ctx.state.sides?.[ctx.me.id];
-    body = <TextSubmit ctx={ctx} actions={actions} label={side ? `Seu argumento a favor do lado ${side}` : "Seu argumento"} placeholder="Convença a galera do impossível" />;
+    body = <TextSubmit ctx={ctx} actions={actions} label={side ? `Sua defesa do Lado ${side}` : "Seu argumento"} placeholder="Escreva aqui sua defesa irrefutável..." />;
   } else if (phase === "respond") {
     body = <TextSubmit ctx={ctx} actions={actions} label="Sua resposta ao desafio" placeholder="Solta o caos" />;
   } else if (phase === "last_guess") {
@@ -729,10 +782,11 @@ export function PartyPlay({ ctx, actions }: { ctx: PartyCtx; actions: PartyActio
     <div className="dock-clearance space-y-4 pb-10">
       <PhaseHeader ctx={ctx} now={now} />
       <PromptCard ctx={ctx} />
+      {phase === "vote" && ctx.state.ai?.status === "failed" && ctx.state.ai.text && <p role="status" className="party-panel text-sm text-muted-foreground">{ctx.state.ai.text}</p>}
       {(phase === "clues" || phase === "vote" || phase === "last_guess") && <SecretCard ctx={ctx} />}
       {body}
       <Progress ctx={ctx} />
-      {ctx.isHost && (
+      {ctx.isHost && phase !== "evaluating" && (
         <div className="flex flex-wrap gap-2 border-t border-border/70 pt-4">
           {ctx.game === "roleta" && phase === "respond" && (
             <Button variant="secondary" className="flex-1" disabled={ctx.busy !== null || (ctx.state.skipsLeft ?? 0) <= 0} onClick={() => void actions.skip()}>
@@ -846,30 +900,51 @@ function RevealBody({ ctx }: { ctx: PartyCtx }) {
     );
   }
 
-  const entries = [...(ctx.state.entries ?? [])].sort((a, b) => (counts[b.playerId ?? ""] ?? 0) - (counts[a.playerId ?? ""] ?? 0));
+  const judge = results.judge;
+  const bestId = judge?.bestId ?? null;
+  const entries = [...(ctx.state.entries ?? [])].sort((a, b) =>
+    (b.playerId === bestId ? 1 : 0) - (a.playerId === bestId ? 1 : 0) || (counts[b.playerId ?? ""] ?? 0) - (counts[a.playerId ?? ""] ?? 0));
   const multiplier = Number(results.multiplier ?? 1);
   const sideTotals = results.sideTotals;
+  const debateJudged = ctx.game === "debate" && judge?.by === "ia";
   return (
     <div className="space-y-3">
       {notice && <p className="party-panel text-sm text-muted-foreground">{notice}</p>}
-      {ctx.game === "debate" && sideTotals && (
+      {debateJudged && (
+        <section className="party-prompt space-y-1 text-center">
+          <span className="party-icon mx-auto size-12"><Trophy className="size-6" aria-hidden="true" /></span>
+          <p className="font-display text-3xl party-accent">{results.winnerSide ? `Lado ${String(results.winnerSide)} venceu!` : "Sem vencedor nesta rodada"}</p>
+          {bestId && <p className="text-sm">Melhor argumento: <strong>{nick(ctx.players, bestId)}</strong>{bestId === ctx.me.id ? " (você)" : ""}</p>}
+          <p className="text-xs text-muted-foreground">Decisão do juiz de IA</p>
+        </section>
+      )}
+      {ctx.game === "debate" && !debateJudged && sideTotals && (
         <section className="party-prompt text-center">
           <p className="font-display text-3xl party-accent">{results.winnerSide ? `Lado ${String(results.winnerSide)} venceu!` : "Empate entre os lados!"}</p>
           <p className="text-sm tabular-nums text-muted-foreground">Lado A: {sideTotals.A} voto(s) · Lado B: {sideTotals.B} voto(s)</p>
         </section>
       )}
       {ctx.game === "roleta" && multiplier > 1 && <p className="party-prompt text-center font-display text-2xl party-accent">Pontos ×{multiplier} nesta rodada!</p>}
-      <AiCard ctx={ctx} title="Comentário da IA" />
+      <AiCard ctx={ctx} title={judge?.by === "ia" ? (ctx.game === "debate" ? "Veredito do juiz de IA" : "Avaliação do juiz de IA") : "Comentário da IA"} />
       <ul className="space-y-2">
-        {entries.map((entry, index) => (
-          <li key={entry.id} className="party-panel answer-card flex items-start justify-between gap-3" style={{ "--enter-index": index } as CSSProperties}>
-            <div className="min-w-0">
-              <p className="text-xs font-semibold text-muted-foreground">{nick(ctx.players, entry.playerId)}{entry.playerId && ctx.state.sides?.[entry.playerId] ? ` · Lado ${ctx.state.sides[entry.playerId]}` : ""}</p>
-              <p className="text-balance-safe font-semibold">“{entry.text}”</p>
-            </div>
-            <span className="shrink-0 rounded-lg bg-secondary px-2 py-1 font-display text-lg tabular-nums">{counts[entry.playerId ?? ""] ?? 0}</span>
-          </li>
-        ))}
+        {entries.map((entry, index) => {
+          const id = entry.playerId ?? "";
+          const note = judge?.notes?.[id];
+          return (
+            <li key={entry.id} className={cn("party-panel answer-card flex items-start justify-between gap-3", id === bestId && "ring-2 ring-[var(--game-accent)]")} style={{ "--enter-index": index } as CSSProperties}>
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-muted-foreground">{id === bestId && <Trophy className="mr-1 inline size-3.5 party-accent" aria-label="Vencedor" />}{nick(ctx.players, entry.playerId)}{id && ctx.state.sides?.[id] ? ` · Lado ${ctx.state.sides[id]}` : ""}</p>
+                <p className="text-balance-safe font-semibold">“{entry.text}”</p>
+                {note && <p className="mt-1 text-xs italic text-muted-foreground">IA: {note}</p>}
+              </div>
+              {!debateJudged && (
+                <span className="shrink-0 rounded-lg bg-secondary px-2 py-1 text-center font-display text-lg tabular-nums" aria-label={judge?.by === "ia" ? `${counts[id] ?? 0} de 3 pontos da IA` : `${counts[id] ?? 0} votos`}>
+                  {counts[id] ?? 0}{judge?.by === "ia" && <span className="block text-[0.625rem] font-sans text-muted-foreground">/3</span>}
+                </span>
+              )}
+            </li>
+          );
+        })}
       </ul>
     </div>
   );
