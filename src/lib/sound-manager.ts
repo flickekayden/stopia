@@ -26,6 +26,7 @@ const VOLUMES: Record<SoundName, number> = {
 
 class SoundManager {
   private sounds = new Map<SoundName, HTMLAudioElement>();
+  private context: AudioContext | null = null;
   private enabled = true;
   private unlocked = false;
 
@@ -35,6 +36,52 @@ class SoundManager {
 
   unlock() {
     this.unlocked = true;
+    // Resume (or create) the synth context inside the user gesture so the STOP siren can play later.
+    try {
+      const Ctx = typeof window !== "undefined" ? (window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext) : undefined;
+      if (!Ctx) return;
+      this.context ??= new Ctx();
+      if (this.context.state === "suspended") void this.context.resume().catch(() => undefined);
+    } catch {
+      this.context = null;
+    }
+  }
+
+  /** Arcade "STOP!" alarm: two quick siren sweeps plus a buzzer hit, synthesized for low latency (no file to load). */
+  playStopAlarm() {
+    if (!this.enabled || !this.unlocked || !this.context) return;
+    const ctx = this.context;
+    if (ctx.state === "suspended") void ctx.resume().catch(() => undefined);
+    const t = ctx.currentTime + 0.01;
+    const master = ctx.createGain();
+    master.gain.setValueAtTime(0.0001, t);
+    master.gain.exponentialRampToValueAtTime(0.32, t + 0.02);
+    master.gain.setValueAtTime(0.32, t + 0.78);
+    master.gain.exponentialRampToValueAtTime(0.0001, t + 0.95);
+    master.connect(ctx.destination);
+    const siren = ctx.createOscillator();
+    siren.type = "sawtooth";
+    for (let i = 0; i < 2; i += 1) {
+      const start = t + i * 0.32;
+      siren.frequency.setValueAtTime(520, start);
+      siren.frequency.exponentialRampToValueAtTime(1180, start + 0.16);
+      siren.frequency.exponentialRampToValueAtTime(520, start + 0.32);
+    }
+    const sirenGain = ctx.createGain();
+    sirenGain.gain.value = 0.55;
+    siren.connect(sirenGain).connect(master);
+    const buzz = ctx.createOscillator();
+    buzz.type = "square";
+    buzz.frequency.setValueAtTime(110, t + 0.64);
+    const buzzGain = ctx.createGain();
+    buzzGain.gain.setValueAtTime(0.0001, t);
+    buzzGain.gain.setValueAtTime(0.7, t + 0.64);
+    buzzGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.95);
+    buzz.connect(buzzGain).connect(master);
+    siren.start(t);
+    buzz.start(t + 0.64);
+    siren.stop(t + 0.96);
+    buzz.stop(t + 0.96);
   }
 
   play(name: SoundName) {
