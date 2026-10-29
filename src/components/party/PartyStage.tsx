@@ -210,9 +210,9 @@ function JudgeSettings({ ctx, actions, game }: { ctx: LobbyCtx; actions: PartyAc
     <>
       <div>
         <p className="mb-2 text-sm font-semibold text-muted-foreground">{SECONDS_TITLE[game]}</p>
-        <div className={cn("grid gap-2", secondOptions.length > 3 ? "grid-cols-4" : "grid-cols-3")}>
+        <div className={cn("grid gap-2", secondOptions.length > 4 ? "grid-cols-5" : secondOptions.length > 3 ? "grid-cols-4" : "grid-cols-3")}>
           {secondOptions.map((n) => (
-            <Button key={n} variant={option(seconds === n)} aria-label={`${n} segundos`} aria-pressed={seconds === n} disabled={ctx.busy !== null} className="px-2" onClick={() => void setSeconds(n)}>{secondsLabel(n)}</Button>
+            <Button key={n} variant={option(seconds === n)} aria-label={`${n} segundos`} aria-pressed={seconds === n} disabled={ctx.busy !== null} className={secondOptions.length > 4 ? "px-1 text-sm" : "px-2"} onClick={() => void setSeconds(n)}>{secondsLabel(n)}</Button>
           ))}
         </div>
       </div>
