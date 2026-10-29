@@ -6,8 +6,7 @@ import { toast } from "sonner";
 
 import { InstallApp } from "@/components/InstallApp";
 import { PartyIcon } from "@/components/party/PartyIcon";
-import { RulesList } from "@/components/party/RulesList";
-import { StopRules } from "@/components/party/StopParty";
+import { RulesList, StopRules } from "@/components/party/RulesList";
 import { useSound } from "@/components/SoundProvider";
 import { ThemePicker } from "@/components/ThemePicker";
 import { Button } from "@/components/ui/button";

@@ -16,7 +16,6 @@ import {
   STOP_CATEGORY_MAX_LENGTH,
   STOP_INTENSITIES,
   STOP_INTENSITY_LABELS,
-  STOP_RULES,
   STOP_SCORINGS,
   STOP_SCORING_LABELS,
   STOP_SECONDS_OPTIONS,
@@ -57,13 +56,8 @@ export function StopRulesSummary({ settings, className }: { settings: PartySetti
   );
 }
 
-export function StopRules() {
-  return (
-    <ul className="space-y-1.5 text-sm text-muted-foreground">
-      {STOP_RULES.map((rule) => <li key={rule} className="flex gap-2"><span className="party-accent" aria-hidden="true">•</span><span>{rule}</span></li>)}
-    </ul>
-  );
-}
+/* StopRules lives in RulesList so the home page never loads the Stop round code. */
+export { StopRules } from "@/components/party/RulesList";
 
 function OptionButton({ active, disabled, onClick, title, detail, label }: { active: boolean; disabled: boolean; onClick: () => void; title: string; detail?: string; label?: string }) {
   return (
