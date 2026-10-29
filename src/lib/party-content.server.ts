@@ -86,7 +86,7 @@ export const DEBATE_TOPICS: { title: string; sideA: string; sideB: string }[] = 
   { title: "Banho gelado no inverno", sideA: "A favor (revigorante)", sideB: "Contra (tortura)" },
   { title: "Dormir de meia", sideA: "A favor (aconchego total)", sideB: "Contra (aberração nos pés)" },
   { title: "Biscoito ou bolacha", sideA: "É biscoito", sideB: "É bolacha" },
-  { title: "Segunda-feira", sideA: "A melhor dia da semana", sideB: "O pior dia da semana" },
+  { title: "Segunda-feira", sideA: "O melhor dia da semana", sideB: "O pior dia da semana" },
   { title: "Áudio longo no WhatsApp", sideA: "A favor (é carinho)", sideB: "Contra (é ataque)" },
   { title: "Dinossauros como pets", sideA: "A favor", sideB: "Contra" },
   { title: "Ketchup na pizza", sideA: "A favor", sideB: "Contra" },
