@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
-import { ArrowRight, BookOpen, Clock, Loader2, Users } from "lucide-react";
+import { ArrowRight, BookOpen, Clock, Dices, Loader2, Users } from "lucide-react";
 import { toast } from "sonner";
 
 import { InstallApp } from "@/components/InstallApp";
@@ -12,6 +12,8 @@ import { ThemePicker } from "@/components/ThemePicker";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { vibrate } from "@/lib/haptics";
+import { randomNickname } from "@/lib/nicknames";
 import { createPartyRoom, joinPartyRoom } from "@/lib/party.functions";
 import { LOBBY_GAMES, PARTY_GAMES, STOP_LOBBY_META, type LobbyGameId } from "@/lib/party-games";
 import { getLastNickname, getOrCreateSessionId, savePlayer } from "@/lib/session";

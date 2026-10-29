@@ -19,6 +19,8 @@ describe("host rules for Debate and Roleta", () => {
     expect(readPartySettings({ debateSeconds: 45 }).debateSeconds).toBe(90);
     expect(readPartySettings({ roletaSeconds: 45 }).roletaSeconds).toBe(45);
     expect(readPartySettings({ roletaSeconds: 120 }).roletaSeconds).toBe(60);
+    expect(readPartySettings({ roletaSeconds: 180 }).roletaSeconds).toBe(180);
+    expect(readPartySettings({ roletaSeconds: 300 }).roletaSeconds).toBe(300);
     expect(readPartySettings({ debateJudge: "juiz" }).debateJudge).toBe("auto");
   });
 
@@ -39,10 +41,10 @@ describe("host rules for Debate and Roleta", () => {
 });
 
 describe("longer answers", () => {
-  test("debate accepts 500 characters, tribunal 350, other games 220", () => {
+  test("debate, tribunal and roleta accept 500 characters, other games 220", () => {
     expect(textMaxFor("debate")).toBe(500);
-    expect(textMaxFor("tribunal")).toBe(350);
-    expect(textMaxFor("roleta")).toBe(220);
+    expect(textMaxFor("tribunal")).toBe(500);
+    expect(textMaxFor("roleta")).toBe(500);
     expect(textMaxFor("autor")).toBe(220);
   });
 });
