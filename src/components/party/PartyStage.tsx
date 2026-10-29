@@ -115,7 +115,6 @@ function PlayersPanel({ players, me }: { players: PartyPlayer[]; me: PartyPlayer
 function GameMetaLine({ game }: { game: LobbyGameMeta }) {
   return (
     <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-semibold text-muted-foreground">
-      <span className="inline-flex items-center gap-1"><Users className="size-3.5" aria-hidden="true" /> {game.minPlayers}+</span>
       <span className="inline-flex items-center gap-1"><Clock className="size-3.5" aria-hidden="true" /> {game.duration}</span>
     </span>
   );

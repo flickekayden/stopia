@@ -123,7 +123,7 @@ export async function aiJudgeDebate(input: { tema: string; lado_a: string; lado_
   const labels = input.argumentos.map((a) => a.rotulo);
   const result = await withTimeout(
     generateJsonGemini<{ vencedor: string; bonus: number; veredito: string }>({
-      instructions: `Você é o juiz de um tribunal de debates cômico e rigoroso no jogo "Debate Impossível". Cada argumento defende o lado sorteado (A ou B), concordando ou não. Avalie oratória, convicção, criatividade, nível de absurdo bem usado e humor; ignore erros de digitação. Argumento vazio ou fora do tema perde. Escolha UM vencedor pelo rótulo. "bonus": 0 vitória apertada, 1 vitória clara, 2 massacre. "veredito": anuncie o vencedor com humor sarcástico citando o porquê, sem humilhar ninguém. ${SAFETY} Máximo de 45 palavras no veredito.${toneLine(tone)}`,
+      instructions: `Você é o juiz de um tribunal de debates cômico e rigoroso no jogo "Debate Impossível". Cada argumento defende o lado sorteado (A ou B), concordando ou não. Avalie oratória, convicção, criatividade, nível de absurdo bem usado e humor; ignore erros de digitação. Argumento vazio ou fora do tema perde. Escolha UM vencedor pelo rótulo. "bonus": 0 vitória apertada, 1 vitória clara, 2 massacre. "veredito": anuncie o vencedor com humor sarcástico citando o porquê, sem humilhar ninguém. Refira-se aos argumentos só como "o Lado A" e "o Lado B" (ou "a defesa do Lado A"), nunca pelo rótulo ou número. ${SAFETY} Máximo de 45 palavras no veredito.${toneLine(tone)}`,
       input: JSON.stringify(input),
       schemaName: "debate_judge",
       schema: {
@@ -146,7 +146,7 @@ export async function aiJudgeRoleta(input: { desafio: string; respostas: { rotul
   const labels = input.respostas.map((r) => r.rotulo);
   const result = await withTimeout(
     generateJsonGemini<{ notas: { rotulo: string; pontos: number; comentario: string }[]; resumo: string }>({
-      instructions: `Você é o juiz da "Roleta do Caos". Para cada resposta, dê de 0 a 3 pontos: 0 não cumpriu o desafio, 1 cumpriu sem graça, 2 cumpriu com criatividade, 3 genial e hilária. "comentario" com até 12 palavras por resposta. "resumo": eleja a melhor com humor, até 35 palavras. ${SAFETY}${toneLine(tone)}`,
+      instructions: `Você é o juiz da "Roleta do Caos". Para cada resposta, dê de 0 a 3 pontos: 0 não cumpriu o desafio, 1 cumpriu sem graça, 2 cumpriu com criatividade, 3 genial e hilária. "comentario" com até 12 palavras por resposta. "resumo": eleja a melhor com humor, até 35 palavras, citando um trecho dela e nunca pelo rótulo ou número. ${SAFETY}${toneLine(tone)}`,
       input: JSON.stringify(input),
       schemaName: "roleta_judge",
       schema: {
