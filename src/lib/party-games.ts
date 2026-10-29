@@ -84,30 +84,34 @@ export const PARTY_GAMES: Record<PartyGameId, PartyGameMeta> = {
     id: "debate",
     name: "Debate Impossível",
     short: "Defenda o indefensável. O melhor argumento vence.",
-    description: "Um dilema absurdo, dois lados sorteados. Cada um defende o seu lado e o grupo vota no melhor argumento.",
+    description: "Um tema absurdo, dois lados sorteados. Cada um defende o seu lado e o juiz de IA (ou a galera) decide quem convenceu mais.",
     minPlayers: 2,
     icon: "mic",
     rules: [
-      "A rodada traz um dilema absurdo com dois lados: A e B.",
-      "Os jogadores são divididos em dois times; cada um defende o lado sorteado, concordando ou não.",
-      "Todos votam no melhor argumento (não vale o próprio).",
+      "A rodada traz um tema com dois lados opostos: A e B. Você recebe um deles, concordando ou não.",
+      "Escreva o seu argumento antes do tempo acabar.",
+      "Juiz de IA: a IA lê tudo, escolhe o melhor argumento e explica o veredito.",
+      "Votação da galera: todos votam no melhor argumento (não vale o próprio).",
     ],
-    scoring: ["+1 por voto recebido.", "Time com mais votos no total: +1 para cada membro. Empate: ninguém ganha o bônus."],
+    scoring: [
+      "Juiz de IA: melhor argumento +2 (até +2 extra se a vitória for esmagadora); o lado vencedor ganha +1.",
+      "Votação: +1 por voto recebido; time com mais votos: +1 para cada membro.",
+    ],
   },
   roleta: {
     id: "roleta",
     name: "Roleta do Caos",
-    short: "Desafios aleatórios, eventos malucos e votação rápida.",
-    description: "A roleta sorteia um desafio e um evento do caos. Todos cumprem por escrito e o grupo vota na melhor resposta.",
+    short: "Desafios aleatórios, eventos malucos e julgamento rápido.",
+    description: "A roleta sorteia um desafio e um evento do caos. Todos cumprem por escrito e o juiz de IA (ou a galera) avalia.",
     minPlayers: 2,
     icon: "dices",
     rules: [
       "A roleta sorteia um desafio da intensidade escolhida e um evento do caos (pontos em dobro, triplo...).",
       "Todos respondem por escrito. Nada perigoso, ilegal ou que exponha dados pessoais.",
       "O mestre pode pular desafios até o limite configurado.",
-      "Todos votam na melhor resposta (não vale a própria).",
+      "Juiz de IA: dá de 0 a 3 pontos por resposta. Votação: todos votam na melhor (não vale a própria).",
     ],
-    scoring: ["Cada voto recebido vale pontos multiplicados pelo evento da rodada."],
+    scoring: ["Pontos da IA ou votos recebidos, multiplicados pelo evento da rodada."],
   },
 };
 
@@ -134,11 +138,23 @@ export const STOP_CATEGORY_MAX_LENGTH = 160;
 export const STOP_CATEGORY_LIMIT = 250;
 export const STOP_ANSWER_MAX = 80;
 
+/** Who decides Debate/Roleta rounds. "auto": AI judge with 2 players, group vote with 3+. */
+export type JudgeMode = "auto" | "ia" | "voto";
+export const JUDGE_MODES: readonly JudgeMode[] = ["auto", "ia", "voto"];
+export const DEBATE_SECONDS_OPTIONS = [60, 90, 120] as const;
+export const ROLETA_SECONDS_OPTIONS = [45, 60, 90] as const;
+
 export type PartySettings = {
   rounds: number;
   ai: boolean;
   intensity: "leve" | "media" | "caotica";
   skips: number;
+  /** Debate Impossível: argument time and who judges. */
+  debateSeconds: number;
+  debateJudge: JudgeMode;
+  /** Roleta do Caos: answer time per challenge and who judges. */
+  roletaSeconds: number;
+  roletaJudge: JudgeMode;
   /** Stop only. */
   stopSeconds: number;
   scoring: StopScoring;
@@ -151,6 +167,10 @@ export const DEFAULT_PARTY_SETTINGS: PartySettings = {
   ai: true,
   intensity: "media",
   skips: 1,
+  debateSeconds: 90,
+  debateJudge: "auto",
+  roletaSeconds: 60,
+  roletaJudge: "auto",
   stopSeconds: 90,
   scoring: "fixed",
   aiIntensity: "padrao",
@@ -177,6 +197,10 @@ export function readStopCategories(raw: unknown): string[] {
   return out.length > 0 ? out : [...DEFAULT_CATEGORIES];
 }
 
+function pick<T>(options: readonly T[], value: unknown, fallback: T): T {
+  return options.includes(value as T) ? (value as T) : fallback;
+}
+
 export function readPartySettings(raw: unknown): PartySettings {
   const value = (raw && typeof raw === "object" ? raw : {}) as Partial<PartySettings>;
   const seconds = Number(value.stopSeconds);
@@ -185,6 +209,10 @@ export function readPartySettings(raw: unknown): PartySettings {
     ai: typeof value.ai === "boolean" ? value.ai : DEFAULT_PARTY_SETTINGS.ai,
     intensity: value.intensity === "leve" || value.intensity === "caotica" || value.intensity === "media" ? value.intensity : DEFAULT_PARTY_SETTINGS.intensity,
     skips: PARTY_SKIP_OPTIONS.includes(value.skips as 0) ? (value.skips as number) : DEFAULT_PARTY_SETTINGS.skips,
+    debateSeconds: pick<number>(DEBATE_SECONDS_OPTIONS, value.debateSeconds, DEFAULT_PARTY_SETTINGS.debateSeconds),
+    debateJudge: pick(JUDGE_MODES, value.debateJudge, DEFAULT_PARTY_SETTINGS.debateJudge),
+    roletaSeconds: pick<number>(ROLETA_SECONDS_OPTIONS, value.roletaSeconds, DEFAULT_PARTY_SETTINGS.roletaSeconds),
+    roletaJudge: pick(JUDGE_MODES, value.roletaJudge, DEFAULT_PARTY_SETTINGS.roletaJudge),
     stopSeconds: Number.isFinite(seconds) && value.stopSeconds !== null && value.stopSeconds !== undefined
       ? Math.min(STOP_SECONDS_MAX, Math.max(STOP_SECONDS_MIN, Math.round(seconds)))
       : DEFAULT_PARTY_SETTINGS.stopSeconds,
@@ -192,6 +220,24 @@ export function readPartySettings(raw: unknown): PartySettings {
     aiIntensity: STOP_INTENSITIES.includes(value.aiIntensity as StopIntensity) ? (value.aiIntensity as StopIntensity) : DEFAULT_PARTY_SETTINGS.aiIntensity,
     categories: readStopCategories(value.categories),
   };
+}
+
+/** The judge actually used: "auto" means the AI judges a 2-player duel and the group votes with 3+. */
+export function effectiveJudge(mode: JudgeMode, players: number): "ia" | "voto" {
+  if (mode === "auto") return players <= 2 ? "ia" : "voto";
+  return mode;
+}
+
+/** Judge mode setting for a judged game (Debate or Roleta); other games have none. */
+export function judgeModeFor(game: PartyGameId, settings: PartySettings): JudgeMode | null {
+  return game === "debate" ? settings.debateJudge : game === "roleta" ? settings.roletaJudge : null;
+}
+
+/** Host-chosen seconds for the writing step of Debate/Roleta; null for everything else. */
+export function hostPhaseSeconds(game: PartyGameId, phase: PartyPhaseId, settings: PartySettings): number | null {
+  if (game === "debate" && phase === "argue") return settings.debateSeconds;
+  if (game === "roleta" && phase === "respond") return settings.roletaSeconds;
+  return null;
 }
 
 /** Keeps only this round's categories, trimmed and capped; anything else a client sends is dropped. */
