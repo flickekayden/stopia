@@ -14,8 +14,11 @@ import { Route as ComprarRouteImport } from './routes/comprar'
 import { Route as EntrarRouteImport } from './routes/entrar'
 import { Route as JogosRouteImport } from './routes/jogos'
 import { Route as PerfilRouteImport } from './routes/perfil'
+import { Route as PrivacidadeRouteImport } from './routes/privacidade'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as StopRouteImport } from './routes/stop'
+import { Route as SuporteRouteImport } from './routes/suporte'
+import { Route as TermosRouteImport } from './routes/termos'
 import { Route as FestaCodeRouteImport } from './routes/festa.$code'
 import { Route as SalaCodeRouteImport } from './routes/sala.$code'
 
@@ -44,6 +47,11 @@ const PerfilRoute = PerfilRouteImport.update({
   path: '/perfil',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PrivacidadeRoute = PrivacidadeRouteImport.update({
+  id: '/privacidade',
+  path: '/privacidade',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
   id: '/reset-password',
   path: '/reset-password',
@@ -52,6 +60,16 @@ const ResetPasswordRoute = ResetPasswordRouteImport.update({
 const StopRoute = StopRouteImport.update({
   id: '/stop',
   path: '/stop',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SuporteRoute = SuporteRouteImport.update({
+  id: '/suporte',
+  path: '/suporte',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TermosRoute = TermosRouteImport.update({
+  id: '/termos',
+  path: '/termos',
   getParentRoute: () => rootRouteImport,
 } as any)
 const FestaCodeRoute = FestaCodeRouteImport.update({
@@ -71,8 +89,11 @@ export interface FileRoutesByFullPath {
   '/entrar': typeof EntrarRoute
   '/jogos': typeof JogosRoute
   '/perfil': typeof PerfilRoute
+  '/privacidade': typeof PrivacidadeRoute
   '/reset-password': typeof ResetPasswordRoute
   '/stop': typeof StopRoute
+  '/suporte': typeof SuporteRoute
+  '/termos': typeof TermosRoute
   '/festa/$code': typeof FestaCodeRoute
   '/sala/$code': typeof SalaCodeRoute
 }
@@ -82,8 +103,11 @@ export interface FileRoutesByTo {
   '/entrar': typeof EntrarRoute
   '/jogos': typeof JogosRoute
   '/perfil': typeof PerfilRoute
+  '/privacidade': typeof PrivacidadeRoute
   '/reset-password': typeof ResetPasswordRoute
   '/stop': typeof StopRoute
+  '/suporte': typeof SuporteRoute
+  '/termos': typeof TermosRoute
   '/festa/$code': typeof FestaCodeRoute
   '/sala/$code': typeof SalaCodeRoute
 }
@@ -94,8 +118,11 @@ export interface FileRoutesById {
   '/entrar': typeof EntrarRoute
   '/jogos': typeof JogosRoute
   '/perfil': typeof PerfilRoute
+  '/privacidade': typeof PrivacidadeRoute
   '/reset-password': typeof ResetPasswordRoute
   '/stop': typeof StopRoute
+  '/suporte': typeof SuporteRoute
+  '/termos': typeof TermosRoute
   '/festa/$code': typeof FestaCodeRoute
   '/sala/$code': typeof SalaCodeRoute
 }
@@ -107,8 +134,11 @@ export interface FileRouteTypes {
     | '/entrar'
     | '/jogos'
     | '/perfil'
+    | '/privacidade'
     | '/reset-password'
     | '/stop'
+    | '/suporte'
+    | '/termos'
     | '/festa/$code'
     | '/sala/$code'
   fileRoutesByTo: FileRoutesByTo
@@ -118,8 +148,11 @@ export interface FileRouteTypes {
     | '/entrar'
     | '/jogos'
     | '/perfil'
+    | '/privacidade'
     | '/reset-password'
     | '/stop'
+    | '/suporte'
+    | '/termos'
     | '/festa/$code'
     | '/sala/$code'
   id:
@@ -129,8 +162,11 @@ export interface FileRouteTypes {
     | '/entrar'
     | '/jogos'
     | '/perfil'
+    | '/privacidade'
     | '/reset-password'
     | '/stop'
+    | '/suporte'
+    | '/termos'
     | '/festa/$code'
     | '/sala/$code'
   fileRoutesById: FileRoutesById
@@ -141,8 +177,11 @@ export interface RootRouteChildren {
   EntrarRoute: typeof EntrarRoute
   JogosRoute: typeof JogosRoute
   PerfilRoute: typeof PerfilRoute
+  PrivacidadeRoute: typeof PrivacidadeRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   StopRoute: typeof StopRoute
+  SuporteRoute: typeof SuporteRoute
+  TermosRoute: typeof TermosRoute
   FestaCodeRoute: typeof FestaCodeRoute
   SalaCodeRoute: typeof SalaCodeRoute
 }
@@ -184,6 +223,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PerfilRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/privacidade': {
+      id: '/privacidade'
+      path: '/privacidade'
+      fullPath: '/privacidade'
+      preLoaderRoute: typeof PrivacidadeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/reset-password': {
       id: '/reset-password'
       path: '/reset-password'
@@ -196,6 +242,20 @@ declare module '@tanstack/react-router' {
       path: '/stop'
       fullPath: '/stop'
       preLoaderRoute: typeof StopRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/suporte': {
+      id: '/suporte'
+      path: '/suporte'
+      fullPath: '/suporte'
+      preLoaderRoute: typeof SuporteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/termos': {
+      id: '/termos'
+      path: '/termos'
+      fullPath: '/termos'
+      preLoaderRoute: typeof TermosRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/festa/$code': {
@@ -221,8 +281,11 @@ const rootRouteChildren: RootRouteChildren = {
   EntrarRoute: EntrarRoute,
   JogosRoute: JogosRoute,
   PerfilRoute: PerfilRoute,
+  PrivacidadeRoute: PrivacidadeRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   StopRoute: StopRoute,
+  SuporteRoute: SuporteRoute,
+  TermosRoute: TermosRoute,
   FestaCodeRoute: FestaCodeRoute,
   SalaCodeRoute: SalaCodeRoute,
 }
