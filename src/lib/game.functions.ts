@@ -31,13 +31,6 @@ async function resolveDevOverrides(dev: DevOverrides) {
   return (await isDeveloper(dev.token)) ? dev : undefined;
 }
 
-async function loadSavedAi(): Promise<DevOverrides> {
-  const supabase = await db();
-  const { data } = await supabase.from("app_settings").select("value").eq("key", "ai").maybeSingle();
-  const parsed = devOverridesSchema.safeParse(data?.value ?? undefined);
-  return parsed.success ? parsed.data : undefined;
-}
-
 const shortStr = z.string().max(80);
 const uiSchema = z.object({
   buttonLayout: z.enum(["default", "reversed", "stacked"]),
