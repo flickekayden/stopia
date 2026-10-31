@@ -116,7 +116,7 @@ function GamesHub() {
         <p className="text-base text-muted-foreground">Reúna a galera numa sala só e escolham juntos o que jogar. No celular e sem cadastro obrigatório.</p>
         <div className="flex items-center gap-2">
           <Button asChild variant="secondary" className="h-11 px-4">
-            <Link to={credits.signedIn ? "/perfil" : "/entrar"}><UserRound /> {credits.signedIn ? "Meu Stopia" : "Entrar ou criar conta"}</Link>
+            <Link to={credits.signedIn ? "/perfil" : "/entrar"}><UserRound /> {credits.signedIn ? "Meu Stopia" : "Entrar"}</Link>
           </Button>
           {!credits.signedIn && <Button asChild variant="ghost" className="h-11 px-3 text-sm"><Link to="/perfil">Meu saldo</Link></Button>}
         </div>
