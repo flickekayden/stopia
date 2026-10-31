@@ -712,11 +712,6 @@ function StopReveal({ ctx, actions }: { ctx: PartyCtx; actions: PartyActions }) 
             <Scale /> Recorrer ao juiz: a galera decide se “{myRow?.resposta}” vale ponto
           </Button>
         )}
-        {!lastCategory && (
-          <Button variant="secondary" className="h-12 w-full font-semibold" onClick={() => { setIndex((i) => i + 1); window.scrollTo({ top: 0, behavior: "smooth" }); }}>
-            Próxima categoria <ChevronRight />
-          </Button>
-        )}
       </section>
 
       <AppealPanel ctx={ctx} actions={actions} />
@@ -724,7 +719,11 @@ function StopReveal({ ctx, actions }: { ctx: PartyCtx; actions: PartyActions }) 
       <StopScoreboard ctx={ctx} />
 
       <div className="mobile-bottom-bar fixed inset-x-0 bottom-0 mx-auto w-full max-w-md border-t border-border bg-background/95 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
-        {ctx.isHost ? (
+        {!seenAll ? (
+          <Button className="h-14 w-full text-lg font-bold" onClick={goNextCategory}>
+            Próxima categoria <span className="tabular-nums text-sm font-semibold opacity-80">({index + 1}/{categories.length})</span> <ChevronRight />
+          </Button>
+        ) : ctx.isHost ? (
           <Button className="party-accent-button h-14 w-full text-lg font-bold shadow-none" disabled={ctx.busy !== null || appealOpen} aria-busy={ctx.busy === "next"} onClick={() => void actions.next()}>
             {ctx.busy === "next" ? <><Loader2 className="animate-spin" /> Preparando…</> : appealOpen ? <><Scale /> Votação do recurso…</> : last ? "Ver resultado final" : "Próxima rodada"}
           </Button>
