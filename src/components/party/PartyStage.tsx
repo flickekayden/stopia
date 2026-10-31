@@ -43,6 +43,7 @@ import {
 } from "@/lib/party-games";
 import { vibrate } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
+import { localShareImageFor } from "@/lib/share-images";
 
 export type PartyCtx = {
   room: PartyRoom;
@@ -423,7 +424,7 @@ function RulesShelf({ onRules }: { onRules: (game: LobbyGameId) => void }) {
 }
 
 /** Big room code with the full invite link: copy it or open the phone's share sheet. */
-function RoomShareCard({ code }: { code: string }) {
+function RoomShareCard({ code, game }: { code: string; game: string }) {
   const [url, setUrl] = useState(`/festa/${code}`);
   const [copied, setCopied] = useState(false);
   const [canShare, setCanShare] = useState(false);
@@ -448,9 +449,28 @@ function RoomShareCard({ code }: { code: string }) {
     }
   }
 
-  async function share() {
+  async function copyCode() {
     try {
-      await navigator.share({ title: "Sala da Galera", text: `Bora jogar! Entra na sala ${code}:`, url });
+      await navigator.clipboard.writeText(code);
+      vibrate(15);
+      toast.success(`Código ${code} copiado!`, { duration: 1_500 });
+    } catch {
+      toast.error("Não foi possível copiar o código.");
+    }
+  }
+
+  async function share() {
+    const name = game === "lobby" ? "Sala da Galera" : lobbyGameMeta(game as LobbyGameId).name;
+    const text = `Bora jogar ${name} no Stopia? Código da sala: ${code}`;
+    try {
+      // Android share sheet with the game's card when the device supports sharing images.
+      let files: File[] | undefined;
+      try {
+        const blob = await (await fetch(localShareImageFor(game))).blob();
+        const file = new File([blob], `stopia-${code}.jpg`, { type: "image/jpeg" });
+        if (navigator.canShare?.({ files: [file] })) files = [file];
+      } catch { /* text-only share */ }
+      await navigator.share({ title: `Stopia — ${name}`, text: `${text}\n${url}`, ...(files ? { files } : { url }) });
       vibrate(15);
     } catch (err) {
       if (!(err instanceof DOMException && err.name === "AbortError")) void copy();
@@ -465,13 +485,16 @@ function RoomShareCard({ code }: { code: string }) {
       <button type="button" onClick={() => void copy()} className="mt-4 w-full truncate rounded-lg border border-dashed border-border bg-background/60 px-3 py-3 font-mono text-sm text-foreground" aria-label={`Copiar link ${url}`}>
         {url.replace(/^https?:\/\//, "")}
       </button>
-      <div className={cn("mt-3 grid gap-2", canShare ? "grid-cols-2" : "grid-cols-1")}>
-        <Button onClick={() => void copy()} variant={copied ? "selected" : "outline"} className="h-12 font-semibold">
-          {copied ? <Check className="size-5" /> : <Copy className="size-5" />} {copied ? "Copiado" : "Copiar link"}
+      <div className={cn("mt-3 grid gap-2", canShare ? "grid-cols-3" : "grid-cols-2")}>
+        <Button onClick={() => void copy()} variant={copied ? "selected" : "outline"} className="h-12 px-2 font-semibold">
+          {copied ? <Check className="size-5" /> : <Copy className="size-5" />} {copied ? "Copiado" : "Link"}
+        </Button>
+        <Button onClick={() => void copyCode()} variant="outline" className="h-12 px-2 font-semibold">
+          <Copy className="size-5" /> Código
         </Button>
         {canShare && (
           <Button onClick={() => void share()} variant="outline" className="h-12 font-semibold">
-            <Share2 className="size-5" /> Compartilhar
+            <Share2 className="size-5" /> Enviar
           </Button>
         )}
       </div>
@@ -495,7 +518,7 @@ export function PartyLobby({ ctx, actions }: { ctx: LobbyCtx; actions: PartyActi
   }, [showSetup, selected]);
   const roomInfo = (
     <>
-      <RoomShareCard code={ctx.room.code} />
+      <RoomShareCard code={ctx.room.code} game={ctx.room.game} />
       <PlayersPanel players={ctx.players} me={ctx.me} actions={actions} busy={ctx.busy !== null} />
     </>
   );
