@@ -10,7 +10,9 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as EntrarRouteImport } from './routes/entrar'
 import { Route as JogosRouteImport } from './routes/jogos'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as StopRouteImport } from './routes/stop'
 import { Route as FestaCodeRouteImport } from './routes/festa.$code'
 import { Route as SalaCodeRouteImport } from './routes/sala.$code'
@@ -20,9 +22,19 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const EntrarRoute = EntrarRouteImport.update({
+  id: '/entrar',
+  path: '/entrar',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const JogosRoute = JogosRouteImport.update({
   id: '/jogos',
   path: '/jogos',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
   getParentRoute: () => rootRouteImport,
 } as any)
 const StopRoute = StopRouteImport.update({
@@ -43,14 +55,18 @@ const SalaCodeRoute = SalaCodeRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/entrar': typeof EntrarRoute
   '/jogos': typeof JogosRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/stop': typeof StopRoute
   '/festa/$code': typeof FestaCodeRoute
   '/sala/$code': typeof SalaCodeRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/entrar': typeof EntrarRoute
   '/jogos': typeof JogosRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/stop': typeof StopRoute
   '/festa/$code': typeof FestaCodeRoute
   '/sala/$code': typeof SalaCodeRoute
@@ -58,22 +74,48 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/entrar': typeof EntrarRoute
   '/jogos': typeof JogosRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/stop': typeof StopRoute
   '/festa/$code': typeof FestaCodeRoute
   '/sala/$code': typeof SalaCodeRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/jogos' | '/stop' | '/festa/$code' | '/sala/$code'
+  fullPaths:
+    | '/'
+    | '/entrar'
+    | '/jogos'
+    | '/reset-password'
+    | '/stop'
+    | '/festa/$code'
+    | '/sala/$code'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/jogos' | '/stop' | '/festa/$code' | '/sala/$code'
-  id: '__root__' | '/' | '/jogos' | '/stop' | '/festa/$code' | '/sala/$code'
+  to:
+    | '/'
+    | '/entrar'
+    | '/jogos'
+    | '/reset-password'
+    | '/stop'
+    | '/festa/$code'
+    | '/sala/$code'
+  id:
+    | '__root__'
+    | '/'
+    | '/entrar'
+    | '/jogos'
+    | '/reset-password'
+    | '/stop'
+    | '/festa/$code'
+    | '/sala/$code'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  EntrarRoute: typeof EntrarRoute
   JogosRoute: typeof JogosRoute
+  ResetPasswordRoute: typeof ResetPasswordRoute
   StopRoute: typeof StopRoute
   FestaCodeRoute: typeof FestaCodeRoute
   SalaCodeRoute: typeof SalaCodeRoute
@@ -88,11 +130,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/entrar': {
+      id: '/entrar'
+      path: '/entrar'
+      fullPath: '/entrar'
+      preLoaderRoute: typeof EntrarRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/jogos': {
       id: '/jogos'
       path: '/jogos'
       fullPath: '/jogos'
       preLoaderRoute: typeof JogosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/stop': {
@@ -121,7 +177,9 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  EntrarRoute: EntrarRoute,
   JogosRoute: JogosRoute,
+  ResetPasswordRoute: ResetPasswordRoute,
   StopRoute: StopRoute,
   FestaCodeRoute: FestaCodeRoute,
   SalaCodeRoute: SalaCodeRoute,
