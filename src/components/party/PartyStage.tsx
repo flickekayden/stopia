@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { Award, BookOpen, Bot, Check, Clock, Copy, Crown, EyeOff, Eye, Gavel, LayoutGrid, Loader2, LogOut, RefreshCw, Share2, SkipForward, Sparkles, Swords, Trophy, Users } from "lucide-react";
+import { ArrowLeft, Award, BookOpen, Bot, Check, Clock, Copy, Crown, EyeOff, Eye, Gavel, LayoutGrid, Loader2, LogOut, RefreshCw, Share2, SkipForward, Sparkles, Swords, Trophy, Users } from "lucide-react";
 import { toast } from "sonner";
 
 import { CrowdReactions } from "@/components/party/CrowdReactions";
@@ -185,7 +185,7 @@ function GameMetaLine({ game }: { game: LobbyGameMeta }) {
   );
 }
 
-function GamePicker({ ctx, actions, onRules }: { ctx: LobbyCtx; actions: PartyActions; onRules: (game: LobbyGameId) => void }) {
+function GamePicker({ ctx, actions, onRules, onPicked }: { ctx: LobbyCtx; actions: PartyActions; onRules: (game: LobbyGameId) => void; onPicked: () => void }) {
   return (
     <section className="space-y-3" aria-labelledby="lobby-pick">
       <h2 id="lobby-pick" className="text-lg font-bold">Escolha o jogo</h2>
@@ -198,7 +198,11 @@ function GamePicker({ ctx, actions, onRules }: { ctx: LobbyCtx; actions: PartyAc
               type="button"
               aria-pressed={active}
               disabled={ctx.busy !== null}
-              onClick={() => { if (!active) void actions.select(game.id); }}
+              onClick={() => {
+                // Picking opens that game's setup screen right away so its settings are never missed below the fold.
+                if (active) onPicked();
+                else void actions.select(game.id).then((ok) => { if (ok) onPicked(); });
+              }}
               className={cn(
                 "party-card flex min-h-36 flex-1 flex-col items-start gap-2 p-3 text-left transition-transform active:scale-[0.98] disabled:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                 active && "ring-2 ring-[var(--game-accent)]",
@@ -473,15 +477,40 @@ export function PartyLobby({ ctx, actions }: { ctx: LobbyCtx; actions: PartyActi
   const connected = activePlayers(ctx.players).length;
   const missing = selected ? missingPlayers(selected, connected) : 0;
   const [rulesFor, setRulesFor] = useState<LobbyGameId | null>(null);
+  // Host: the game picker, or the chosen game's setup screen (settings first, room info below).
+  const [picking, setPicking] = useState(false);
+  const showSetup = Boolean(selected) && !(ctx.isHost && picking);
+  const firstRender = useRef(true);
+  useEffect(() => {
+    if (firstRender.current) { firstRender.current = false; return; }
+    window.scrollTo({ top: 0, behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+  }, [showSetup, selected]);
+  const roomInfo = (
+    <>
+      <RoomShareCard code={ctx.room.code} />
+      <PlayersPanel players={ctx.players} me={ctx.me} actions={actions} busy={ctx.busy !== null} />
+    </>
+  );
 
   return (
     <div className="dock-clearance space-y-4">
       <NightCrownBanner players={ctx.players} me={ctx.me} />
-      <RoomShareCard code={ctx.room.code} />
-      <PlayersPanel players={ctx.players} me={ctx.me} actions={actions} busy={ctx.busy !== null} />
+      {showSetup && selected ? (
+        <>
+          {ctx.isHost && (
+            <Button variant="ghost" className="-ml-2 h-11 px-2 font-semibold" disabled={ctx.busy !== null} onClick={() => setPicking(true)}>
+              <ArrowLeft /> Escolher outro jogo
+            </Button>
+          )}
+          <SelectedGame ctx={ctx} actions={actions} selected={selected} />
+          {roomInfo}
+        </>
+      ) : (
+        roomInfo
+      )}
 
-      {ctx.isHost ? (
-        <GamePicker ctx={ctx} actions={actions} onRules={setRulesFor} />
+      {ctx.isHost && !showSetup ? (
+        <GamePicker ctx={ctx} actions={actions} onRules={setRulesFor} onPicked={() => setPicking(false)} />
       ) : !selected ? (
         <section className="party-prompt space-y-4 text-center" role="status">
           <span className="party-icon mx-auto size-14 motion-safe:animate-pulse"><Sparkles className="size-7" aria-hidden="true" /></span>
@@ -493,7 +522,6 @@ export function PartyLobby({ ctx, actions }: { ctx: LobbyCtx; actions: PartyActi
         </section>
       ) : null}
 
-      {selected && <SelectedGame ctx={ctx} actions={actions} selected={selected} />}
 
       {!ctx.isHost && selected && (
         <section className="space-y-3" aria-labelledby="lobby-all-rules">
