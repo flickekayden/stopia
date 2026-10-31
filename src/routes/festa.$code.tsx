@@ -38,6 +38,7 @@ import {
   submitPartyAction,
   updatePartySettings,
   touchPartyPresence,
+  getRoomCredits,
 } from "@/lib/party.functions";
 import { HEARTBEAT_MS } from "@/lib/party-presence";
 import { isPartyGame, lobbyGameMeta, readPartySettings, readPublicState, readRoomGame } from "@/lib/party-games";
@@ -87,6 +88,8 @@ function PartyRoomPage() {
   const tickFn = useServerFn(tickPartyBots);
   const devFn = useServerFn(devRoomAction);
   const touchFn = useServerFn(touchPartyPresence);
+  const creditsFn = useServerFn(getRoomCredits);
+  const [hostCredits, setHostCredits] = useState<{ balance: number; billed: boolean } | null>(null);
 
   useEffect(() => {
     const sessionId = getOrCreateSessionId();
@@ -205,6 +208,18 @@ function PartyRoomPage() {
     return () => window.clearInterval(id);
   }, [hasBots, isHost, playing, roomId, identity, tickFn, refresh]);
 
+  // Host: the room creator's AI balance, refreshed whenever the room returns to the lobby or a match ends.
+  const roomStatus = room?.status;
+  const roomGame = room?.game;
+  useEffect(() => {
+    if (!isHost || !roomId || !identity || roomStatus === "playing") return;
+    let alive = true;
+    creditsFn({ data: { roomId, ...identity } })
+      .then((res) => { if (alive) setHostCredits(res); })
+      .catch(() => { if (alive) setHostCredits(null); });
+    return () => { alive = false; };
+  }, [isHost, roomId, identity, roomStatus, roomGame, creditsFn]);
+
   // The developer panel's room controls work on the room on screen.
   useEffect(() => {
     if (!room || !identity) { setDevRoom(null); return; }
@@ -316,7 +331,7 @@ function PartyRoomPage() {
   const ctx: PartyCtx | null = isPartyGame(game) || game === "stop"
     ? { room, players, me, isHost: me.is_host, game, state: readPublicState(room.public_state), settings, view: privateView, busy }
     : null;
-  const lobbyCtx: LobbyCtx = { room, players, me, isHost: me.is_host, selected: game === "lobby" ? null : game, settings, busy };
+  const lobbyCtx: LobbyCtx = { room, players, me, isHost: me.is_host, selected: game === "lobby" ? null : game, settings, busy, credits: me.is_host ? hostCredits : null };
 
   return (
     <main data-game={dataGame} className="game-screen mx-auto w-full max-w-md px-4 pt-[calc(0.75rem+env(safe-area-inset-top))]">
