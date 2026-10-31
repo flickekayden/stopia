@@ -17,6 +17,7 @@ import { randomNickname } from "@/lib/nicknames";
 import { createPartyRoom, joinPartyRoom } from "@/lib/party.functions";
 import { LOBBY_GAMES, type LobbyGameId } from "@/lib/party-games";
 import { getLastNickname, getOrCreateSessionId, savePlayer } from "@/lib/session";
+import { friendlyError } from "@/lib/friendly-error";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -68,7 +69,7 @@ function GamesHub() {
       navigate({ to: "/festa/$code", params: { code: res.code } });
     } catch (error) {
       play("error");
-      toast.error(error instanceof Error ? error.message : "Não foi possível criar a sala");
+      toast.error(friendlyError(error, "Não foi possível criar a sala. Tente de novo."));
     } finally {
       setBusy(null);
     }
@@ -90,7 +91,7 @@ function GamesHub() {
       navigate({ to: "/festa/$code", params: { code: res.code } });
     } catch (error) {
       play("error");
-      toast.error(error instanceof Error ? error.message : "Não foi possível entrar na sala");
+      toast.error(friendlyError(error, "Não foi possível entrar na sala. Confira o código e o apelido (até 20 letras)."));
     } finally {
       setBusy(null);
     }

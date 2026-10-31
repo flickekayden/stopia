@@ -6,6 +6,7 @@ import { CrowdReactions } from "@/components/party/CrowdReactions";
 import { PartyIcon } from "@/components/party/PartyIcon";
 import { GameRulesDialog, RulesList } from "@/components/party/RulesList";
 import { StopLobbySettings, StopRules } from "@/components/party/StopParty";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
@@ -966,12 +967,41 @@ export function PartyPlay({ ctx, actions }: { ctx: PartyCtx; actions: PartyActio
               {ctx.busy === "skip" ? <Loader2 className="animate-spin" /> : <SkipForward />} Pular desafio ({ctx.state.skipsLeft ?? 0})
             </Button>
           )}
-          <Button variant="outline" className="flex-1" disabled={ctx.busy !== null} onClick={() => void actions.advance(true)}>
-            {ctx.busy === "advance" ? <Loader2 className="animate-spin" /> : null} Encerrar etapa agora
-          </Button>
+          <EarlyAdvance ctx={ctx} actions={actions} />
         </div>
       )}
     </div>
+  );
+}
+
+/** Host shortcut that closes the step early; asks first when someone has not sent yet. */
+function EarlyAdvance({ ctx, actions }: { ctx: PartyCtx; actions: PartyActions }) {
+  const [open, setOpen] = useState(false);
+  const present = new Set(ctx.players.map((p) => p.id));
+  const eligible = (ctx.state.eligible ?? []).filter((id) => present.has(id));
+  const done = (ctx.state.submitted ?? []).filter((id) => eligible.includes(id)).length;
+  const pending = eligible.length - done;
+  const close = () => { setOpen(false); void actions.advance(true); };
+  return (
+    <>
+      <Button variant="outline" className="flex-1" disabled={ctx.busy !== null} aria-busy={ctx.busy === "advance"} onClick={() => (pending > 0 ? setOpen(true) : close())}>
+        {ctx.busy === "advance" ? <Loader2 className="animate-spin" /> : null} Encerrar etapa agora
+      </Button>
+      <AlertDialog open={open} onOpenChange={setOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Encerrar antes do tempo?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {done} de {eligible.length} já enviaram. {pending === 1 ? "Quem ainda não enviou fica" : `Os ${pending} que ainda não enviaram ficam`} sem resposta nesta etapa.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Esperar mais</AlertDialogCancel>
+            <AlertDialogAction onClick={close}>Encerrar agora</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
 

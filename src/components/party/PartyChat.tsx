@@ -14,6 +14,7 @@ import { listPartyChat, sendPartyChat } from "@/lib/party.functions";
 import { PARTY_CHAT_MAX, PARTY_CHAT_QUICK } from "@/lib/party-games";
 import { nightKingId } from "@/lib/ranking";
 import { cn } from "@/lib/utils";
+import { friendlyError } from "@/lib/friendly-error";
 
 type ChatRow = Tables<"party_chat">;
 const HISTORY_CAP = 80;
@@ -125,7 +126,7 @@ export function PartyChat({ roomId, playerId, sessionId, players, quickOnly }: {
       setMessages((current) => merge(current, [row as ChatRow]));
       if (clean === text.trim()) setText("");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Não foi possível enviar.");
+      toast.error(friendlyError(err, "Mensagem não enviada. Seu texto continua aqui, tente de novo."));
     } finally {
       setSending(false);
     }
