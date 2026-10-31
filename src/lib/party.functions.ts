@@ -161,3 +161,7 @@ export const voteStopAppeal = createServerFn({ method: "POST" })
 export const resolveStopAppeal = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => z.object({ ...session, round: z.number().int().min(1) }).parse(input))
   .handler(async ({ data }) => (await server()).resolveStopAppeal(data));
+
+export const touchPartyPresence = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => z.object(session).parse(input))
+  .handler(async ({ data }) => (await server()).touchPartyPresence(data));

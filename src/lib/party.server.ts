@@ -70,6 +70,7 @@ import {
   TRIBUNAL_CASES,
 } from "./party-content.server";
 import { MAX_BOTS, botDelayMs, fallbackBotLine, fallbackStopAnswers, nextBotName, seededPick, seededUnit, type BotActionKind } from "./party-bots";
+import { TOUCH_THROTTLE_MS, activePlayers, forChallenge, roletaChallengeKey } from "./party-presence";
 import { APPEAL_SECONDS, appealBlocker, appealClosed, appealOutcome, appealPoints, type AppealVote, type StopAppeal } from "./stop-appeal";
 
 type RoomRow = Tables<"party_rooms">;
@@ -242,45 +243,103 @@ async function guardedUpdate(room: RoomRow, patch: Partial<RoomRow>) {
   return data ?? null;
 }
 
-async function uniqueCode() {
-  for (let i = 0; i < 10; i += 1) {
+/** A code not used by legacy Stop rooms; the party_rooms UNIQUE constraint stays the final guarantee. */
+async function candidateCode() {
+  for (let i = 0; i < 6; i += 1) {
     const code = generateRoomCode();
-    const [{ data: party }, { data: stop }] = await Promise.all([
-      db().from("party_rooms").select("id").eq("code", code).maybeSingle(),
-      db().from("rooms").select("id").eq("code", code).maybeSingle(),
-    ]);
-    if (!party && !stop) return code;
+    const { data: stop } = await db().from("rooms").select("id").eq("code", code).maybeSingle();
+    if (!stop) return code;
   }
-  throw new Error("Não consegui gerar um código de sala. Tente de novo.");
+  return generateRoomCode();
+}
+
+/* Abuse limits: counted per network address (falls back to the device session) in a server-only table. */
+const RATE_LIMITS = {
+  create: { max: 15, windowMs: 60 * 60_000 },
+  join_miss: { max: 20, windowMs: 10 * 60_000 },
+} as const;
+
+async function rateKey(sessionId: string) {
+  let ip = "";
+  try {
+    const { getRequestHeader } = await import("@tanstack/react-start/server");
+    ip = (getRequestHeader("cf-connecting-ip") ?? getRequestHeader("x-forwarded-for")?.split(",")[0] ?? "").trim();
+  } catch { /* not inside a request (tests) */ }
+  return createHash("sha256").update(`rate:${ip || `s:${sessionId}`}`).digest("hex");
+}
+
+async function rateLimited(key: string, kind: keyof typeof RATE_LIMITS) {
+  const { max, windowMs } = RATE_LIMITS[kind];
+  const { count, error } = await db()
+    .from("party_rate_events")
+    .select("id", { count: "exact", head: true })
+    .eq("key_hash", key)
+    .eq("kind", kind)
+    .gte("created_at", new Date(Date.now() - windowMs).toISOString());
+  if (error) return false; // never lock friends out because the counter itself failed
+  return (count ?? 0) >= max;
+}
+
+async function recordRate(key: string, kind: keyof typeof RATE_LIMITS) {
+  await db().from("party_rate_events").insert({ key_hash: key, kind });
+  // Occasional cleanup keeps the counter table small.
+  if (Math.random() < 0.02) await db().from("party_rate_events").delete().lt("created_at", new Date(Date.now() - 24 * 60 * 60_000).toISOString());
 }
 
 /* ---------------------------------- Rooms --------------------------------- */
 
 export async function createPartyRoom(input: { game?: PartyGameId | undefined; nickname: string; sessionId: string }) {
-  const code = await uniqueCode();
-  const { data: room, error } = await db()
-    .from("party_rooms")
-    .insert({ code, game: input.game ?? "lobby", settings: asJson(readPartySettings({})), public_state: asJson({ scores: {} }) })
-    .select()
-    .single();
-  if (error || !room) throw new Error("Não foi possível criar a sala");
+  const nickname = input.nickname.trim();
+  if (!nickname) throw new Error("Coloca um apelido primeiro");
+  const key = await rateKey(input.sessionId);
+  if (await rateLimited(key, "create")) throw new Error("Muitas salas criadas em pouco tempo. Espere alguns minutos e tente de novo.");
+  let room: RoomRow | null = null;
+  for (let attempt = 0; attempt < 5 && !room; attempt += 1) {
+    const code = await candidateCode();
+    const { data, error } = await db()
+      .from("party_rooms")
+      .insert({ code, game: input.game ?? "lobby", settings: asJson(readPartySettings({})), public_state: asJson({ scores: {} }) })
+      .select()
+      .single();
+    if (data) room = data;
+    else if (error?.code !== "23505") {
+      console.error("createPartyRoom: room insert failed", error?.code);
+      throw new Error("Não foi possível criar a sala. Tente de novo.");
+    }
+    // 23505: another room took this code at the same moment; draw a new one.
+  }
+  if (!room) throw new Error("Não consegui gerar um código de sala. Tente de novo.");
   const { data: player, error: playerError } = await db()
     .from("party_players")
-    .insert({ room_id: room.id, nickname: input.nickname.trim(), is_host: true })
+    .insert({ room_id: room.id, nickname, is_host: true })
     .select()
     .single();
-  if (playerError || !player) throw new Error("Não foi possível entrar na sala");
-  await db().from("party_sessions").insert({ player_id: player.id, room_id: room.id, session_hash: hashSession(input.sessionId) });
+  const { error: sessionError } = player
+    ? await db().from("party_sessions").insert({ player_id: player.id, room_id: room.id, session_hash: hashSession(input.sessionId) })
+    : { error: playerError };
+  if (playerError || !player || sessionError) {
+    // Compensate: an inaccessible room is removed (players and sessions cascade).
+    await db().from("party_rooms").delete().eq("id", room.id);
+    console.error("createPartyRoom: host setup failed", playerError?.code ?? sessionError?.code);
+    throw new Error("Não foi possível criar a sala. Nada foi salvo, tente de novo.");
+  }
+  await recordRate(key, "create");
   return { code: room.code, roomId: room.id, playerId: player.id };
 }
 
 export async function joinPartyRoom(input: { code: string; nickname: string; sessionId: string }) {
   const code = input.code.trim().toUpperCase();
+  const key = await rateKey(input.sessionId);
+  if (await rateLimited(key, "join_miss")) throw new Error("Muitas tentativas com códigos errados. Espere alguns minutos e confira o código com quem criou a sala.");
   const { data: room } = await db().from("party_rooms").select("*").eq("code", code).maybeSingle();
-  if (!room) throw new Error("Sala não encontrada");
+  if (!room) {
+    await recordRate(key, "join_miss");
+    throw new Error("Sala não encontrada. Confira o código com quem criou a sala.");
+  }
   const sessionHash = hashSession(input.sessionId);
   const { data: existing } = await db().from("party_sessions").select("player_id").eq("room_id", room.id).eq("session_hash", sessionHash).maybeSingle();
   if (existing) {
+    // Same device again (retry after a network failure or returning later): reuse the seat, never duplicate it.
     await db().from("party_players").update({ last_seen: new Date().toISOString() }).eq("id", existing.player_id);
     return { kind: "party" as const, code: room.code, roomId: room.id, playerId: existing.player_id, reconnected: true };
   }
@@ -296,9 +355,27 @@ export async function joinPartyRoom(input: { code: string; nickname: string; ses
     .insert({ room_id: room.id, nickname, is_host: players.length === 0 })
     .select()
     .single();
-  if (error || !player) throw new Error("Não foi possível entrar na sala");
-  await db().from("party_sessions").insert({ player_id: player.id, room_id: room.id, session_hash: sessionHash });
+  if (error || !player) throw new Error("Não foi possível entrar na sala. Tente de novo.");
+  const { error: sessionError } = await db().from("party_sessions").insert({ player_id: player.id, room_id: room.id, session_hash: sessionHash });
+  if (sessionError) {
+    // Compensate so a retry can join with the same nickname instead of hitting a ghost seat.
+    await db().from("party_players").delete().eq("id", player.id);
+    console.error("joinPartyRoom: session insert failed", sessionError.code);
+    throw new Error("Não foi possível entrar na sala. Tente de novo.");
+  }
   return { kind: "party" as const, code: room.code, roomId: room.id, playerId: player.id, reconnected: false };
+}
+
+/** Presence heartbeat: refreshes last_seen at most every TOUCH_THROTTLE_MS so it never floods realtime. */
+export async function touchPartyPresence(input: { roomId: string; playerId: string; sessionId: string }) {
+  await requireSession(input.roomId, input.playerId, input.sessionId);
+  const now = Date.now();
+  await db()
+    .from("party_players")
+    .update({ last_seen: new Date(now).toISOString() })
+    .eq("id", input.playerId)
+    .lt("last_seen", new Date(now - TOUCH_THROTTLE_MS).toISOString());
+  return { ok: true as const };
 }
 
 export async function leavePartyRoom(input: { roomId: string; playerId: string; sessionId: string }) {
@@ -337,12 +414,23 @@ const RESET_TO_LOBBY = {
   public_state: asJson({ scores: {} }),
 } satisfies Partial<RoomRow>;
 
+/** Deletes a finished match's round rows; every failure is reported instead of silently ignored. */
 async function clearRoundData(roomId: string) {
-  await Promise.all([
+  const results = await Promise.all([
     db().from("party_submissions").delete().eq("room_id", roomId),
     // Positive rows are rounds, negative rows are the training bots' per-round cache; 0 is room history.
     db().from("party_private").delete().eq("room_id", roomId).neq("round_number", 0),
   ]);
+  const failed = results.find((r) => r.error)?.error;
+  if (failed) {
+    console.error("clearRoundData failed", failed.code);
+    throw new Error("Não foi possível preparar a sala. Tente de novo.");
+  }
+}
+
+/** After a transition already committed, leftover rows are harmless (the next start clears again). */
+async function clearAfterTransition(roomId: string) {
+  await clearRoundData(roomId).catch(() => undefined);
 }
 
 /** Host picks (or changes) the game while the group waits in the lobby. */
@@ -359,13 +447,14 @@ export async function selectPartyGame(input: { roomId: string; playerId: string;
 export async function returnPartyToLobby(input: { roomId: string; playerId: string; sessionId: string }) {
   const [, room] = await Promise.all([requireHost(input.roomId, input.playerId, input.sessionId), loadRoom(input.roomId)]);
   if (room.game === "lobby" && room.status === "lobby") return { ok: true };
-  await clearRoundData(room.id);
+  // Transition first (version-guarded); round data is only cleared once the room is safely in the lobby.
   const updated = await guardedUpdate(room, { ...RESET_TO_LOBBY, game: "lobby" });
   if (!updated) {
     const fresh = await loadRoom(room.id);
     if (fresh.game === "lobby" && fresh.status === "lobby") return { ok: true };
     throw new Error("A sala mudou ao mesmo tempo. Tente de novo.");
   }
+  await clearAfterTransition(room.id);
   return { ok: true };
 }
 
@@ -385,25 +474,37 @@ export async function updatePartySettings(input: { roomId: string; playerId: str
 }
 
 export async function startPartyGame(input: { roomId: string; playerId: string; sessionId: string }) {
-  const [, room] = await Promise.all([requireHost(input.roomId, input.playerId, input.sessionId), loadRoom(input.roomId)]);
+  const [host, room] = await Promise.all([requireHost(input.roomId, input.playerId, input.sessionId), loadRoom(input.roomId)]);
   if (room.status === "playing") return { ok: true };
   if (!isPartyGame(room.game) && room.game !== "stop") throw new Error("Escolha um jogo primeiro.");
   const game = room.game;
-  const players = await loadPlayers(room.id);
+  // The host pressing "Começar" is present by definition.
+  await db().from("party_players").update({ last_seen: new Date().toISOString() }).eq("id", host.id);
+  const players = activePlayers(await loadPlayers(room.id));
   const min = lobbyGameMeta(game).minPlayers;
-  if (players.length < min) throw new Error(`Este jogo precisa de pelo menos ${min} jogadores.`);
+  if (players.length < min) throw new Error(`Este jogo precisa de pelo menos ${min} jogadores conectados.`);
+  // Claim the start (version bump) before touching round data: a repeated or concurrent
+  // start loses here and leaves the winner's fresh round alone.
+  const claimed = await guardedUpdate(room, RESET_TO_LOBBY);
+  if (!claimed) return { ok: true };
   await clearRoundData(room.id);
   const scores = Object.fromEntries(players.map((p) => [p.id, 0]));
-  if (game === "stop") await startStopRound(room, players, 1, scores);
-  else await startRound(room, players, 1, scores, readPartySettings(room.settings).skips);
+  const started = game === "stop"
+    ? await startStopRound(claimed, players, 1, scores)
+    : await startRound(claimed, players, 1, scores, readPartySettings(claimed.settings).skips);
+  if (!started) {
+    const fresh = await loadRoom(room.id);
+    if (fresh.status === "playing") return { ok: true };
+    throw new Error("Não foi possível começar a partida. A sala continua no lobby, tente de novo.");
+  }
   return { ok: true };
 }
 
 export async function restartPartyRoom(input: { roomId: string; playerId: string; sessionId: string }) {
   const [, room] = await Promise.all([requireHost(input.roomId, input.playerId, input.sessionId), loadRoom(input.roomId)]);
-  await clearRoundData(room.id);
   const updated = await guardedUpdate(room, RESET_TO_LOBBY);
   if (!updated) throw new Error("A sala mudou ao mesmo tempo. Tente de novo.");
+  await clearAfterTransition(room.id);
   return { ok: true };
 }
 
@@ -580,9 +681,10 @@ async function nextRoundFor(initial: RoomRow) {
     if (withAwards) await (room.game === "debate" ? buildDebateCommentary(ended) : buildTribunalCommentary(ended));
     return { ok: true };
   }
-  const players = await loadPlayers(room.id);
+  // Long-silent players sit the round out (scores kept); they rejoin the next round once back.
+  const players = activePlayers(await loadPlayers(room.id));
   const min = room.game === "stop" ? lobbyGameMeta("stop").minPlayers : PARTY_GAMES[gameOf(room)].minPlayers;
-  if (players.length < min) throw new Error(`Faltam jogadores: este jogo precisa de pelo menos ${min}.`);
+  if (players.length < min) throw new Error(`Faltam jogadores conectados: este jogo precisa de pelo menos ${min}. Quem saiu do app pode voltar pelo mesmo link.`);
   if (room.game === "stop") await startStopRound(room, players, room.round_number + 1, state.scores ?? {});
   else await startRound(room, players, room.round_number + 1, state.scores ?? {}, state.skipsLeft);
   return { ok: true };
@@ -606,12 +708,28 @@ export async function skipRoletaChallenge(input: { roomId: string; playerId: str
     phase_ends_at: deadline("roleta", "respond", admin, settings),
     public_state: asJson({ ...state, prompt, submitted: [], skipsLeft: (state.skipsLeft ?? 1) - 1 }),
   });
-  if (!updated) throw new Error("A rodada mudou ao mesmo tempo. Tente de novo.");
-  await Promise.all([
+  if (!updated) {
+    // A retried request after a network failure: the skip already happened.
+    const fresh = await loadRoom(room.id);
+    if (fresh.round_number === room.round_number && readPublicState(fresh.public_state).skipsLeft !== state.skipsLeft) return { ok: true };
+    throw new Error("A rodada mudou ao mesmo tempo. Tente de novo.");
+  }
+  // The new challenge is live (public state is authoritative). Old answers are tagged with the
+  // previous challenge key and ignored everywhere, so this cleanup is tidy-up, not a correctness step.
+  const results = await Promise.allSettled([
     writePrivate(room.id, 0, { used, history: history.slice(-30) }),
     writePrivate(room.id, room.round_number, { ...roundPrivate, prompt }),
-    db().from("party_submissions").delete().eq("room_id", room.id).eq("round_number", room.round_number).eq("phase", "respond"),
+    db()
+      .from("party_submissions")
+      .delete()
+      .eq("room_id", room.id)
+      .eq("round_number", room.round_number)
+      .eq("phase", "respond")
+      .or(`payload->>challenge.is.null,payload->>challenge.neq.${roletaChallengeKey((state.skipsLeft ?? 1) - 1)}`),
   ]);
+  if (results.some((r) => r.status === "rejected" || (r.status === "fulfilled" && (r.value as { error?: unknown } | undefined)?.error))) {
+    console.error("skipRoletaChallenge: post-skip cleanup incomplete");
+  }
   return { ok: true };
 }
 
@@ -651,6 +769,7 @@ export async function submitPartyAction(input: { roomId: string; playerId: strin
     payload = { answers: sanitizeStopAnswers(raw?.answers, state.stop.categories), done: raw?.done === true };
   } else if (TEXT_PHASES.includes(phase)) {
     payload = textPayload(input.payload, textMaxFor(game));
+    if (game === "roleta" && phase === "respond") payload["challenge"] = roletaChallengeKey(state.skipsLeft);
   } else if (phase === "vote" && game === "tribunal") {
     const verdict = (input.payload as { verdict?: unknown })?.verdict;
     if (verdict !== "culpado" && verdict !== "inocente") throw new Error("Voto inválido.");
@@ -695,10 +814,13 @@ async function syncSubmitted(roomId: string) {
       db().from("party_submissions").select("player_id, payload").eq("room_id", room.id).eq("round_number", room.round_number).eq("phase", room.phase),
       loadPlayers(room.id),
     ]);
-    const present = new Set(players.map((p) => p.id));
+    // Players silent for minutes (closed tab, dead phone) no longer hold everyone else up;
+    // their answers still count if they come back before the step closes.
+    const present = new Set(activePlayers(players).map((p) => p.id));
     const eligibleNow = (state.eligible ?? []).filter((id) => present.has(id));
+    const current = roomSubs(room, state, subs ?? []);
     // Stop drafts are saved continuously: only "Terminei"/STOP counts as finished.
-    const finished = room.game === "stop" ? (subs ?? []).filter((s) => (s.payload as PartyMine | null)?.done === true) : (subs ?? []);
+    const finished = room.game === "stop" ? current.filter((s) => (s.payload as PartyMine | null)?.done === true) : current;
     const submitted = finished.map((s) => s.player_id).filter((id) => eligibleNow.includes(id));
     if (eligibleNow.every((id) => submitted.includes(id))) {
       // A concurrent submit may have bumped the version first; retry with fresh state instead of stalling.
@@ -723,9 +845,15 @@ export async function advancePartyPhase(input: { roomId: string; playerId: strin
 
 /* --------------------------------- Advance --------------------------------- */
 
+/** Roleta answers count only for the challenge on screen (see skipRoletaChallenge). */
+function roomSubs<T extends { payload: unknown }>(room: RoomRow, state: PartyPublicState, subs: T[], phase = room.phase) {
+  return room.game === "roleta" && phase === "respond" ? forChallenge(subs, roletaChallengeKey(state.skipsLeft)) : subs;
+}
+
 async function submissionsFor(room: RoomRow, phase: string) {
   const { data } = await db().from("party_submissions").select("player_id, payload, created_at").eq("room_id", room.id).eq("round_number", room.round_number).eq("phase", phase).order("created_at");
-  return (data ?? []) as unknown as { player_id: string; payload: PartyMine; created_at: string }[];
+  const subs = (data ?? []) as unknown as { player_id: string; payload: PartyMine; created_at: string }[];
+  return roomSubs(room, readPublicState(room.public_state), subs, phase);
 }
 
 function textEntries(subs: { player_id: string; payload: PartyMine }[], present: Set<string>): PartyEntry[] {
@@ -1201,9 +1329,14 @@ export async function stopPartyRound(input: { roomId: string; playerId: string; 
     if (state.stop.stopBy) return { ok: true };
     const answers = sanitizeStopAnswers(input.answers, state.stop.categories);
     if (!stopAnswersComplete(answers, state.stop.categories)) throw new Error("Preencha todas as categorias para gritar STOP!");
-    await db()
+    // The round is only locked once this player's answers are confirmed saved.
+    const { error: saveError } = await db()
       .from("party_submissions")
       .upsert({ room_id: room.id, round_number: room.round_number, phase: "write", player_id: player.id, payload: asJson({ answers, done: true }) }, { onConflict: "room_id,round_number,phase,player_id" });
+    if (saveError) {
+      console.error("stopPartyRound: answer save failed", saveError.code);
+      throw new Error("Não foi possível salvar suas respostas. Nada foi encerrado, tente o STOP de novo.");
+    }
     const lockAt = Date.now() + STOP_LOCK_MS;
     const endsAt = room.phase_ends_at ? Math.min(Date.parse(room.phase_ends_at), lockAt) : lockAt;
     const updated = await guardedUpdate(room, {
@@ -1293,7 +1426,8 @@ export async function getPartyPrivateView(input: { roomId: string; playerId: str
     readPrivate<RoundPrivate>(room.id, room.round_number),
     db().from("party_submissions").select("payload").eq("room_id", room.id).eq("round_number", room.round_number).eq("phase", room.phase).eq("player_id", player.id).maybeSingle(),
   ]);
-  const view: PartyPrivateViewData = { ...empty, mine: (mine?.payload ?? null) as PartyMine | null };
+  const myCurrent = mine ? roomSubs(room, readPublicState(room.public_state), [mine])[0] : undefined;
+  const view: PartyPrivateViewData = { ...empty, mine: (myCurrent?.payload ?? null) as PartyMine | null };
   const game = gameOf(room);
   if (game === "infiltrado" && room.phase !== "reveal") {
     if (!(roundPrivate.playerIds ?? []).includes(player.id)) view.role = "espectador";
@@ -1502,6 +1636,7 @@ async function tickPartyGameBots(room: RoomRow, state: PartyPublicState, players
         const pick = seededPick(INFILTRADO_WORDS.filter((w) => w.category === rp.category), `${bot.id}:${room.round_number}:guess`);
         payload = { text: pick?.word ?? "Não faço ideia" };
       } else payload = textPayload({ text: texts[bot.id] || fallbackBotLine(botRole(game, bot, state, rp).fallback, bot.id) }, textMaxFor(game));
+      if (payload && game === "roleta" && phase === "respond") payload["challenge"] = roletaChallengeKey(state.skipsLeft);
       return payload ? { bot, payload } : null;
     })
     .filter((row): row is { bot: PlayerRow; payload: Record<string, unknown> } => row !== null);

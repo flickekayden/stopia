@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import type { PartyPlayer, PartyPrivateView, PartyRoom } from "@/hooks/use-party-room";
+import { activePlayers, isActivePlayer } from "@/lib/party-presence";
 import { nightKingId, rankPlayers } from "@/lib/ranking";
 import { useDevSettings } from "@/lib/dev-settings";
 import { MAX_BOTS } from "@/lib/party-bots";
@@ -138,6 +139,12 @@ function TrainingBots({ players, actions, busy }: { players: PartyPlayer[]; acti
 
 function PlayersPanel({ players, me, actions, busy }: { players: PartyPlayer[]; me: PartyPlayer; actions: PartyActions; busy: boolean }) {
   const king = nightLeaderId(players);
+  // A slow clock so "Ausente" labels appear without new data.
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(Date.now()), 30_000);
+    return () => window.clearInterval(id);
+  }, []);
   const anyNight = players.some((p) => p.score > 0);
   return (
     <section className="party-panel" aria-labelledby="lobby-players">
@@ -155,6 +162,7 @@ function PlayersPanel({ players, me, actions, busy }: { players: PartyPlayer[]; 
                 {p.is_host && <span className="inline-flex items-center gap-1 text-xs font-bold party-accent"><Crown className="size-3.5" aria-hidden="true" /> Mestre da sala</span>}
                 {p.id === king && <span className="inline-flex items-center gap-1 text-xs font-bold text-primary">👑 Rei da Noite</span>}
                 {p.is_bot && <span className="inline-flex items-center gap-1 text-xs font-bold text-muted-foreground"><Bot className="size-3.5" aria-hidden="true" /> Robô de treino</span>}
+                {!p.is_bot && p.id !== me.id && !isActivePlayer(p, now) && <span className="inline-flex items-center gap-1 text-xs font-semibold text-muted-foreground"><span className="size-2 rounded-full border border-muted-foreground" aria-hidden="true" /> Ausente · não conta para começar</span>}
               </span>
             </span>
             {anyNight && <span className="shrink-0 text-right font-display text-lg tabular-nums" aria-label={`${p.score} pontos na noite`}>{p.score}<span className="block font-sans text-[0.625rem] font-semibold text-muted-foreground">na noite</span></span>}
@@ -170,6 +178,7 @@ function GameMetaLine({ game }: { game: LobbyGameMeta }) {
   return (
     <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-semibold text-muted-foreground">
       <span className="inline-flex items-center gap-1"><Clock className="size-3.5" aria-hidden="true" /> {game.duration}</span>
+      <span className="inline-flex items-center gap-1"><Users className="size-3.5" aria-hidden="true" /> {game.minPlayers}+ jogadores</span>
     </span>
   );
 }
@@ -459,7 +468,8 @@ function RoomShareCard({ code }: { code: string }) {
 export function PartyLobby({ ctx, actions }: { ctx: LobbyCtx; actions: PartyActions }) {
   const selected = ctx.selected;
   const meta = selected ? lobbyGameMeta(selected) : null;
-  const missing = selected ? missingPlayers(selected, ctx.players.length) : 0;
+  const connected = activePlayers(ctx.players).length;
+  const missing = selected ? missingPlayers(selected, connected) : 0;
   const [rulesFor, setRulesFor] = useState<LobbyGameId | null>(null);
 
   return (
@@ -495,7 +505,7 @@ export function PartyLobby({ ctx, actions }: { ctx: LobbyCtx; actions: PartyActi
       <div data-game={selected ?? undefined} className="mobile-bottom-bar fixed inset-x-0 bottom-0 mx-auto w-full max-w-md border-t border-border bg-background/95 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
         {ctx.isHost ? (
           <div className="space-y-2">
-            {selected && missing > 0 && <p role="status" className="text-center text-sm text-muted-foreground">Necessário mínimo de {meta!.minPlayers} jogadores. Compartilhe o código!</p>}
+            {selected && missing > 0 && <p role="status" className="text-center text-sm text-muted-foreground">Necessário mínimo de {meta!.minPlayers} jogadores conectados{connected < ctx.players.length ? ` (${ctx.players.length - connected} ausente${ctx.players.length - connected > 1 ? "s" : ""})` : ""}. Compartilhe o código!</p>}
             <Button className="party-accent-button h-14 w-full text-lg font-bold shadow-none" disabled={!selected || missing > 0 || ctx.busy !== null} aria-busy={ctx.busy === "start"} onClick={() => void actions.start()}>
               {ctx.busy === "start" ? <><Loader2 className="animate-spin" /> Preparando…</> : !selected ? "Escolha um jogo" : `Iniciar ${meta!.name}`}
             </Button>
@@ -663,7 +673,9 @@ function TribunalRole({ ctx, isDefendant, duel }: { ctx: PartyCtx; isDefendant: 
 }
 
 function TextSubmit({ ctx, actions, label, placeholder }: { ctx: PartyCtx; actions: PartyActions; label: string; placeholder: string }) {
-  const phaseKey = `${ctx.room.round_number}:${ctx.room.phase}`;
+  // Roleta "Pular desafio" keeps round and phase but swaps the challenge: start a fresh answer.
+  const challengeKey = ctx.game === "roleta" ? `:${ctx.state.skipsLeft ?? 0}` : "";
+  const phaseKey = `${ctx.room.round_number}:${ctx.room.phase}${challengeKey}`;
   const [text, setText] = useState("");
   const [touched, setTouched] = useState(false);
   const [sentText, setSentText] = useState<string | null>(null);
