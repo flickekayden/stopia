@@ -52,7 +52,8 @@ export const Route = createFileRoute("/festa/$code")({
   head: ({ params, loaderData }) => {
     const preview = loaderData?.preview ?? null;
     const code = params.code.toUpperCase();
-    const gameName = preview && preview.game !== "lobby" ? readRoomGame(preview.game) === "lobby" ? "Sala da Galera" : lobbyGameMeta(readRoomGame(preview.game) as Exclude<ReturnType<typeof readRoomGame>, "lobby">).name : "Sala da Galera";
+    const roomGame = readRoomGame(preview?.game);
+    const gameName = roomGame === "lobby" ? "Sala da Galera" : lobbyGameMeta(roomGame).name;
     const title = preview ? `Sala ${code} · ${gameName} — Stopia` : "Sala da Galera — Central de Jogos do Stopia";
     const description = preview
       ? preview.status === "ended"
