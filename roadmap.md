@@ -139,13 +139,14 @@
 - [x] Testes e partida real
 
 ## Comercial (prompt-21)
-- [ ] Banco: carteiras, movimentações, uso de IA, transações, perfis, papéis, denúncias, auditoria
-- [ ] Cobrança de 1 solicitação de IA do mestre por chamada (idempotente, com estorno em falha)
-- [ ] Contador de saldo (início, escolha de jogo, lobby, perfil, compra)
-- [ ] Tela de compra com Google Play Billing (TWA) e verificação no servidor
-- [ ] Login opcional (e-mail/senha, Google), convidado, recuperação de senha, perfil
-- [ ] Admin por papel no servidor (sem senha fixa) + painel comercial auditado
-- [ ] Compartilhamento: cartões por jogo, metadados da sala, convite com código
-- [ ] Termos, privacidade, suporte, denúncia e bloqueio
-- [ ] Android: assetlinks, twa-manifest, guia de publicação
-- [ ] Testes, regressão do juiz e relatório
+- [x] Banco: carteiras, movimentações, uso de IA, transações, perfis, papéis, denúncias, auditoria
+- [x] Cobrança de 1 solicitação de IA do mestre por chamada (idempotente, com estorno em falha)
+- [x] Contador de saldo (início, escolha de jogo, lobby, perfil, compra)
+- [x] Tela de compra com Google Play Billing (TWA) e verificação no servidor
+- [x] Login opcional (e-mail/senha, Google), convidado, recuperação de senha, perfil
+- [x] Admin por papel no servidor (sem senha fixa) + painel comercial auditado
+- [x] Compartilhamento: cartões por jogo, metadados da sala, convite com código
+- [x] Termos, privacidade, suporte, denúncia e bloqueio
+- [x] Android: assetlinks, twa-manifest, guia de publicação
+- [x] Testes, regressão do juiz e relatório
+- [ ] Ativar compras reais: depende da Play Console, do produto stopia_ia_20 e dos segredos GOOGLE_PLAY_SERVICE_ACCOUNT_JSON / ANDROID_SHA256_FINGERPRINTS (dono)
