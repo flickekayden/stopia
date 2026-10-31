@@ -173,28 +173,7 @@ function GamesHub() {
         ))}
       </section>
 
-      <Dialog open={rulesFor !== null} onOpenChange={(open) => !open && setRulesFor(null)}>
-        <DialogContent className="max-h-[85dvh] w-[calc(100%_-_2rem)] overflow-y-auto rounded-2xl border-border bg-card" data-game={rulesFor ?? undefined}>
-          {rulesFor === "stop" ? (
-            <>
-              <DialogHeader>
-                <DialogTitle className="party-accent">{STOP_LOBBY_META.name}</DialogTitle>
-                <DialogDescription>{STOP_LOBBY_META.short} Jogado dentro da sala da galera: o mestre escolhe pontuação, intensidade da IA, rodadas, tempo e categorias.</DialogDescription>
-              </DialogHeader>
-              <StopRules />
-              <p className="text-xs text-muted-foreground">Mínimo de {STOP_LOBBY_META.minPlayers} jogadores · tudo é escrito no app.</p>
-            </>
-          ) : rules && (
-            <>
-              <DialogHeader>
-                <DialogTitle className="party-accent">{rules.name}</DialogTitle>
-                <DialogDescription>{rules.description}</DialogDescription>
-              </DialogHeader>
-              <RulesList game={rules.id} />
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
+      <GameRulesDialog game={rulesFor} onClose={() => setRulesFor(null)} />
 
       <InstallApp />
     </main>
