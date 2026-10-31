@@ -413,12 +413,23 @@ const RESET_TO_LOBBY = {
   public_state: asJson({ scores: {} }),
 } satisfies Partial<RoomRow>;
 
+/** Deletes a finished match's round rows; every failure is reported instead of silently ignored. */
 async function clearRoundData(roomId: string) {
-  await Promise.all([
+  const results = await Promise.all([
     db().from("party_submissions").delete().eq("room_id", roomId),
     // Positive rows are rounds, negative rows are the training bots' per-round cache; 0 is room history.
     db().from("party_private").delete().eq("room_id", roomId).neq("round_number", 0),
   ]);
+  const failed = results.find((r) => r.error)?.error;
+  if (failed) {
+    console.error("clearRoundData failed", failed.code);
+    throw new Error("Não foi possível preparar a sala. Tente de novo.");
+  }
+}
+
+/** After a transition already committed, leftover rows are harmless (the next start clears again). */
+async function clearAfterTransition(roomId: string) {
+  await clearRoundData(roomId).catch(() => undefined);
 }
 
 /** Host picks (or changes) the game while the group waits in the lobby. */
@@ -435,13 +446,14 @@ export async function selectPartyGame(input: { roomId: string; playerId: string;
 export async function returnPartyToLobby(input: { roomId: string; playerId: string; sessionId: string }) {
   const [, room] = await Promise.all([requireHost(input.roomId, input.playerId, input.sessionId), loadRoom(input.roomId)]);
   if (room.game === "lobby" && room.status === "lobby") return { ok: true };
-  await clearRoundData(room.id);
+  // Transition first (version-guarded); round data is only cleared once the room is safely in the lobby.
   const updated = await guardedUpdate(room, { ...RESET_TO_LOBBY, game: "lobby" });
   if (!updated) {
     const fresh = await loadRoom(room.id);
     if (fresh.game === "lobby" && fresh.status === "lobby") return { ok: true };
     throw new Error("A sala mudou ao mesmo tempo. Tente de novo.");
   }
+  await clearAfterTransition(room.id);
   return { ok: true };
 }
 
@@ -461,25 +473,37 @@ export async function updatePartySettings(input: { roomId: string; playerId: str
 }
 
 export async function startPartyGame(input: { roomId: string; playerId: string; sessionId: string }) {
-  const [, room] = await Promise.all([requireHost(input.roomId, input.playerId, input.sessionId), loadRoom(input.roomId)]);
+  const [host, room] = await Promise.all([requireHost(input.roomId, input.playerId, input.sessionId), loadRoom(input.roomId)]);
   if (room.status === "playing") return { ok: true };
   if (!isPartyGame(room.game) && room.game !== "stop") throw new Error("Escolha um jogo primeiro.");
   const game = room.game;
-  const players = await loadPlayers(room.id);
+  // The host pressing "Começar" is present by definition.
+  await db().from("party_players").update({ last_seen: new Date().toISOString() }).eq("id", host.id);
+  const players = activePlayers(await loadPlayers(room.id));
   const min = lobbyGameMeta(game).minPlayers;
-  if (players.length < min) throw new Error(`Este jogo precisa de pelo menos ${min} jogadores.`);
+  if (players.length < min) throw new Error(`Este jogo precisa de pelo menos ${min} jogadores conectados.`);
+  // Claim the start (version bump) before touching round data: a repeated or concurrent
+  // start loses here and leaves the winner's fresh round alone.
+  const claimed = await guardedUpdate(room, RESET_TO_LOBBY);
+  if (!claimed) return { ok: true };
   await clearRoundData(room.id);
   const scores = Object.fromEntries(players.map((p) => [p.id, 0]));
-  if (game === "stop") await startStopRound(room, players, 1, scores);
-  else await startRound(room, players, 1, scores, readPartySettings(room.settings).skips);
+  const started = game === "stop"
+    ? await startStopRound(claimed, players, 1, scores)
+    : await startRound(claimed, players, 1, scores, readPartySettings(claimed.settings).skips);
+  if (!started) {
+    const fresh = await loadRoom(room.id);
+    if (fresh.status === "playing") return { ok: true };
+    throw new Error("Não foi possível começar a partida. A sala continua no lobby, tente de novo.");
+  }
   return { ok: true };
 }
 
 export async function restartPartyRoom(input: { roomId: string; playerId: string; sessionId: string }) {
   const [, room] = await Promise.all([requireHost(input.roomId, input.playerId, input.sessionId), loadRoom(input.roomId)]);
-  await clearRoundData(room.id);
   const updated = await guardedUpdate(room, RESET_TO_LOBBY);
   if (!updated) throw new Error("A sala mudou ao mesmo tempo. Tente de novo.");
+  await clearAfterTransition(room.id);
   return { ok: true };
 }
 
