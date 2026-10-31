@@ -1,13 +1,8 @@
-import { createHash, timingSafeEqual } from "node:crypto";
-
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
-function passwordMatches(input: string, expected: string) {
-  const inputHash = createHash("sha256").update(input, "utf8").digest();
-  const expectedHash = createHash("sha256").update(expected, "utf8").digest();
-  return timingSafeEqual(inputHash, expectedHash);
-}
+const devToken = z.string().max(300).optional();
+const adminId = async (token?: string) => (await import("./dev-session.server")).adminUserId(token);
 
 export const listRooms = createServerFn({ method: "GET" }).handler(async () => {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -28,26 +23,35 @@ export const listRooms = createServerFn({ method: "GET" }).handler(async () => {
       createdAt: room.created_at,
       playerCount: room.players[0]?.count ?? 0,
     })),
-    developerUnlocked: await (await import("./dev-session.server")).developerIsUnlocked(),
+    developerUnlocked: await (await import("./dev-session.server")).developerIsUnlocked().catch(() => false),
   };
 });
 
+/**
+ * Developer mode without a shared password: the caller signs in with an account that holds the
+ * "admin" role (checked on the server) and receives a short-lived token bound to that account.
+ */
 export const unlockDeveloper = createServerFn({ method: "POST" })
-  .inputValidator((input: unknown) => z.object({ password: z.string().min(1).max(100) }).parse(input))
+  .inputValidator((input: unknown) => z.object({ accessToken: z.string().min(10).max(4096) }).parse(input))
   .handler(async ({ data }) => {
-    const expected = process.env["DEVELOPER_PASSWORD"];
-    if (!expected) throw new Error("A senha de desenvolvedor não está configurada");
-    if (!passwordMatches(data.password, expected)) return { ok: false as const };
-
-    const session = await (await import("./dev-session.server")).getDeveloperSession();
-    await session.update({ unlocked: true });
-    return { ok: true as const, token: (await import("./dev-session.server")).createDevToken() };
+    const credits = await import("./credits.server");
+    const userId = await credits.userIdFromToken(data.accessToken);
+    if (!userId) return { ok: false as const, reason: "signed_out" as const };
+    if (!(await credits.isAdmin(userId))) return { ok: false as const, reason: "not_admin" as const };
+    const dev = await import("./dev-session.server");
+    try {
+      const session = await dev.getDeveloperSession();
+      await session.update({ unlocked: true, uid: userId });
+    } catch { /* cookies are optional; the token is enough */ }
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await supabaseAdmin.from("admin_audit").insert({ actor_user_id: userId, action: "developer_unlock" });
+    return { ok: true as const, token: dev.createDevToken(userId) };
   });
 
 export const deleteRoom = createServerFn({ method: "POST" })
-  .inputValidator((input: unknown) => z.object({ roomId: z.string().uuid() }).parse(input))
+  .inputValidator((input: unknown) => z.object({ roomId: z.string().uuid(), token: devToken }).parse(input))
   .handler(async ({ data }) => {
-    if (!(await (await import("./dev-session.server")).developerIsUnlocked())) throw new Error("Acesso de desenvolvedor necessário");
+    if (!(await adminId(data.token))) throw new Error("Acesso de administrador necessário");
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: rounds, error: roundsReadError } = await supabaseAdmin
@@ -76,29 +80,18 @@ export const deleteRoom = createServerFn({ method: "POST" })
     return { ok: true as const };
   });
 export const deleteCategoryPreset = createServerFn({ method: "POST" })
-  .inputValidator((input: unknown) =>
-    z.object({ presetId: z.string().uuid(), password: z.string().max(100).optional() }).parse(input),
-  )
+  .inputValidator((input: unknown) => z.object({ presetId: z.string().uuid(), token: devToken }).parse(input))
   .handler(async ({ data }) => {
-    let unlocked = await (await import("./dev-session.server")).developerIsUnlocked();
-    if (!unlocked && data.password) {
-      const expected = process.env["DEVELOPER_PASSWORD"];
-      if (expected && passwordMatches(data.password, expected)) {
-        const session = await (await import("./dev-session.server")).getDeveloperSession();
-        await session.update({ unlocked: true });
-        unlocked = true;
-      }
-    }
-    if (!unlocked) return { ok: false as const, needsPassword: true };
+    if (!(await adminId(data.token))) return { ok: false as const };
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { error } = await supabaseAdmin.from("category_presets").delete().eq("id", data.presetId);
     if (error) throw new Error("Não foi possível apagar a lista");
-    return { ok: true as const, needsPassword: false };
+    return { ok: true as const };
   });
 
-export const getDeveloperStatus = createServerFn({ method: "GET" }).handler(async () => ({
-  unlocked: await (await import("./dev-session.server")).developerIsUnlocked(),
-}));
+export const getDeveloperStatus = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => z.object({ token: devToken }).parse(input ?? {}))
+  .handler(async ({ data }) => ({ unlocked: (await adminId(data.token)) !== null }));
 
 export const updateCategoryPreset = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) =>
@@ -106,11 +99,12 @@ export const updateCategoryPreset = createServerFn({ method: "POST" })
       .object({
         presetId: z.string().uuid(),
         categories: z.array(z.string().trim().min(1).max(160)).min(1).max(100),
+        token: devToken,
       })
       .parse(input),
   )
   .handler(async ({ data }) => {
-    if (!(await (await import("./dev-session.server")).developerIsUnlocked())) throw new Error("Acesso de desenvolvedor necessário");
+    if (!(await adminId(data.token))) throw new Error("Acesso de administrador necessário");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { error } = await supabaseAdmin
       .from("category_presets")

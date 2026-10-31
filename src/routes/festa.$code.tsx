@@ -38,23 +38,44 @@ import {
   submitPartyAction,
   updatePartySettings,
   touchPartyPresence,
+  getRoomCredits,
 } from "@/lib/party.functions";
 import { HEARTBEAT_MS } from "@/lib/party-presence";
 import { isPartyGame, lobbyGameMeta, readPartySettings, readPublicState, readRoomGame } from "@/lib/party-games";
 import { getLastNickname, getOrCreateSessionId, getPlayer, removePlayer, savePlayer } from "@/lib/session";
 import { friendlyError } from "@/lib/friendly-error";
+import { getRoomPreview } from "@/lib/room-preview.functions";
+import { shareImageFor } from "@/lib/share-images";
 
 export const Route = createFileRoute("/festa/$code")({
-  head: () => ({
-    meta: [
-      { title: "Sala da Galera — Central de Jogos do Stopia" },
-      { name: "description", content: "Entre na sala da galera e joguem juntos Stop, Tribunal dos Amigos, Quem Escreveu Essa Desgraça?, Infiltrado, Debate Impossível ou Roleta do Caos." },
-      { property: "og:title", content: "Bora jogar? Sala da Central de Jogos do Stopia" },
-      { property: "og:description", content: "Entre com o código e jogue com a galera pelo celular." },
-      { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary" },
-    ],
-  }),
+  loader: async ({ params }) => ({ preview: await getRoomPreview({ data: { code: params.code } }).catch(() => null) }),
+  head: ({ params, loaderData }) => {
+    const preview = loaderData?.preview ?? null;
+    const code = params.code.toUpperCase();
+    const roomGame = readRoomGame(preview?.game);
+    const gameName = roomGame === "lobby" ? "Sala da Galera" : lobbyGameMeta(roomGame).name;
+    const title = preview ? `Sala ${code} · ${gameName} — Stopia` : "Sala da Galera — Central de Jogos do Stopia";
+    const description = preview
+      ? preview.status === "ended"
+        ? `A partida de ${gameName} na sala ${code} terminou. Entre para a revanche com a galera.`
+        : `Bora jogar ${gameName}? Toque para entrar na sala ${code} pelo celular${preview.players > 0 ? ` — ${preview.players} na sala` : ""}.`
+      : "Entre com o código e jogue com a galera pelo celular: Stop, Tribunal dos Amigos, Infiltrado e mais.";
+    const image = shareImageFor(preview?.game);
+    return {
+      meta: [
+        { title },
+        { name: "description", content: description },
+        { property: "og:title", content: preview ? `Bora jogar ${gameName}? Sala ${code}` : "Bora jogar? Sala da Central de Jogos do Stopia" },
+        { property: "og:description", content: description },
+        { property: "og:type", content: "website" },
+        { property: "og:image", content: image },
+        { property: "og:image:width", content: "1200" },
+        { property: "og:image:height", content: "630" },
+        { name: "twitter:card", content: "summary_large_image" },
+        { name: "twitter:image", content: image },
+      ],
+    };
+  },
   component: PartyRoomPage,
 });
 
@@ -87,6 +108,8 @@ function PartyRoomPage() {
   const tickFn = useServerFn(tickPartyBots);
   const devFn = useServerFn(devRoomAction);
   const touchFn = useServerFn(touchPartyPresence);
+  const creditsFn = useServerFn(getRoomCredits);
+  const [hostCredits, setHostCredits] = useState<{ balance: number; billed: boolean } | null>(null);
 
   useEffect(() => {
     const sessionId = getOrCreateSessionId();
@@ -205,6 +228,18 @@ function PartyRoomPage() {
     return () => window.clearInterval(id);
   }, [hasBots, isHost, playing, roomId, identity, tickFn, refresh]);
 
+  // Host: the room creator's AI balance, refreshed whenever the room returns to the lobby or a match ends.
+  const roomStatus = room?.status;
+  const roomGame = room?.game;
+  useEffect(() => {
+    if (!isHost || !roomId || !identity || roomStatus === "playing") return;
+    let alive = true;
+    creditsFn({ data: { roomId, ...identity } })
+      .then((res) => { if (alive) setHostCredits(res); })
+      .catch(() => { if (alive) setHostCredits(null); });
+    return () => { alive = false; };
+  }, [isHost, roomId, identity, roomStatus, roomGame, creditsFn]);
+
   // The developer panel's room controls work on the room on screen.
   useEffect(() => {
     if (!room || !identity) { setDevRoom(null); return; }
@@ -316,7 +351,7 @@ function PartyRoomPage() {
   const ctx: PartyCtx | null = isPartyGame(game) || game === "stop"
     ? { room, players, me, isHost: me.is_host, game, state: readPublicState(room.public_state), settings, view: privateView, busy }
     : null;
-  const lobbyCtx: LobbyCtx = { room, players, me, isHost: me.is_host, selected: game === "lobby" ? null : game, settings, busy };
+  const lobbyCtx: LobbyCtx = { room, players, me, isHost: me.is_host, selected: game === "lobby" ? null : game, settings, busy, credits: me.is_host ? hostCredits : null };
 
   return (
     <main data-game={dataGame} className="game-screen mx-auto w-full max-w-md px-4 pt-[calc(0.75rem+env(safe-area-inset-top))]">

@@ -1,5 +1,5 @@
 import { useServerFn } from "@tanstack/react-start";
-import { CornerDownLeft, Loader2, MessageCircle, X } from "lucide-react";
+import { CornerDownLeft, Flag, Loader2, MessageCircle, VolumeX, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -10,7 +10,7 @@ import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupTextarea } fro
 import type { PartyPlayer } from "@/hooks/use-party-room";
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
-import { listPartyChat, sendPartyChat } from "@/lib/party.functions";
+import { listPartyChat, reportPartyContent, sendPartyChat } from "@/lib/party.functions";
 import { PARTY_CHAT_MAX, PARTY_CHAT_QUICK } from "@/lib/party-games";
 import { nightKingId } from "@/lib/ranking";
 import { cn } from "@/lib/utils";
@@ -18,6 +18,26 @@ import { friendlyError } from "@/lib/friendly-error";
 
 type ChatRow = Tables<"party_chat">;
 const HISTORY_CAP = 80;
+const MUTED_KEY = "stopia-muted-players";
+
+const REPORT_REASONS = [
+  { id: "ofensa", label: "Ofensa ou ódio" },
+  { id: "assedio", label: "Assédio ou ameaça" },
+  { id: "conteudo_improprio", label: "Conteúdo impróprio" },
+  { id: "spam", label: "Spam" },
+  { id: "outro", label: "Outro motivo" },
+] as const;
+
+/** Players this device chose to silence in chats (device-local, never sent to the server). */
+function readMuted(): string[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = JSON.parse(window.localStorage.getItem(MUTED_KEY) ?? "[]") as unknown;
+    return Array.isArray(raw) ? raw.filter((v): v is string => typeof v === "string").slice(-200) : [];
+  } catch {
+    return [];
+  }
+}
 
 function merge(current: ChatRow[], incoming: ChatRow[]) {
   const byId = new Map<string, ChatRow>();
@@ -39,7 +59,37 @@ export function PartyChat({ roomId, playerId, sessionId, players, quickOnly }: {
 }) {
   const listFn = useServerFn(listPartyChat);
   const sendFn = useServerFn(sendPartyChat);
+  const reportFn = useServerFn(reportPartyContent);
   const { play } = useSound();
+  const [muted, setMuted] = useState<string[]>([]);
+  const [selected, setSelected] = useState<string | null>(null);
+  const [reporting, setReporting] = useState<ChatRow | null>(null);
+  const [reportBusy, setReportBusy] = useState(false);
+  useEffect(() => setMuted(readMuted()), []);
+  const mutedRef = useRef<string[]>([]);
+  mutedRef.current = muted;
+
+  function toggleMute(id: string) {
+    const next = muted.includes(id) ? muted.filter((m) => m !== id) : [...muted, id];
+    setMuted(next);
+    window.localStorage.setItem(MUTED_KEY, JSON.stringify(next));
+    setSelected(null);
+    toast.success(next.includes(id) ? "Jogador silenciado neste aparelho" : "Mensagens do jogador visíveis de novo");
+  }
+
+  async function sendReport(reason: (typeof REPORT_REASONS)[number]["id"]) {
+    if (!reporting) return;
+    setReportBusy(true);
+    try {
+      await reportFn({ data: { roomId, playerId, sessionId, messageId: reporting.id, reason, detail: "" } });
+      toast.success("Denúncia enviada para a moderação. Obrigado!");
+      setReporting(null);
+    } catch (err) {
+      toast.error(friendlyError(err, "Não foi possível enviar a denúncia. Tente de novo."));
+    } finally {
+      setReportBusy(false);
+    }
+  }
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<ChatRow[]>([]);
   const [text, setText] = useState("");
@@ -74,7 +124,7 @@ export function PartyChat({ roomId, playerId, sessionId, players, quickOnly }: {
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "party_chat", filter: `room_id=eq.${roomId}` }, (payload) => {
         const row = payload.new as ChatRow;
         setMessages((current) => (current.some((m) => m.id === row.id) ? current : merge(current, [row])));
-        if (row.player_id !== playerId) {
+        if (row.player_id !== playerId && !(row.player_id && mutedRef.current.includes(row.player_id))) {
           play("message");
           if (!openRef.current) {
             setUnread((n) => n + 1);
@@ -182,16 +232,47 @@ export function PartyChat({ roomId, playerId, sessionId, players, quickOnly }: {
               <p className="py-10 text-center text-sm text-muted-foreground">Ninguém falou ainda. Começa a zoeira!</p>
             ) : messages.map((m) => {
               const mine = m.player_id === playerId;
+              const silenced = Boolean(m.player_id && muted.includes(m.player_id));
+              if (silenced && selected !== m.id) {
+                return (
+                  <button key={m.id} type="button" onClick={() => setSelected(m.id)} className="block w-full text-left text-xs italic text-muted-foreground">
+                    Mensagem de jogador silenciado
+                  </button>
+                );
+              }
               return (
-                <div key={m.id} className={cn("flex", mine ? "justify-end" : "justify-start")}>
-                  <div className={cn("max-w-[85%] rounded-2xl px-3 py-2", mine ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground")}>
+                <div key={m.id} className={cn("flex flex-col", mine ? "items-end" : "items-start")}>
+                  <button
+                    type="button"
+                    disabled={mine}
+                    aria-label={mine ? undefined : `Opções da mensagem de ${m.nickname}`}
+                    onClick={() => setSelected((cur) => (cur === m.id ? null : m.id))}
+                    className={cn("max-w-[85%] rounded-2xl px-3 py-2 text-left", mine ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground")}
+                  >
                     {!mine && <p className="text-xs font-bold opacity-80">{m.player_id && m.player_id === kingId ? "👑 " : ""}{m.nickname}{m.player_id && hostIds.has(m.player_id) ? " · mestre" : ""}</p>}
                     <p className="whitespace-pre-wrap break-words text-sm">{m.content}</p>
-                  </div>
+                  </button>
+                  {!mine && selected === m.id && (
+                    <div className="mt-1 flex gap-2">
+                      <Button size="sm" variant="ghost" className="h-9" onClick={() => { setReporting(m); setSelected(null); }}><Flag /> Denunciar</Button>
+                      {m.player_id && <Button size="sm" variant="ghost" className="h-9" onClick={() => toggleMute(m.player_id!)}><VolumeX /> {silenced ? "Mostrar jogador" : "Silenciar jogador"}</Button>}
+                    </div>
+                  )}
                 </div>
               );
             })}
           </div>
+          {reporting && (
+            <div className="space-y-2 border-t border-border bg-card p-3" role="dialog" aria-label="Denunciar mensagem">
+              <p className="text-sm font-semibold">Denunciar a mensagem de {reporting.nickname}? Escolha o motivo:</p>
+              <div className="flex flex-wrap gap-2">
+                {REPORT_REASONS.map((r) => (
+                  <Button key={r.id} size="sm" variant="secondary" disabled={reportBusy} onClick={() => void sendReport(r.id)}>{r.label}</Button>
+                ))}
+                <Button size="sm" variant="ghost" disabled={reportBusy} onClick={() => setReporting(null)}>Cancelar</Button>
+              </div>
+            </div>
+          )}
           <div className="space-y-2 border-t border-border bg-background p-3 pb-[calc(.75rem+env(safe-area-inset-bottom))]">
             <div className="game-scroll flex gap-2 overflow-x-auto pb-1" role="group" aria-label="Reações rápidas">
               {PARTY_CHAT_QUICK.map((quick) => (

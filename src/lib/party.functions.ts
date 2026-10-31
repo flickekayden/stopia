@@ -6,7 +6,9 @@ const gameId = z.enum(["tribunal", "autor", "infiltrado", "debate", "roleta"]);
 const server = () => import("./party.server");
 
 export const createPartyRoom = createServerFn({ method: "POST" })
-  .inputValidator((input: unknown) => z.object({ game: gameId.optional(), nickname: z.string().trim().min(1).max(20), sessionId: z.string().uuid() }).parse(input))
+  .inputValidator((input: unknown) =>
+    z.object({ game: gameId.optional(), nickname: z.string().trim().min(1).max(20), sessionId: z.string().uuid(), accessToken: z.string().max(4096).optional(), guestToken: z.string().max(80).optional() }).parse(input),
+  )
   .handler(async ({ data }) => (await server()).createPartyRoom(data));
 
 export const joinPartyRoom = createServerFn({ method: "POST" })
@@ -165,3 +167,22 @@ export const resolveStopAppeal = createServerFn({ method: "POST" })
 export const touchPartyPresence = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => z.object(session).parse(input))
   .handler(async ({ data }) => (await server()).touchPartyPresence(data));
+
+/** Host only: AI requests left in the room creator's wallet. */
+export const getRoomCredits = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => z.object(session).parse(input))
+  .handler(async ({ data }) => (await server()).getRoomCredits(data));
+
+export const reportPartyContent = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        ...session,
+        targetPlayerId: z.string().uuid().optional(),
+        messageId: z.string().uuid().optional(),
+        reason: z.enum(["ofensa", "assedio", "spam", "conteudo_improprio", "outro"]),
+        detail: z.string().max(500).default(""),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }) => (await server()).reportPartyContent(data));

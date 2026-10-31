@@ -533,3 +533,15 @@ input, select, textarea { font-size: max(16px, 1em); }
 .theme-swatch > span { flex: 1; }
 .theme-swatch > span:last-child { flex: 0 0 38%; }
 @media (prefers-reduced-motion: reduce) { .theme-option { transition: none; } .theme-option:active { transform: none; } }
+
+/* AI balance indicator (credits): discreet card, warning tones from semantic tokens. */
+.credit-badge { display: flex; align-items: center; gap: 0.75rem; border-radius: calc(var(--radius) + 2px); border: 1px solid color-mix(in oklch, var(--border) 75%, transparent); background: var(--card); padding: 0.75rem 0.875rem; }
+.credit-badge[data-tone="low"] { border-color: color-mix(in oklch, var(--primary) 55%, var(--border)); }
+.credit-badge[data-tone="empty"] { border-color: color-mix(in oklch, var(--destructive) 55%, var(--border)); }
+.credit-badge .credit-warn { color: var(--primary); }
+.credit-badge[data-tone="empty"] .credit-warn { color: var(--destructive); }
+.credit-line[data-tone="empty"] { color: var(--destructive); }
+.credit-line[data-tone="low"] { color: var(--primary); }
+.legal-prose h2 { margin-top: 1.5rem; font-size: 1.125rem; font-weight: 700; }
+.legal-prose p, .legal-prose li { margin-top: 0.5rem; font-size: 0.9375rem; line-height: 1.6; color: var(--muted-foreground); }
+.legal-prose ul { list-style: disc; padding-left: 1.25rem; }

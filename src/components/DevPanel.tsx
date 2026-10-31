@@ -8,6 +8,7 @@ import { AnswerCard, type AnswerCardData } from "@/components/game/AnswerCard";
 import { PartyAdminPanel } from "@/components/party/PartyAdminPanel";
 import { DevRoomControls } from "@/components/party/DevRoomControls";
 import { PartyRoomsAdmin } from "@/components/party/PartyRoomsAdmin";
+import { BusinessAdmin } from "@/components/party/BusinessAdmin";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -111,6 +112,7 @@ export function DevPanel() {
             <div className="space-y-5 px-4 pb-6 pt-3">
               <DevRoomControls />
               <AiHealth />
+              <BusinessAdmin />
               <PartyRoomsAdmin />
             </div>
           ) : (

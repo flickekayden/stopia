@@ -10,8 +10,16 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ComprarRouteImport } from './routes/comprar'
+import { Route as EntrarRouteImport } from './routes/entrar'
 import { Route as JogosRouteImport } from './routes/jogos'
+import { Route as PerfilRouteImport } from './routes/perfil'
+import { Route as PrivacidadeRouteImport } from './routes/privacidade'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as StopRouteImport } from './routes/stop'
+import { Route as SuporteRouteImport } from './routes/suporte'
+import { Route as TermosRouteImport } from './routes/termos'
+import { Route as DotwellKnownAssetlinksDotjsonRouteImport } from './routes/[.]well-known/assetlinks[.]json'
 import { Route as FestaCodeRouteImport } from './routes/festa.$code'
 import { Route as SalaCodeRouteImport } from './routes/sala.$code'
 
@@ -20,9 +28,34 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ComprarRoute = ComprarRouteImport.update({
+  id: '/comprar',
+  path: '/comprar',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EntrarRoute = EntrarRouteImport.update({
+  id: '/entrar',
+  path: '/entrar',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const JogosRoute = JogosRouteImport.update({
   id: '/jogos',
   path: '/jogos',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PerfilRoute = PerfilRouteImport.update({
+  id: '/perfil',
+  path: '/perfil',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacidadeRoute = PrivacidadeRouteImport.update({
+  id: '/privacidade',
+  path: '/privacidade',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
   getParentRoute: () => rootRouteImport,
 } as any)
 const StopRoute = StopRouteImport.update({
@@ -30,6 +63,22 @@ const StopRoute = StopRouteImport.update({
   path: '/stop',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SuporteRoute = SuporteRouteImport.update({
+  id: '/suporte',
+  path: '/suporte',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TermosRoute = TermosRouteImport.update({
+  id: '/termos',
+  path: '/termos',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DotwellKnownAssetlinksDotjsonRoute =
+  DotwellKnownAssetlinksDotjsonRouteImport.update({
+    id: '/.well-known/assetlinks.json',
+    path: '/.well-known/assetlinks.json',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const FestaCodeRoute = FestaCodeRouteImport.update({
   id: '/festa/$code',
   path: '/festa/$code',
@@ -43,38 +92,110 @@ const SalaCodeRoute = SalaCodeRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/comprar': typeof ComprarRoute
+  '/entrar': typeof EntrarRoute
   '/jogos': typeof JogosRoute
+  '/perfil': typeof PerfilRoute
+  '/privacidade': typeof PrivacidadeRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/stop': typeof StopRoute
+  '/suporte': typeof SuporteRoute
+  '/termos': typeof TermosRoute
+  '/.well-known/assetlinks.json': typeof DotwellKnownAssetlinksDotjsonRoute
   '/festa/$code': typeof FestaCodeRoute
   '/sala/$code': typeof SalaCodeRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/comprar': typeof ComprarRoute
+  '/entrar': typeof EntrarRoute
   '/jogos': typeof JogosRoute
+  '/perfil': typeof PerfilRoute
+  '/privacidade': typeof PrivacidadeRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/stop': typeof StopRoute
+  '/suporte': typeof SuporteRoute
+  '/termos': typeof TermosRoute
+  '/.well-known/assetlinks.json': typeof DotwellKnownAssetlinksDotjsonRoute
   '/festa/$code': typeof FestaCodeRoute
   '/sala/$code': typeof SalaCodeRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/comprar': typeof ComprarRoute
+  '/entrar': typeof EntrarRoute
   '/jogos': typeof JogosRoute
+  '/perfil': typeof PerfilRoute
+  '/privacidade': typeof PrivacidadeRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/stop': typeof StopRoute
+  '/suporte': typeof SuporteRoute
+  '/termos': typeof TermosRoute
+  '/.well-known/assetlinks.json': typeof DotwellKnownAssetlinksDotjsonRoute
   '/festa/$code': typeof FestaCodeRoute
   '/sala/$code': typeof SalaCodeRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/jogos' | '/stop' | '/festa/$code' | '/sala/$code'
+  fullPaths:
+    | '/'
+    | '/comprar'
+    | '/entrar'
+    | '/jogos'
+    | '/perfil'
+    | '/privacidade'
+    | '/reset-password'
+    | '/stop'
+    | '/suporte'
+    | '/termos'
+    | '/.well-known/assetlinks.json'
+    | '/festa/$code'
+    | '/sala/$code'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/jogos' | '/stop' | '/festa/$code' | '/sala/$code'
-  id: '__root__' | '/' | '/jogos' | '/stop' | '/festa/$code' | '/sala/$code'
+  to:
+    | '/'
+    | '/comprar'
+    | '/entrar'
+    | '/jogos'
+    | '/perfil'
+    | '/privacidade'
+    | '/reset-password'
+    | '/stop'
+    | '/suporte'
+    | '/termos'
+    | '/.well-known/assetlinks.json'
+    | '/festa/$code'
+    | '/sala/$code'
+  id:
+    | '__root__'
+    | '/'
+    | '/comprar'
+    | '/entrar'
+    | '/jogos'
+    | '/perfil'
+    | '/privacidade'
+    | '/reset-password'
+    | '/stop'
+    | '/suporte'
+    | '/termos'
+    | '/.well-known/assetlinks.json'
+    | '/festa/$code'
+    | '/sala/$code'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ComprarRoute: typeof ComprarRoute
+  EntrarRoute: typeof EntrarRoute
   JogosRoute: typeof JogosRoute
+  PerfilRoute: typeof PerfilRoute
+  PrivacidadeRoute: typeof PrivacidadeRoute
+  ResetPasswordRoute: typeof ResetPasswordRoute
   StopRoute: typeof StopRoute
+  SuporteRoute: typeof SuporteRoute
+  TermosRoute: typeof TermosRoute
+  DotwellKnownAssetlinksDotjsonRoute: typeof DotwellKnownAssetlinksDotjsonRoute
   FestaCodeRoute: typeof FestaCodeRoute
   SalaCodeRoute: typeof SalaCodeRoute
 }
@@ -88,6 +209,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/comprar': {
+      id: '/comprar'
+      path: '/comprar'
+      fullPath: '/comprar'
+      preLoaderRoute: typeof ComprarRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/entrar': {
+      id: '/entrar'
+      path: '/entrar'
+      fullPath: '/entrar'
+      preLoaderRoute: typeof EntrarRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/jogos': {
       id: '/jogos'
       path: '/jogos'
@@ -95,11 +230,53 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof JogosRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/perfil': {
+      id: '/perfil'
+      path: '/perfil'
+      fullPath: '/perfil'
+      preLoaderRoute: typeof PerfilRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacidade': {
+      id: '/privacidade'
+      path: '/privacidade'
+      fullPath: '/privacidade'
+      preLoaderRoute: typeof PrivacidadeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/stop': {
       id: '/stop'
       path: '/stop'
       fullPath: '/stop'
       preLoaderRoute: typeof StopRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/suporte': {
+      id: '/suporte'
+      path: '/suporte'
+      fullPath: '/suporte'
+      preLoaderRoute: typeof SuporteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/termos': {
+      id: '/termos'
+      path: '/termos'
+      fullPath: '/termos'
+      preLoaderRoute: typeof TermosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/.well-known/assetlinks.json': {
+      id: '/.well-known/assetlinks.json'
+      path: '/.well-known/assetlinks.json'
+      fullPath: '/.well-known/assetlinks.json'
+      preLoaderRoute: typeof DotwellKnownAssetlinksDotjsonRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/festa/$code': {
@@ -121,8 +298,16 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ComprarRoute: ComprarRoute,
+  EntrarRoute: EntrarRoute,
   JogosRoute: JogosRoute,
+  PerfilRoute: PerfilRoute,
+  PrivacidadeRoute: PrivacidadeRoute,
+  ResetPasswordRoute: ResetPasswordRoute,
   StopRoute: StopRoute,
+  SuporteRoute: SuporteRoute,
+  TermosRoute: TermosRoute,
+  DotwellKnownAssetlinksDotjsonRoute: DotwellKnownAssetlinksDotjsonRoute,
   FestaCodeRoute: FestaCodeRoute,
   SalaCodeRoute: SalaCodeRoute,
 }

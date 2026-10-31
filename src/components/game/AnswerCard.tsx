@@ -3,6 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { HelpCircle, Loader2, MessageCircle, Sparkles } from "lucide-react";
 
 import { explainAnswer } from "@/lib/explain.functions";
+import { getDevToken, useDevSettings } from "@/lib/dev-settings";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -44,6 +45,8 @@ export const AnswerCard = memo(function AnswerCard({
 }) {
   const superCreative = data.points >= 20;
   const explain = useServerFn(explainAnswer);
+  // Free-form AI explanations are not tied to any room balance, so only administrators can request them.
+  const { isDev } = useDevSettings();
   const [explanation, setExplanation] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [explanationError, setExplanationError] = useState(false);
@@ -60,6 +63,7 @@ export const AnswerCard = memo(function AnswerCard({
           response: data.response.slice(0, 80),
           points: data.points,
           comment: data.comment.slice(0, 300),
+          token: getDevToken(),
         },
       });
       setExplanation(r.text);
@@ -128,7 +132,7 @@ export const AnswerCard = memo(function AnswerCard({
       )}
       {!compact && (
         <div className="answer-actions">
-          <Button
+          {isDev && <Button
             type="button"
             variant="ghost"
             size="sm"
@@ -140,7 +144,7 @@ export const AnswerCard = memo(function AnswerCard({
             }}
           >
             {loading ? <Loader2 className="animate-spin" /> : <HelpCircle />} {loading ? "Consultando..." : explanation ? "Explicação da IA" : explanationError ? "Tentar explicação novamente" : "Entender pontuação"}
-          </Button>
+          </Button>}
           {explanationError && <p role="alert" className="mt-1 text-sm text-destructive">Não foi possível explicar agora. Você pode tentar novamente.</p>}
           {explanation && (
             <p

@@ -14,6 +14,86 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_audit: {
+        Row: {
+          action: string
+          actor_user_id: string
+          created_at: string
+          detail: Json
+          id: string
+          target: string | null
+        }
+        Insert: {
+          action: string
+          actor_user_id: string
+          created_at?: string
+          detail?: Json
+          id?: string
+          target?: string | null
+        }
+        Update: {
+          action?: string
+          actor_user_id?: string
+          created_at?: string
+          detail?: Json
+          id?: string
+          target?: string | null
+        }
+        Relationships: []
+      }
+      admin_invites: {
+        Row: {
+          created_at: string
+          email: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+        }
+        Relationships: []
+      }
+      ai_usage: {
+        Row: {
+          created_at: string
+          label: string
+          room_id: string | null
+          status: string
+          updated_at: string
+          usage_key: string
+          wallet_id: string
+        }
+        Insert: {
+          created_at?: string
+          label?: string
+          room_id?: string | null
+          status: string
+          updated_at?: string
+          usage_key: string
+          wallet_id: string
+        }
+        Update: {
+          created_at?: string
+          label?: string
+          room_id?: string | null
+          status?: string
+          updated_at?: string
+          usage_key?: string
+          wallet_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_usage_wallet_id_fkey"
+            columns: ["wallet_id"]
+            isOneToOne: false
+            referencedRelation: "credit_wallets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       answers: {
         Row: {
           finished: boolean
@@ -133,6 +213,142 @@ export type Database = {
             columns: ["room_id"]
             isOneToOne: false
             referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      content_reports: {
+        Row: {
+          created_at: string
+          detail: string
+          excerpt: string
+          id: string
+          message_id: string | null
+          reason: string
+          reporter_player_id: string | null
+          room_code: string
+          room_id: string | null
+          status: string
+          target_nickname: string
+          target_player_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          detail?: string
+          excerpt?: string
+          id?: string
+          message_id?: string | null
+          reason: string
+          reporter_player_id?: string | null
+          room_code?: string
+          room_id?: string | null
+          status?: string
+          target_nickname?: string
+          target_player_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          detail?: string
+          excerpt?: string
+          id?: string
+          message_id?: string | null
+          reason?: string
+          reporter_player_id?: string | null
+          room_code?: string
+          room_id?: string | null
+          status?: string
+          target_nickname?: string
+          target_player_id?: string | null
+        }
+        Relationships: []
+      }
+      credit_ledger: {
+        Row: {
+          actor_user_id: string | null
+          balance_after: number
+          created_at: string
+          delta: number
+          id: string
+          kind: string
+          note: string | null
+          reference: string | null
+          wallet_id: string
+        }
+        Insert: {
+          actor_user_id?: string | null
+          balance_after: number
+          created_at?: string
+          delta: number
+          id?: string
+          kind: string
+          note?: string | null
+          reference?: string | null
+          wallet_id: string
+        }
+        Update: {
+          actor_user_id?: string | null
+          balance_after?: number
+          created_at?: string
+          delta?: number
+          id?: string
+          kind?: string
+          note?: string | null
+          reference?: string | null
+          wallet_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "credit_ledger_wallet_id_fkey"
+            columns: ["wallet_id"]
+            isOneToOne: false
+            referencedRelation: "credit_wallets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      credit_wallets: {
+        Row: {
+          balance: number
+          consumed_total: number
+          created_at: string
+          free_granted: number
+          guest_token_hash: string | null
+          id: string
+          merged_into: string | null
+          purchased_total: number
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          balance?: number
+          consumed_total?: number
+          created_at?: string
+          free_granted?: number
+          guest_token_hash?: string | null
+          id?: string
+          merged_into?: string | null
+          purchased_total?: number
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          balance?: number
+          consumed_total?: number
+          created_at?: string
+          free_granted?: number
+          guest_token_hash?: string | null
+          id?: string
+          merged_into?: string | null
+          purchased_total?: number
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "credit_wallets_merged_into_fkey"
+            columns: ["merged_into"]
+            isOneToOne: false
+            referencedRelation: "credit_wallets"
             referencedColumns: ["id"]
           },
         ]
@@ -267,6 +483,39 @@ export type Database = {
         }
         Relationships: []
       }
+      party_room_billing: {
+        Row: {
+          created_at: string
+          room_id: string
+          wallet_id: string
+        }
+        Insert: {
+          created_at?: string
+          room_id: string
+          wallet_id: string
+        }
+        Update: {
+          created_at?: string
+          room_id?: string
+          wallet_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "party_room_billing_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: true
+            referencedRelation: "party_rooms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "party_room_billing_wallet_id_fkey"
+            columns: ["wallet_id"]
+            isOneToOne: false
+            referencedRelation: "credit_wallets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       party_rooms: {
         Row: {
           code: string
@@ -393,6 +642,71 @@ export type Database = {
           },
         ]
       }
+      payment_transactions: {
+        Row: {
+          confirmed_at: string | null
+          created_at: string
+          credits: number
+          error: string | null
+          id: string
+          order_id: string | null
+          platform: string
+          price_label: string
+          product_id: string
+          purchase_token: string | null
+          purchase_token_hash: string | null
+          status: string
+          store_consumed: boolean
+          test_purchase: boolean
+          updated_at: string
+          wallet_id: string
+        }
+        Insert: {
+          confirmed_at?: string | null
+          created_at?: string
+          credits: number
+          error?: string | null
+          id?: string
+          order_id?: string | null
+          platform: string
+          price_label?: string
+          product_id: string
+          purchase_token?: string | null
+          purchase_token_hash?: string | null
+          status?: string
+          store_consumed?: boolean
+          test_purchase?: boolean
+          updated_at?: string
+          wallet_id: string
+        }
+        Update: {
+          confirmed_at?: string | null
+          created_at?: string
+          credits?: number
+          error?: string | null
+          id?: string
+          order_id?: string | null
+          platform?: string
+          price_label?: string
+          product_id?: string
+          purchase_token?: string | null
+          purchase_token_hash?: string | null
+          status?: string
+          store_consumed?: boolean
+          test_purchase?: boolean
+          updated_at?: string
+          wallet_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_transactions_wallet_id_fkey"
+            columns: ["wallet_id"]
+            isOneToOne: false
+            referencedRelation: "credit_wallets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       players: {
         Row: {
           created_at: string
@@ -439,6 +753,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      profiles: {
+        Row: {
+          avatar: string
+          created_at: string
+          display_name: string
+          id: string
+          terms_accepted_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          avatar?: string
+          created_at?: string
+          display_name?: string
+          id: string
+          terms_accepted_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          avatar?: string
+          created_at?: string
+          display_name?: string
+          id?: string
+          terms_accepted_at?: string | null
+          updated_at?: string
+        }
+        Relationships: []
       }
       room_voice_notes: {
         Row: {
@@ -599,15 +940,67 @@ export type Database = {
           },
         ]
       }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      credit_apply: {
+        Args: {
+          p_actor: string
+          p_delta: number
+          p_kind: string
+          p_note: string
+          p_reference: string
+          p_wallet: string
+        }
+        Returns: number
+      }
+      credit_consume: {
+        Args: {
+          p_key: string
+          p_label: string
+          p_room: string
+          p_wallet: string
+        }
+        Returns: string
+      }
+      credit_merge: { Args: { p_guest: string; p_user: string }; Returns: Json }
+      credit_refund: {
+        Args: { p_key: string; p_wallet: string }
+        Returns: boolean
+      }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "moderator" | "user"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -734,6 +1127,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "moderator", "user"],
+    },
   },
 } as const
