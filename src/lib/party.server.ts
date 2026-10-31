@@ -242,45 +242,103 @@ async function guardedUpdate(room: RoomRow, patch: Partial<RoomRow>) {
   return data ?? null;
 }
 
-async function uniqueCode() {
-  for (let i = 0; i < 10; i += 1) {
+/** A code not used by legacy Stop rooms; the party_rooms UNIQUE constraint stays the final guarantee. */
+async function candidateCode() {
+  for (let i = 0; i < 6; i += 1) {
     const code = generateRoomCode();
-    const [{ data: party }, { data: stop }] = await Promise.all([
-      db().from("party_rooms").select("id").eq("code", code).maybeSingle(),
-      db().from("rooms").select("id").eq("code", code).maybeSingle(),
-    ]);
-    if (!party && !stop) return code;
+    const { data: stop } = await db().from("rooms").select("id").eq("code", code).maybeSingle();
+    if (!stop) return code;
   }
-  throw new Error("Não consegui gerar um código de sala. Tente de novo.");
+  return generateRoomCode();
+}
+
+/* Abuse limits: counted per network address (falls back to the device session) in a server-only table. */
+const RATE_LIMITS = {
+  create: { max: 15, windowMs: 60 * 60_000 },
+  join_miss: { max: 20, windowMs: 10 * 60_000 },
+} as const;
+
+async function rateKey(sessionId: string) {
+  let ip = "";
+  try {
+    const { getRequestHeader } = await import("@tanstack/react-start/server");
+    ip = (getRequestHeader("cf-connecting-ip") ?? getRequestHeader("x-forwarded-for")?.split(",")[0] ?? "").trim();
+  } catch { /* not inside a request (tests) */ }
+  return createHash("sha256").update(`rate:${ip || `s:${sessionId}`}`).digest("hex");
+}
+
+async function rateLimited(key: string, kind: keyof typeof RATE_LIMITS) {
+  const { max, windowMs } = RATE_LIMITS[kind];
+  const { count, error } = await db()
+    .from("party_rate_events")
+    .select("id", { count: "exact", head: true })
+    .eq("key_hash", key)
+    .eq("kind", kind)
+    .gte("created_at", new Date(Date.now() - windowMs).toISOString());
+  if (error) return false; // never lock friends out because the counter itself failed
+  return (count ?? 0) >= max;
+}
+
+async function recordRate(key: string, kind: keyof typeof RATE_LIMITS) {
+  await db().from("party_rate_events").insert({ key_hash: key, kind });
+  // Occasional cleanup keeps the counter table small.
+  if (Math.random() < 0.02) await db().from("party_rate_events").delete().lt("created_at", new Date(Date.now() - 24 * 60 * 60_000).toISOString());
 }
 
 /* ---------------------------------- Rooms --------------------------------- */
 
 export async function createPartyRoom(input: { game?: PartyGameId | undefined; nickname: string; sessionId: string }) {
-  const code = await uniqueCode();
-  const { data: room, error } = await db()
-    .from("party_rooms")
-    .insert({ code, game: input.game ?? "lobby", settings: asJson(readPartySettings({})), public_state: asJson({ scores: {} }) })
-    .select()
-    .single();
-  if (error || !room) throw new Error("Não foi possível criar a sala");
+  const nickname = input.nickname.trim();
+  if (!nickname) throw new Error("Coloca um apelido primeiro");
+  const key = await rateKey(input.sessionId);
+  if (await rateLimited(key, "create")) throw new Error("Muitas salas criadas em pouco tempo. Espere alguns minutos e tente de novo.");
+  let room: RoomRow | null = null;
+  for (let attempt = 0; attempt < 5 && !room; attempt += 1) {
+    const code = await candidateCode();
+    const { data, error } = await db()
+      .from("party_rooms")
+      .insert({ code, game: input.game ?? "lobby", settings: asJson(readPartySettings({})), public_state: asJson({ scores: {} }) })
+      .select()
+      .single();
+    if (data) room = data;
+    else if (error?.code !== "23505") {
+      console.error("createPartyRoom: room insert failed", error?.code);
+      throw new Error("Não foi possível criar a sala. Tente de novo.");
+    }
+    // 23505: another room took this code at the same moment; draw a new one.
+  }
+  if (!room) throw new Error("Não consegui gerar um código de sala. Tente de novo.");
   const { data: player, error: playerError } = await db()
     .from("party_players")
-    .insert({ room_id: room.id, nickname: input.nickname.trim(), is_host: true })
+    .insert({ room_id: room.id, nickname, is_host: true })
     .select()
     .single();
-  if (playerError || !player) throw new Error("Não foi possível entrar na sala");
-  await db().from("party_sessions").insert({ player_id: player.id, room_id: room.id, session_hash: hashSession(input.sessionId) });
+  const { error: sessionError } = player
+    ? await db().from("party_sessions").insert({ player_id: player.id, room_id: room.id, session_hash: hashSession(input.sessionId) })
+    : { error: playerError };
+  if (playerError || !player || sessionError) {
+    // Compensate: an inaccessible room is removed (players and sessions cascade).
+    await db().from("party_rooms").delete().eq("id", room.id);
+    console.error("createPartyRoom: host setup failed", playerError?.code ?? sessionError?.code);
+    throw new Error("Não foi possível criar a sala. Nada foi salvo, tente de novo.");
+  }
+  await recordRate(key, "create");
   return { code: room.code, roomId: room.id, playerId: player.id };
 }
 
 export async function joinPartyRoom(input: { code: string; nickname: string; sessionId: string }) {
   const code = input.code.trim().toUpperCase();
+  const key = await rateKey(input.sessionId);
+  if (await rateLimited(key, "join_miss")) throw new Error("Muitas tentativas com códigos errados. Espere alguns minutos e confira o código com quem criou a sala.");
   const { data: room } = await db().from("party_rooms").select("*").eq("code", code).maybeSingle();
-  if (!room) throw new Error("Sala não encontrada");
+  if (!room) {
+    await recordRate(key, "join_miss");
+    throw new Error("Sala não encontrada. Confira o código com quem criou a sala.");
+  }
   const sessionHash = hashSession(input.sessionId);
   const { data: existing } = await db().from("party_sessions").select("player_id").eq("room_id", room.id).eq("session_hash", sessionHash).maybeSingle();
   if (existing) {
+    // Same device again (retry after a network failure or returning later): reuse the seat, never duplicate it.
     await db().from("party_players").update({ last_seen: new Date().toISOString() }).eq("id", existing.player_id);
     return { kind: "party" as const, code: room.code, roomId: room.id, playerId: existing.player_id, reconnected: true };
   }
@@ -296,9 +354,27 @@ export async function joinPartyRoom(input: { code: string; nickname: string; ses
     .insert({ room_id: room.id, nickname, is_host: players.length === 0 })
     .select()
     .single();
-  if (error || !player) throw new Error("Não foi possível entrar na sala");
-  await db().from("party_sessions").insert({ player_id: player.id, room_id: room.id, session_hash: sessionHash });
+  if (error || !player) throw new Error("Não foi possível entrar na sala. Tente de novo.");
+  const { error: sessionError } = await db().from("party_sessions").insert({ player_id: player.id, room_id: room.id, session_hash: sessionHash });
+  if (sessionError) {
+    // Compensate so a retry can join with the same nickname instead of hitting a ghost seat.
+    await db().from("party_players").delete().eq("id", player.id);
+    console.error("joinPartyRoom: session insert failed", sessionError.code);
+    throw new Error("Não foi possível entrar na sala. Tente de novo.");
+  }
   return { kind: "party" as const, code: room.code, roomId: room.id, playerId: player.id, reconnected: false };
+}
+
+/** Presence heartbeat: refreshes last_seen at most every TOUCH_THROTTLE_MS so it never floods realtime. */
+export async function touchPartyPresence(input: { roomId: string; playerId: string; sessionId: string }) {
+  await requireSession(input.roomId, input.playerId, input.sessionId);
+  const now = Date.now();
+  await db()
+    .from("party_players")
+    .update({ last_seen: new Date(now).toISOString() })
+    .eq("id", input.playerId)
+    .lt("last_seen", new Date(now - TOUCH_THROTTLE_MS).toISOString());
+  return { ok: true as const };
 }
 
 export async function leavePartyRoom(input: { roomId: string; playerId: string; sessionId: string }) {
