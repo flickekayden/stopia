@@ -769,7 +769,7 @@ export async function submitPartyAction(input: { roomId: string; playerId: strin
     payload = { answers: sanitizeStopAnswers(raw?.answers, state.stop.categories), done: raw?.done === true };
   } else if (TEXT_PHASES.includes(phase)) {
     payload = textPayload(input.payload, textMaxFor(game));
-    if (game === "roleta" && phase === "respond") payload.challenge = roletaChallengeKey(state.skipsLeft);
+    if (game === "roleta" && phase === "respond") payload["challenge"] = roletaChallengeKey(state.skipsLeft);
   } else if (phase === "vote" && game === "tribunal") {
     const verdict = (input.payload as { verdict?: unknown })?.verdict;
     if (verdict !== "culpado" && verdict !== "inocente") throw new Error("Voto inválido.");
@@ -1636,7 +1636,7 @@ async function tickPartyGameBots(room: RoomRow, state: PartyPublicState, players
         const pick = seededPick(INFILTRADO_WORDS.filter((w) => w.category === rp.category), `${bot.id}:${room.round_number}:guess`);
         payload = { text: pick?.word ?? "Não faço ideia" };
       } else payload = textPayload({ text: texts[bot.id] || fallbackBotLine(botRole(game, bot, state, rp).fallback, bot.id) }, textMaxFor(game));
-      if (payload && game === "roleta" && phase === "respond") payload.challenge = roletaChallengeKey(state.skipsLeft);
+      if (payload && game === "roleta" && phase === "respond") payload["challenge"] = roletaChallengeKey(state.skipsLeft);
       return payload ? { bot, payload } : null;
     })
     .filter((row): row is { bot: PlayerRow; payload: Record<string, unknown> } => row !== null);

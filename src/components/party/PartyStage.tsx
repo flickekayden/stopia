@@ -169,16 +169,6 @@ function PlayersPanel({ players, me, actions, busy }: { players: PartyPlayer[]; 
   );
 }
 
-/** Re-renders on an interval so "Ausente" labels appear without new data. */
-function useNow(everyMs: number) {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    const id = window.setInterval(() => setNow(Date.now()), everyMs);
-    return () => window.clearInterval(id);
-  }, [everyMs]);
-  return now;
-}
-
 function GameMetaLine({ game }: { game: LobbyGameMeta }) {
   return (
     <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-semibold text-muted-foreground">
