@@ -1,17 +1,13 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
+import { partyPayloadSchema, stopAnswersSchema } from "./party-input";
+
 const session = { roomId: z.string().uuid(), playerId: z.string().uuid(), sessionId: z.string().uuid() };
 const gameId = z.enum(["tribunal", "autor", "infiltrado", "debate", "roleta"]);
 const server = () => import("./party.server");
-/** Game payloads are small JSON objects; the size cap keeps oversized or deeply nested input out of the database. */
-const MAX_PAYLOAD_BYTES = 8_000;
-const payload = z
-  .record(z.string().max(60), z.unknown())
-  .refine((value) => Object.keys(value).length <= 40 && JSON.stringify(value).length <= MAX_PAYLOAD_BYTES, "Resposta grande demais");
-const stopAnswers = z
-  .record(z.string().max(160), z.string().max(400))
-  .refine((value) => Object.keys(value).length <= 30, "Categorias demais");
+const payload = partyPayloadSchema;
+const stopAnswers = stopAnswersSchema;
 
 export const createPartyRoom = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) =>
