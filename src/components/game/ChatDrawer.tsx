@@ -30,6 +30,7 @@ import { listChatMessages, sendChatMessage, type ChatQuote } from "@/lib/chat.fu
 
 type ChatMessage = Tables<"chat_messages">;
 import { DEFAULT_QUICK_MESSAGES, useEffectiveDevSettings } from "@/lib/dev-settings";
+import { friendlyError } from "@/lib/friendly-error";
 
 function parseQuote(value: ChatMessage["quote"]): ChatQuote | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
@@ -210,7 +211,7 @@ export function ChatDrawer({
       setText("");
       onQuoteChange(null);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Não foi possível enviar");
+      toast.error(friendlyError(error, "Mensagem não enviada. Tente de novo."));
     } finally {
       sendInFlight.current = false;
       setSending(false);

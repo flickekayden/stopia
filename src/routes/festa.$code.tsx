@@ -42,6 +42,7 @@ import {
 import { HEARTBEAT_MS } from "@/lib/party-presence";
 import { isPartyGame, lobbyGameMeta, readPartySettings, readPublicState, readRoomGame } from "@/lib/party-games";
 import { getLastNickname, getOrCreateSessionId, getPlayer, removePlayer, savePlayer } from "@/lib/session";
+import { friendlyError } from "@/lib/friendly-error";
 
 export const Route = createFileRoute("/festa/$code")({
   head: () => ({
@@ -111,7 +112,7 @@ function PartyRoomPage() {
       return true;
     } catch (err) {
       play("error");
-      toast.error(err instanceof Error ? err.message : "Algo deu errado. Tente de novo.");
+      toast.error(friendlyError(err, "Algo deu errado. A partida continua salva — tente de novo."));
       await refresh();
       return false;
     } finally {
@@ -251,7 +252,7 @@ function PartyRoomPage() {
       await refresh();
     } catch (err) {
       play("error");
-      toast.error(err instanceof Error ? err.message : "Não foi possível entrar");
+      toast.error(friendlyError(err, "Não foi possível entrar. Tente de novo."));
     } finally {
       setBusy(null);
     }
