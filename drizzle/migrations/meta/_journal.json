@@ -57,6 +57,13 @@
       "when": 1793452700914,
       "tag": "0007_commercial_accounts_credits",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1793452824668,
+      "tag": "0008_credit_merge_and_store_consume",
+      "breakpoints": true
     }
   ]
 }

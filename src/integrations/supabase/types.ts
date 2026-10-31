@@ -656,6 +656,8 @@ export type Database = {
           purchase_token: string | null
           purchase_token_hash: string | null
           status: string
+          store_consumed: boolean
+          test_purchase: boolean
           updated_at: string
           wallet_id: string
         }
@@ -672,6 +674,8 @@ export type Database = {
           purchase_token?: string | null
           purchase_token_hash?: string | null
           status?: string
+          store_consumed?: boolean
+          test_purchase?: boolean
           updated_at?: string
           wallet_id: string
         }
@@ -688,6 +692,8 @@ export type Database = {
           purchase_token?: string | null
           purchase_token_hash?: string | null
           status?: string
+          store_consumed?: boolean
+          test_purchase?: boolean
           updated_at?: string
           wallet_id?: string
         }
@@ -980,6 +986,7 @@ export type Database = {
         }
         Returns: string
       }
+      credit_merge: { Args: { p_guest: string; p_user: string }; Returns: Json }
       credit_refund: {
         Args: { p_key: string; p_wallet: string }
         Returns: boolean
