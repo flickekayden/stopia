@@ -50,3 +50,6 @@ Fixed and verified:
 - Presence heartbeat: lobby shows "Ausente" for players silent over 3 minutes; they stop counting toward minimums and "everyone done" but keep their scores and seat.
 
 Known limitation (not changed): party_rooms, party_players and party_chat stay readable by anyone holding the public key (USING (true)) because live updates depend on it and players have no sign-in. They contain only public state, nicknames, scores and chat; secrets live in party_private / party_submissions / party_sessions, which have no client access. Scoping reads per room would need real sign-in or a broadcast-only realtime redesign.
+- Error toasts on home, room, and chat hide technical details (validation dumps, network, database) and say what to do next.
+- "Encerrar etapa agora" asks the host to confirm when someone has not sent yet, showing how many already did.
+- Verified this pass in the preview: Tribunal (2 phones) and Debate (2 phones) through the AI verdict; Quem Escreveu, Infiltrado and Roleta (3 phones) from writing into voting; Stop (2 phones) through the AI judge to the results.

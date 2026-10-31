@@ -13,3 +13,4 @@
 - Group-room presence is a 30s session-verified heartbeat (`touchPartyPresence`, throttled server-side); `party-presence.ts` decides who counts (3-minute window, bots always) for starts, new-round seats and "everyone done", and never deletes players, so blips and app switches cost nothing.
 - Room transitions claim the version-guarded room update first and clear round rows only afterwards; room creation/join compensate partial inserts, retry code collisions on the UNIQUE constraint, and are rate-limited per network address in server-only `party_rate_events`.
 - Roleta respond submissions carry the challenge key (skips counter) and every read filters by it, so answers to a skipped challenge never leak into the next one even if cleanup fails.
+- Player-facing error toasts go through `friendlyError` (`friendly-error.ts`) so server messages written for players pass through while validation dumps, network and database details become plain guidance.
