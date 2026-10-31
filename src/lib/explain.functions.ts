@@ -9,10 +9,14 @@ export const explainAnswer = createServerFn({ method: "POST" })
         response: z.string().max(80),
         points: z.number().int().min(0).max(20),
         comment: z.string().max(300),
+        token: z.string().max(300).optional(),
       })
       .parse(d),
   )
   .handler(async ({ data }) => {
+    // Not tied to any room balance: only administrators may spend AI requests here.
+    const { isDeveloper } = await import("./dev-session.server");
+    if (!(await isDeveloper(data.token))) return { ok: false as const, text: "Explicações extras da IA estão disponíveis só para administradores." };
     try {
       const { generateJsonGemini } = await import("./ai.server");
       const out = await generateJsonGemini<{ explanation: string }>({

@@ -36,6 +36,8 @@ export const createRoom = createServerFn({ method: "POST" })
     z.object({ nickname: z.string().min(1).max(20), sessionId: z.string().uuid() }).parse(input),
   )
   .handler(async ({ data }) => {
+    // Legacy Stop rooms are closed: every new game happens in a group room, whose AI is paid by its creator.
+    if (data.nickname) throw new Error("Este tipo de sala foi encerrado. Crie uma Sala da Galera na tela inicial.");
     const supabase = await db();
     let code = generateRoomCode();
     for (let i = 0; i < 6; i++) {
@@ -480,6 +482,8 @@ export const evaluateRound = createServerFn({ method: "POST" })
     const { data: round } = await supabase.from("rounds").select("*").eq("id", data.roundId).maybeSingle();
     if (!round) throw new Error("Rodada não encontrada");
     if (round.evaluation && !force) return { evaluation: round.evaluation as unknown as Evaluation, latencyMs: 0 };
+    // Legacy rooms have no AI balance: only administrators may run the AI judge there.
+    if (!callerDev) throw new Error("A avaliação por IA destas salas antigas foi encerrada. Crie uma Sala da Galera na tela inicial para jogar Stop com IA.");
     const previous = (round.evaluation as unknown as Evaluation | null) ?? null;
 
     const [{ data: players }, { data: answers }] = await Promise.all([
