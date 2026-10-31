@@ -227,3 +227,32 @@ export function useDevGameContext() {
 export function getDevToken() {
   return devToken();
 }
+
+/* The group room the developer is in right now (set by /festa/$code), for the panel's room controls. */
+export type DevRoom = {
+  roomId: string;
+  code: string;
+  playerId: string;
+  sessionId: string;
+  game: string;
+  status: string;
+  phase: string;
+  players: { id: string; nickname: string; isBot: boolean; isHost: boolean }[];
+};
+let devRoom: DevRoom | null = null;
+const devRoomListeners = new Set<() => void>();
+export function setDevRoom(value: DevRoom | null) {
+  if (JSON.stringify(devRoom) === JSON.stringify(value)) return;
+  devRoom = value;
+  devRoomListeners.forEach((l) => l());
+}
+export function useDevRoom() {
+  return useSyncExternalStore(
+    (l) => {
+      devRoomListeners.add(l);
+      return () => devRoomListeners.delete(l);
+    },
+    () => devRoom,
+    () => null,
+  );
+}
