@@ -80,6 +80,38 @@ async function accountWallet(userId: string): Promise<WalletRow> {
 
 export type ResolvedWallet = { wallet: WalletRow; userId: string | null; newGuestToken?: string };
 
+async function networkKey() {
+  let ip = "";
+  try {
+    const { getRequestHeader } = await import("@tanstack/react-start/server");
+    ip = (getRequestHeader("cf-connecting-ip") ?? getRequestHeader("x-forwarded-for")?.split(",")[0] ?? "").trim();
+  } catch { /* not inside a request */ }
+  return ip ? createHash("sha256").update(`rate:${ip}`).digest("hex") : null;
+}
+
+/** At most this many new guest wallets per network address per day receive the free credits. */
+const GUEST_FREE_PER_DAY = 5;
+
+/** Wallet of a room creator: a brand-new guest gets the free credits unless this network used them up today. */
+export async function ensureHostWallet(cred: CreditCredentials) {
+  const existing = await findWallet(cred);
+  if (existing) return existing;
+  const key = await networkKey();
+  let allowFree = true;
+  if (key) {
+    const { count } = await db()
+      .from("party_rate_events")
+      .select("id", { count: "exact", head: true })
+      .eq("key_hash", key)
+      .eq("kind", "guest_wallet")
+      .gte("created_at", new Date(Date.now() - 24 * 60 * 60_000).toISOString());
+    allowFree = (count ?? 0) < GUEST_FREE_PER_DAY;
+  }
+  const created = await ensureWallet(cred, allowFree);
+  if (key && created.newGuestToken) await db().from("party_rate_events").insert({ key_hash: key, kind: "guest_wallet" });
+  return { ...created, freeDenied: !allowFree };
+}
+
 /** The caller's wallet, without creating a guest wallet. */
 export async function findWallet(cred: CreditCredentials): Promise<ResolvedWallet | null> {
   const userId = await userIdFromToken(cred.accessToken);

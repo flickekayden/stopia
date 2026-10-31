@@ -11,40 +11,6 @@ const cred = {
 };
 const credits = () => import("./credits.server");
 
-async function rateFreeAllowed() {
-  // Up to five guest wallets with free credits per network address per day.
-  let ip = "";
-  try {
-    const { getRequestHeader } = await import("@tanstack/react-start/server");
-    ip = (getRequestHeader("cf-connecting-ip") ?? getRequestHeader("x-forwarded-for")?.split(",")[0] ?? "").trim();
-  } catch { /* no request */ }
-  if (!ip) return true;
-  const { createHash } = await import("node:crypto");
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const key = createHash("sha256").update(`rate:${ip}`).digest("hex");
-  const { count } = await supabaseAdmin
-    .from("party_rate_events")
-    .select("id", { count: "exact", head: true })
-    .eq("key_hash", key)
-    .eq("kind", "guest_wallet")
-    .gte("created_at", new Date(Date.now() - 24 * 60 * 60_000).toISOString());
-  return (count ?? 0) < 5;
-}
-
-export async function recordGuestWallet() {
-  let ip = "";
-  try {
-    const { getRequestHeader } = await import("@tanstack/react-start/server");
-    ip = (getRequestHeader("cf-connecting-ip") ?? getRequestHeader("x-forwarded-for")?.split(",")[0] ?? "").trim();
-  } catch { /* no request */ }
-  if (!ip) return;
-  const { createHash } = await import("node:crypto");
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  await supabaseAdmin.from("party_rate_events").insert({ key_hash: createHash("sha256").update(`rate:${ip}`).digest("hex"), kind: "guest_wallet" });
-}
-
-export { rateFreeAllowed };
-
 /** Price and pack size as configured on the server (public, no personal data). */
 export const getBillingInfo = createServerFn({ method: "GET" }).handler(async () => {
   const c = await (await credits()).loadBillingConfig();
