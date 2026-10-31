@@ -37,7 +37,9 @@ import {
   stopPartyRound,
   submitPartyAction,
   updatePartySettings,
+  touchPartyPresence,
 } from "@/lib/party.functions";
+import { HEARTBEAT_MS } from "@/lib/party-presence";
 import { isPartyGame, lobbyGameMeta, readPartySettings, readPublicState, readRoomGame } from "@/lib/party-games";
 import { getLastNickname, getOrCreateSessionId, getPlayer, removePlayer, savePlayer } from "@/lib/session";
 
@@ -83,6 +85,7 @@ function PartyRoomPage() {
   const appealResolveFn = useServerFn(resolveStopAppeal);
   const tickFn = useServerFn(tickPartyBots);
   const devFn = useServerFn(devRoomAction);
+  const touchFn = useServerFn(touchPartyPresence);
 
   useEffect(() => {
     const sessionId = getOrCreateSessionId();
@@ -154,6 +157,30 @@ function PartyRoomPage() {
       devBots: (action) => run("bots", async () => { await devFn({ data: { ...base, token: getDevToken(), action } }); vibrate(10); }),
     };
   }, [room, identity, run, submitFn, advanceFn, nextFn, skipFn, startFn, restartFn, settingsFn, selectFn, replayFn, lobbyFn, stopFn, appealFn, appealVoteFn, appealResolveFn, devFn, refresh, play]);
+
+  // Presence heartbeat while the room is on screen, plus an immediate check-in when the tab
+  // comes back or the network returns, so others can see who is still around.
+  const presenceRoomId = room?.id;
+  useEffect(() => {
+    if (!presenceRoomId || !identity) return;
+    let inFlight = false;
+    const beat = async () => {
+      if (inFlight || document.hidden) return;
+      inFlight = true;
+      try { await touchFn({ data: { roomId: presenceRoomId, ...identity } }); } catch { /* the next beat retries */ }
+      finally { inFlight = false; }
+    };
+    const onVisible = () => { if (!document.hidden) void beat(); };
+    void beat();
+    const id = window.setInterval(() => void beat(), HEARTBEAT_MS);
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("online", onVisible);
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("online", onVisible);
+    };
+  }, [presenceRoomId, identity, touchFn]);
 
   // Training bots act only when the host's device asks: a light heartbeat while a match with bots is on.
   const hasBots = players.some((p) => p.is_bot);

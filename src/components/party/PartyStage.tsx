@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import type { PartyPlayer, PartyPrivateView, PartyRoom } from "@/hooks/use-party-room";
+import { activePlayers, isActivePlayer } from "@/lib/party-presence";
 import { nightKingId, rankPlayers } from "@/lib/ranking";
 import { useDevSettings } from "@/lib/dev-settings";
 import { MAX_BOTS } from "@/lib/party-bots";
@@ -138,6 +139,7 @@ function TrainingBots({ players, actions, busy }: { players: PartyPlayer[]; acti
 
 function PlayersPanel({ players, me, actions, busy }: { players: PartyPlayer[]; me: PartyPlayer; actions: PartyActions; busy: boolean }) {
   const king = nightLeaderId(players);
+  const now = useNow(30_000);
   const anyNight = players.some((p) => p.score > 0);
   return (
     <section className="party-panel" aria-labelledby="lobby-players">
@@ -155,6 +157,7 @@ function PlayersPanel({ players, me, actions, busy }: { players: PartyPlayer[]; 
                 {p.is_host && <span className="inline-flex items-center gap-1 text-xs font-bold party-accent"><Crown className="size-3.5" aria-hidden="true" /> Mestre da sala</span>}
                 {p.id === king && <span className="inline-flex items-center gap-1 text-xs font-bold text-primary">👑 Rei da Noite</span>}
                 {p.is_bot && <span className="inline-flex items-center gap-1 text-xs font-bold text-muted-foreground"><Bot className="size-3.5" aria-hidden="true" /> Robô de treino</span>}
+                {!p.is_bot && p.id !== me.id && !isActivePlayer(p, now) && <span className="inline-flex items-center gap-1 text-xs font-semibold text-muted-foreground"><span className="size-2 rounded-full border border-muted-foreground" aria-hidden="true" /> Ausente · não conta para começar</span>}
               </span>
             </span>
             {anyNight && <span className="shrink-0 text-right font-display text-lg tabular-nums" aria-label={`${p.score} pontos na noite`}>{p.score}<span className="block font-sans text-[0.625rem] font-semibold text-muted-foreground">na noite</span></span>}
@@ -166,10 +169,21 @@ function PlayersPanel({ players, me, actions, busy }: { players: PartyPlayer[]; 
   );
 }
 
+/** Re-renders on an interval so "Ausente" labels appear without new data. */
+function useNow(everyMs: number) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(Date.now()), everyMs);
+    return () => window.clearInterval(id);
+  }, [everyMs]);
+  return now;
+}
+
 function GameMetaLine({ game }: { game: LobbyGameMeta }) {
   return (
     <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-semibold text-muted-foreground">
       <span className="inline-flex items-center gap-1"><Clock className="size-3.5" aria-hidden="true" /> {game.duration}</span>
+      <span className="inline-flex items-center gap-1"><Users className="size-3.5" aria-hidden="true" /> {game.minPlayers}+ jogadores</span>
     </span>
   );
 }
@@ -459,7 +473,8 @@ function RoomShareCard({ code }: { code: string }) {
 export function PartyLobby({ ctx, actions }: { ctx: LobbyCtx; actions: PartyActions }) {
   const selected = ctx.selected;
   const meta = selected ? lobbyGameMeta(selected) : null;
-  const missing = selected ? missingPlayers(selected, ctx.players.length) : 0;
+  const connected = activePlayers(ctx.players).length;
+  const missing = selected ? missingPlayers(selected, connected) : 0;
   const [rulesFor, setRulesFor] = useState<LobbyGameId | null>(null);
 
   return (
