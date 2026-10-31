@@ -1,9 +1,10 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
-import { ArrowRight, BookOpen, Clock, Dices, Loader2, Users } from "lucide-react";
+import { ArrowRight, BookOpen, Clock, Dices, Loader2, UserRound, Users } from "lucide-react";
 import { toast } from "sonner";
 
+import { CreditBadge } from "@/components/credits/CreditBadge";
 import { DevUnlock } from "@/components/DevUnlock";
 import { InstallApp } from "@/components/InstallApp";
 import { PartyIcon } from "@/components/party/PartyIcon";
@@ -18,6 +19,10 @@ import { createPartyRoom, joinPartyRoom } from "@/lib/party.functions";
 import { LOBBY_GAMES, type LobbyGameId } from "@/lib/party-games";
 import { getLastNickname, getOrCreateSessionId, savePlayer } from "@/lib/session";
 import { friendlyError } from "@/lib/friendly-error";
+import { useMyCredits } from "@/hooks/use-credits";
+import { creditCredentials, setGuestToken } from "@/lib/account-client";
+
+const HOME_OG_IMAGE = "OG_HOME_URL";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -27,7 +32,9 @@ export const Route = createFileRoute("/")({
       { property: "og:title", content: "Central de Jogos do Stopia" },
       { property: "og:description", content: "Uma sala para a galera e seis jogos para escolher, direto no celular e sem cadastro." },
       { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary" },
+      { property: "og:image", content: HOME_OG_IMAGE },
+      { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:image", content: HOME_OG_IMAGE },
     ],
   }),
   component: GamesHub,
@@ -43,6 +50,7 @@ function GamesHub() {
   const [busy, setBusy] = useState<"create" | "join" | null>(null);
   const [rulesFor, setRulesFor] = useState<LobbyGameId | null>(null);
   const [nicknameError, setNicknameError] = useState(false);
+  const credits = useMyCredits();
 
   useEffect(() => {
     getOrCreateSessionId();
@@ -63,7 +71,9 @@ function GamesHub() {
     setBusy("create");
     try {
       const sessionId = getOrCreateSessionId();
-      const res = await create({ data: { nickname: nickname.trim(), sessionId } });
+      const res = await create({ data: { nickname: nickname.trim(), sessionId, ...(await creditCredentials()) } });
+      if (res.newGuestToken) setGuestToken(res.newGuestToken);
+      if (res.freeDenied) toast.info("As solicitações grátis deste aparelho/rede já foram usadas hoje. Crie uma conta ou compre um pacote para jogar com IA.");
       play("create");
       savePlayer(res.code, res.playerId, nickname.trim(), sessionId);
       navigate({ to: "/festa/$code", params: { code: res.code } });
@@ -102,8 +112,16 @@ function GamesHub() {
     <main className="game-screen mx-auto flex min-h-[100dvh] w-full max-w-md flex-col gap-6 px-5 pb-[calc(2rem+env(safe-area-inset-bottom))] pt-[calc(1.25rem+env(safe-area-inset-top))]">
       <header className="space-y-3 top-actions-clear pt-2">
         <h1 className="font-display text-5xl leading-none text-primary"><DevUnlock>Central de Jogos</DevUnlock></h1>
-        <p className="text-base text-muted-foreground">Reúna a galera numa sala só e escolham juntos o que jogar. No celular e sem cadastro.</p>
+        <p className="text-base text-muted-foreground">Reúna a galera numa sala só e escolham juntos o que jogar. No celular e sem cadastro obrigatório.</p>
+        <div className="flex items-center gap-2">
+          <Button asChild variant="secondary" className="h-11 px-4">
+            <Link to={credits.signedIn ? "/perfil" : "/entrar"}><UserRound /> {credits.signedIn ? "Meu Stopia" : "Entrar ou criar conta"}</Link>
+          </Button>
+          {!credits.signedIn && <Button asChild variant="ghost" className="h-11 px-3 text-sm"><Link to="/perfil">Meu saldo</Link></Button>}
+        </div>
       </header>
+
+      <CreditBadge status={credits.status} summary={credits.summary} onRetry={() => void credits.refresh()} />
 
       <section className="party-panel space-y-4" aria-labelledby="hub-entrada">
         <h2 id="hub-entrada" className="sr-only">Entrar na brincadeira</h2>
@@ -147,8 +165,9 @@ function GamesHub() {
               {busy === "join" ? <Loader2 className="animate-spin" /> : <ArrowRight />} Entrar
             </Button>
           </div>
-          <p className="text-xs text-muted-foreground">Todos os jogos, incluindo o Stop, acontecem nesta sala.</p>
+          <p className="text-xs text-muted-foreground">Todos os jogos, incluindo o Stop, acontecem nesta sala. Só quem cria a sala gasta solicitações de IA.</p>
         </form>
+        <p className="text-xs text-muted-foreground">Ao criar ou entrar numa sala você aceita os <Link to="/termos" className="underline">Termos e regras de convivência</Link> e a <Link to="/privacidade" className="underline">Política de privacidade</Link>.</p>
       </section>
 
       <ThemePicker />
