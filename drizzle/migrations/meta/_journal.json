@@ -36,6 +36,13 @@
       "when": 1793266302251,
       "tag": "0004_party_chat",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1793411901579,
+      "tag": "0005_party_training_bots",
+      "breakpoints": true
     }
   ]
 }

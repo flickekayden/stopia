@@ -1,11 +1,12 @@
 import { useRouterState } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { FlaskConical, Loader2, RefreshCw, RotateCcw, Save, Settings } from "lucide-react";
+import { Activity, FlaskConical, Loader2, RefreshCw, RotateCcw, Save, Settings } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { AnswerCard, type AnswerCardData } from "@/components/game/AnswerCard";
 import { PartyAdminPanel } from "@/components/party/PartyAdminPanel";
+import { DevRoomControls } from "@/components/party/DevRoomControls";
 import { PartyRoomsAdmin } from "@/components/party/PartyRoomsAdmin";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,12 +32,6 @@ import {
 } from "@/lib/dev-settings";
 import { evaluateRound, saveAiSettings, testJudgment } from "@/lib/game.functions";
 
-const COLOR_VARS = [
-  ["primary", "Primária", "--primary"],
-  ["secondary", "Secundária", "--secondary"],
-  ["background", "Fundo", "--background"],
-  ["foreground", "Texto", "--foreground"],
-] as const;
 
 const SAMPLE_BUBBLES: Array<{ label: string; data: AnswerCardData }> = [
   { label: "20 pts (criativa)", data: sample(20, "Ornitorrinco", "Até que enfim usou o cérebro.") },
@@ -105,40 +100,21 @@ export function DevPanel() {
               {context === "global" ? "Ajustes gerais do app. As regras de cada jogo aparecem dentro do próprio jogo." : `Só ajustes de ${CONTEXT_LABELS[context]}.`}
             </SheetDescription>
           </SheetHeader>
+          {context !== "global" && (
+            <div className="px-4 pt-3">
+              <DevRoomControls />
+            </div>
+          )}
           {context !== "global" && context !== "stop" ? (
             <PartyAdminPanel key={context} game={context} />
-          ) : (
-          <>
-          {context === "global" ? (
+          ) : context === "global" ? (
             <div className="space-y-5 px-4 pb-6 pt-3">
-              <section className="space-y-2">
-                <Label>Cores</Label>
-                <div className="grid grid-cols-2 gap-2">
-                  {COLOR_VARS.map(([key, label]) => (
-                    <label key={key} className="flex items-center gap-2 rounded-xl border border-border p-2 text-sm">
-                      <input
-                        type="color"
-                        value={s.colors[key] || "#888888"}
-                        onChange={(e) => patch((p) => ({ ...p, colors: { ...p.colors, [key]: e.target.value } }))}
-                        className="size-8 cursor-pointer rounded bg-transparent"
-                      />
-                      <span className="flex-1">{label}</span>
-                      {s.colors[key] && (
-                        <button
-                          type="button"
-                          className="text-xs text-muted-foreground underline"
-                          onClick={() => patch((p) => ({ ...p, colors: { ...p.colors, [key]: "" } }))}
-                        >
-                          limpar
-                        </button>
-                      )}
-                    </label>
-                  ))}
-                </div>
-              </section>
+              <DevRoomControls />
+              <AiHealth />
               <PartyRoomsAdmin />
             </div>
           ) : (
+          <>
           <Tabs defaultValue="visual" className="px-4 pb-6">
             <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="visual">Visual</TabsTrigger>
@@ -240,7 +216,6 @@ export function DevPanel() {
               <AiTab s={s} patch={patch} />
             </TabsContent>
           </Tabs>
-          )}
           <div className="sticky bottom-0 space-y-2 border-t border-border bg-background px-4 pt-3 pb-[calc(1rem+env(safe-area-inset-bottom))]">
             <Button
               className="w-full"
@@ -251,7 +226,7 @@ export function DevPanel() {
                   await save({
                     data: {
                       dev: devAiOverrides(),
-                      ui: { buttonLayout: s.buttonLayout, colors: s.colors, texts: s.texts, scoringMode: s.scoringMode, keyboard: s.keyboard, quickMessages: s.quickMessages },
+                      ui: { buttonLayout: s.buttonLayout, colors: { primary: "", secondary: "", background: "", foreground: "" }, texts: s.texts, scoringMode: s.scoringMode, keyboard: s.keyboard, quickMessages: s.quickMessages },
                     },
                   });
                   setGlobalSettings(s);
@@ -396,5 +371,33 @@ function AiTab({ s, patch }: { s: DevSettings; patch: (fn: (p: DevSettings) => D
         {lastLatency && <p className="text-xs text-muted-foreground">⏱ {lastLatency}</p>}
       </section>
     </div>
+  );
+}
+
+/** Quick health check of the AI judge: one sample judgement with the time it took. */
+function AiHealth() {
+  const test = useServerFn(testJudgment);
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null);
+  async function run() {
+    setBusy(true);
+    try {
+      const r = await test({ data: { letter: "P", category: "Animal", response: "Pato", dev: devAiOverrides() } });
+      setResult({ ok: true, text: `Respondeu em ${(r.latencyMs / 1000).toFixed(1)}s (${r.model}): ${r.pontos} pts. “${r.comentario}”` });
+    } catch (e) {
+      setResult({ ok: false, text: e instanceof Error ? e.message : "A IA não respondeu." });
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <section className="space-y-2 rounded-2xl border border-border p-3" aria-labelledby="ai-health-title">
+      <h3 id="ai-health-title" className="font-semibold">Saúde da IA</h3>
+      <p className="text-xs text-muted-foreground">Faz um julgamento de teste (“Pato” em Animal) e mostra quanto tempo o juiz levou.</p>
+      <Button variant="secondary" className="w-full" disabled={busy} onClick={() => void run()}>
+        {busy ? <Loader2 className="animate-spin" /> : <Activity />} Testar a IA agora
+      </Button>
+      {result && <p role="status" className={result.ok ? "text-sm" : "text-sm text-destructive"}>{result.ok ? "✅ " : "⚠️ "}{result.text}</p>}
+    </section>
   );
 }

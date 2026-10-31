@@ -69,9 +69,14 @@ import {
   ROLETA_EVENTS,
   TRIBUNAL_CASES,
 } from "./party-content.server";
+import { MAX_BOTS, botDelayMs, fallbackBotLine, fallbackStopAnswers, nextBotName, seededPick, seededUnit, type BotActionKind } from "./party-bots";
+import { APPEAL_SECONDS, appealBlocker, appealClosed, appealOutcome, appealPoints, type AppealVote, type StopAppeal } from "./stop-appeal";
 
 type RoomRow = Tables<"party_rooms">;
 type PlayerRow = Tables<"party_players">;
+
+/** Training bots' per-round cache (stored at round_number = -round, never in public state). */
+type BotCache = { stop?: Record<string, Record<string, string>>; texts?: Record<string, string> };
 
 type RoundPrivate = {
   prompt?: PartyPrompt;
@@ -304,8 +309,17 @@ export async function leavePartyRoom(input: { roomId: string; playerId: string; 
     await db().from("party_rooms").delete().eq("id", input.roomId);
     return { ok: true };
   }
-  if (player.is_host && !remaining.some((p) => p.is_host)) {
-    await db().from("party_players").update({ is_host: true }).eq("id", remaining[0]!.id);
+  // Bots never keep a room alive or become host: with no people left, the room closes.
+  const humans = remaining.filter((p) => !p.is_bot);
+  if (humans.length === 0) {
+    await db().from("party_rooms").delete().eq("id", input.roomId);
+    return { ok: true };
+  }
+  if (!humans.some((p) => p.is_host)) {
+    await Promise.all([
+      db().from("party_players").update({ is_host: true }).eq("id", humans[0]!.id),
+      ...remaining.filter((p) => p.is_bot && p.is_host).map((p) => db().from("party_players").update({ is_host: false }).eq("id", p.id)),
+    ]);
   }
   const room = await loadRoom(input.roomId);
   if (room.status === "playing" && (isPartyGame(room.game) || room.game === "stop")) await syncSubmitted(room.id);
@@ -326,7 +340,8 @@ const RESET_TO_LOBBY = {
 async function clearRoundData(roomId: string) {
   await Promise.all([
     db().from("party_submissions").delete().eq("room_id", roomId),
-    db().from("party_private").delete().eq("room_id", roomId).gt("round_number", 0),
+    // Positive rows are rounds, negative rows are the training bots' per-round cache; 0 is room history.
+    db().from("party_private").delete().eq("room_id", roomId).neq("round_number", 0),
   ]);
 }
 
@@ -377,10 +392,7 @@ export async function startPartyGame(input: { roomId: string; playerId: string; 
   const players = await loadPlayers(room.id);
   const min = lobbyGameMeta(game).minPlayers;
   if (players.length < min) throw new Error(`Este jogo precisa de pelo menos ${min} jogadores.`);
-  await Promise.all([
-    db().from("party_submissions").delete().eq("room_id", room.id),
-    db().from("party_private").delete().eq("room_id", room.id).gt("round_number", 0),
-  ]);
+  await clearRoundData(room.id);
   const scores = Object.fromEntries(players.map((p) => [p.id, 0]));
   if (game === "stop") await startStopRound(room, players, 1, scores);
   else await startRound(room, players, 1, scores, readPartySettings(room.settings).skips);
@@ -539,6 +551,18 @@ async function startRound(room: RoomRow, players: PlayerRow[], round: number, sc
 export async function nextPartyRound(input: { roomId: string; playerId: string; sessionId: string; round: number }) {
   const [, room] = await Promise.all([requireHost(input.roomId, input.playerId, input.sessionId), loadRoom(input.roomId)]);
   if (room.phase !== "reveal" || room.round_number !== input.round) return { ok: true };
+  return nextRoundFor(room);
+}
+
+/** Moves a revealed round on (next round or final podium); an open Stop appeal is settled first. */
+async function nextRoundFor(initial: RoomRow) {
+  let room = initial;
+  const open = readPublicState(room.public_state).appeal;
+  if (open?.status === "open") {
+    if (!appealClosed(open, Date.now())) throw new Error("Espere a votação do recurso terminar.");
+    room = (await settleAppeal(room)) ?? (await loadRoom(room.id));
+    if (room.phase !== "reveal") return { ok: true };
+  }
   const settings = readPartySettings(room.settings);
   const state = readPublicState(room.public_state);
   if (room.round_number >= settings.rounds) {
@@ -1202,6 +1226,8 @@ async function advanceStop(room: RoomRow): Promise<boolean> {
       public_state: asJson({ ...state, submitted: [], ai: { status: "pending" } }),
     });
     if (!claimed) return false;
+    // Training bots that were still "writing" hand in what they had when the round closed.
+    await fillStopBots(room, state, true).catch(() => undefined);
     await judgeStop(claimed);
     return true;
   }
@@ -1279,4 +1305,401 @@ export async function getPartyPrivateView(input: { roomId: string; playerId: str
   }
   if (game === "autor") view.myEntryId = roundPrivate.entries?.find((entry) => entry.authorId === player.id)?.id ?? null;
   return view;
+}
+
+/* ------------------------------ Training bots ------------------------------ */
+
+async function inBatches<T>(items: readonly T[], run: (item: T) => PromiseLike<unknown>) {
+  for (let i = 0; i < items.length; i += 6) await Promise.all(items.slice(i, i + 6).map(run));
+}
+
+async function readBotCache(roomId: string, round: number) {
+  return readPrivate<BotCache>(roomId, -round);
+}
+
+async function writeBotCache(roomId: string, round: number, cache: BotCache) {
+  await db().from("party_private").upsert({ room_id: roomId, round_number: -round, data: asJson(cache) }, { onConflict: "room_id,round_number" });
+}
+
+/** Bots' Stop answers for the round: generated once (AI, falling back to a built-in bank) and cached. */
+async function botStopAnswers(room: RoomRow, stop: StopRoundState, bots: PlayerRow[]) {
+  const cache = await readBotCache(room.id, room.round_number);
+  const known = cache.stop ?? {};
+  const missing = bots.filter((b) => !known[b.id]);
+  if (missing.length === 0) return known;
+  let made: Record<string, Record<string, string>> = {};
+  try {
+    const labels = missing.map((_, i) => `R${i + 1}`);
+    const ai = await (await import("./party-ai.server")).aiBotStopAnswers({ letra: stop.letter, categorias: stop.categories, bots: labels });
+    made = Object.fromEntries(missing.map((b, i) => [b.id, ai[labels[i]!] ?? {}]));
+  } catch { made = {}; }
+  const next = { ...known };
+  for (const bot of missing) {
+    const fallback = fallbackStopAnswers(bot.id, room.round_number, stop.letter, stop.categories);
+    const fromAi = made[bot.id] ?? {};
+    next[bot.id] = Object.fromEntries(stop.categories.map((c) => [c, fromAi[c] !== undefined && (fromAi[c] === "" || fromAi[c]!.toUpperCase().startsWith(stop.letter)) ? fromAi[c]! : fallback[c] ?? ""]));
+  }
+  await writeBotCache(room.id, room.round_number, { ...cache, stop: next });
+  return next;
+}
+
+/**
+ * Hands in Stop answers for bots whose "thinking time" is over (or all of them when the round is closing).
+ * A bot interrupted early (somebody shouted STOP) only gets part of its categories filled.
+ */
+async function fillStopBots(room: RoomRow, state: PartyPublicState, force: boolean, known?: PlayerRow[]) {
+  const stop = state.stop;
+  if (!stop) return [];
+  const players = known ?? (await loadPlayers(room.id));
+  const eligible = new Set(state.eligible ?? []);
+  const bots = players.filter((p) => p.is_bot && eligible.has(p.id));
+  if (bots.length === 0) return [];
+  const now = Date.now();
+  const startedAt = Date.parse(stop.startsAt);
+  if (now < startedAt) return [];
+  const subs = await submissionsFor(room, "write");
+  const done = new Set(subs.filter((s) => s.payload?.done === true).map((s) => s.player_id));
+  const pending = bots.filter((b) => !done.has(b.id));
+  if (pending.length === 0) return [];
+  const endsAt = room.phase_ends_at ? Date.parse(room.phase_ends_at) : null;
+  const phaseSeconds = endsAt ? (endsAt - startedAt) / 1000 : readPartySettings(room.settings).stopSeconds;
+  const delay = (bot: PlayerRow) => botDelayMs({ botId: bot.id, round: room.round_number, phase: "write", kind: "stop", phaseSeconds });
+  const humansDone = players.filter((p) => !p.is_bot && eligible.has(p.id)).every((p) => done.has(p.id));
+  const urgent = force || Boolean(stop.stopBy) || humansDone || (endsAt !== null && endsAt - now < 3_000);
+  const due = pending.filter((b) => urgent || now - startedAt >= delay(b));
+  if (due.length === 0) return [];
+  const cache = await botStopAnswers(room, stop, bots);
+  const rows = due.map((bot) => {
+    const full = cache[bot.id] ?? fallbackStopAnswers(bot.id, room.round_number, stop.letter, stop.categories);
+    const progress = Math.min(1, Math.max(0.3, (now - startedAt) / Math.max(1, delay(bot))));
+    const keep = Math.ceil(stop.categories.length * progress);
+    const answers = sanitizeStopAnswers(Object.fromEntries(stop.categories.map((c, i) => [c, i < keep ? full[c] ?? "" : ""])), stop.categories);
+    return { bot, answers };
+  });
+  await inBatches(rows, (row) =>
+    db().from("party_submissions").upsert(
+      { room_id: room.id, round_number: room.round_number, phase: "write", player_id: row.bot.id, payload: asJson({ answers: row.answers, done: true }) },
+      { onConflict: "room_id,round_number,phase,player_id" },
+    ),
+  );
+  return rows;
+}
+
+/** A bot with every category filled sometimes shouts STOP!, locking answers in three seconds like a person would. */
+async function botShoutStop(roomId: string, botId: string, round: number) {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const room = await loadRoom(roomId);
+    const state = readPublicState(room.public_state);
+    if (room.game !== "stop" || room.phase !== "write" || room.round_number !== round || !state.stop || state.stop.stopBy) return;
+    const lockAt = Date.now() + STOP_LOCK_MS;
+    const endsAt = room.phase_ends_at ? Math.min(Date.parse(room.phase_ends_at), lockAt) : lockAt;
+    const updated = await guardedUpdate(room, {
+      phase_ends_at: new Date(endsAt).toISOString(),
+      public_state: asJson({ ...state, stop: { ...state.stop, stopBy: botId, stopAt: new Date().toISOString() } }),
+    });
+    if (updated) return;
+  }
+}
+
+type BotRole = { papel: string; fallback: string; contexto: string };
+
+function botRole(game: PartyGameId, bot: PlayerRow, state: PartyPublicState, rp: RoundPrivate): BotRole {
+  const prompt = state.prompt;
+  if (game === "tribunal") {
+    const defendant = bot.id === state.defendantId;
+    return { papel: defendant ? "réu: escreve a própria defesa" : "acusador: escreve a acusação contra o réu", fallback: defendant ? "defesa" : "acusacao", contexto: prompt?.text ?? "" };
+  }
+  if (game === "infiltrado") {
+    const infiltrado = rp.infiltradoId === bot.id;
+    return {
+      papel: infiltrado ? `infiltrado: NÃO sabe a palavra, só a categoria ${rp.category ?? ""}; blefa com uma pista vaga` : `cidadão: a palavra secreta é "${rp.word ?? ""}"; dá uma pista curta sem dizer a palavra`,
+      fallback: "pista",
+      contexto: prompt?.title ?? "",
+    };
+  }
+  if (game === "debate") {
+    const side = state.sides?.[bot.id] ?? "A";
+    return { papel: `defende o lado ${side}: ${side === "A" ? prompt?.sideA ?? "" : prompt?.sideB ?? ""}`, fallback: "debate", contexto: prompt?.title ?? "" };
+  }
+  if (game === "autor") return { papel: "responde à pergunta de forma engraçada", fallback: "autor", contexto: prompt?.text ?? "" };
+  return { papel: "responde ao desafio", fallback: "roleta", contexto: prompt?.text ?? "" };
+}
+
+/** Bots' texts for the current writing phase, generated once per prompt and cached (AI only when the room has AI on). */
+async function botTexts(room: RoomRow, state: PartyPublicState, rp: RoundPrivate, bots: PlayerRow[]) {
+  const game = gameOf(room);
+  const prefix = `${room.phase}:${Math.round(seededUnit(state.prompt?.text ?? "") * 1e5)}:`;
+  const cache = await readBotCache(room.id, room.round_number);
+  const texts = { ...(cache.texts ?? {}) };
+  const missing = bots.filter((b) => !texts[prefix + b.id]);
+  if (missing.length > 0) {
+    const roles = missing.map((b) => botRole(game, b, state, rp));
+    let made: Record<string, string> = {};
+    if (readPartySettings(room.settings).ai) {
+      try {
+        made = await (await import("./party-ai.server")).aiBotTexts({
+          jogo: lobbyGameMeta(game).name,
+          contexto: roles[0]?.contexto ?? "",
+          papeis: missing.map((_, i) => ({ rotulo: `R${i + 1}`, papel: roles[i]!.papel })),
+        });
+      } catch { made = {}; }
+    }
+    missing.forEach((bot, i) => {
+      texts[prefix + bot.id] = made[`R${i + 1}`] ?? fallbackBotLine(roles[i]!.fallback, `${bot.id}:${room.round_number}:${room.phase}`);
+    });
+    await writeBotCache(room.id, room.round_number, { ...cache, texts });
+  }
+  return Object.fromEntries(bots.map((b) => [b.id, texts[prefix + b.id] ?? ""]));
+}
+
+function botVotePayload(game: PartyGameId, phase: PartyPhaseId, bot: PlayerRow, state: PartyPublicState, rp: RoundPrivate, round: number): Record<string, unknown> | null {
+  const seed = `${bot.id}:${round}:${phase}`;
+  if (game === "tribunal") return { verdict: seededUnit(seed) < 0.5 ? "culpado" : "inocente" };
+  if (game === "autor" && phase === "guess") {
+    const own = rp.entries?.find((e) => e.authorId === bot.id)?.id;
+    const authors = [...new Set((rp.entries ?? []).map((e) => e.authorId))].filter((id) => id !== bot.id);
+    const guesses: Record<string, string> = {};
+    for (const entry of state.entries ?? []) {
+      if (entry.id === own) continue;
+      const pick = seededPick(authors, `${seed}:${entry.id}`);
+      if (pick) guesses[entry.id] = pick;
+    }
+    return Object.keys(guesses).length > 0 ? { guesses } : null;
+  }
+  const allowed = game === "infiltrado" ? (state.eligible ?? []) : (state.entries ?? []).map((e) => e.playerId).filter((id): id is string => Boolean(id));
+  const target = seededPick(allowed.filter((id) => id !== bot.id), seed);
+  return target ? { target } : null;
+}
+
+async function tickPartyGameBots(room: RoomRow, state: PartyPublicState, players: PlayerRow[]) {
+  const game = gameOf(room);
+  const phase = room.phase as PartyPhaseId;
+  const kind: BotActionKind | null = TEXT_PHASES.includes(phase) ? "text" : phase === "vote" || phase === "guess" ? "vote" : null;
+  if (!kind) return 0;
+  const eligible = new Set(state.eligible ?? []);
+  const bots = players.filter((p) => p.is_bot && eligible.has(p.id));
+  if (bots.length === 0) return 0;
+  const subs = await submissionsFor(room, room.phase);
+  const done = new Set(subs.map((s) => s.player_id));
+  const pending = bots.filter((b) => !done.has(b.id));
+  if (pending.length === 0) return 0;
+  const now = Date.now();
+  const startedAt = Date.parse(room.phase_started_at ?? room.updated_at);
+  const endsAt = room.phase_ends_at ? Date.parse(room.phase_ends_at) : null;
+  const phaseSeconds = endsAt ? (endsAt - startedAt) / 1000 : null;
+  const humansDone = players.filter((p) => !p.is_bot && eligible.has(p.id)).every((p) => done.has(p.id));
+  const urgent = humansDone || (endsAt !== null && endsAt - now < 3_000);
+  const due = pending.filter((b) => urgent || now - startedAt >= botDelayMs({ botId: b.id, round: room.round_number, phase: room.phase, kind, phaseSeconds }));
+  const rp = await readPrivate<RoundPrivate>(room.id, room.round_number);
+  // Texts are prepared on the first tick so a slow AI never delays the bots' turn.
+  const texts = kind === "text" && !(game === "infiltrado" && phase === "last_guess") ? await botTexts(room, state, rp, pending) : {};
+  if (due.length === 0) return 0;
+  const rows = due
+    .map((bot) => {
+      let payload: Record<string, unknown> | null;
+      if (kind === "vote") payload = botVotePayload(game, phase, bot, state, rp, room.round_number);
+      else if (game === "infiltrado" && phase === "last_guess") {
+        const pick = seededPick(INFILTRADO_WORDS.filter((w) => w.category === rp.category), `${bot.id}:${room.round_number}:guess`);
+        payload = { text: pick?.word ?? "Não faço ideia" };
+      } else payload = textPayload({ text: texts[bot.id] || fallbackBotLine(botRole(game, bot, state, rp).fallback, bot.id) }, textMaxFor(game));
+      return payload ? { bot, payload } : null;
+    })
+    .filter((row): row is { bot: PlayerRow; payload: Record<string, unknown> } => row !== null);
+  await inBatches(rows, (row) =>
+    db().from("party_submissions").upsert(
+      { room_id: room.id, round_number: room.round_number, phase: room.phase, player_id: row.bot.id, payload: asJson(row.payload) },
+      { onConflict: "room_id,round_number,phase,player_id" },
+    ),
+  );
+  return rows.length;
+}
+
+/** Bots vote on an open "Recorrer ao Juiz" a few seconds after it opens. */
+async function botsVoteOnAppeal(room: RoomRow, state: PartyPublicState, players: PlayerRow[]) {
+  const appeal = state.appeal;
+  if (room.game !== "stop" || appeal?.status !== "open") return 0;
+  const openedAt = Date.parse(appeal.endsAt) - APPEAL_SECONDS * 1000;
+  const now = Date.now();
+  const bots = players.filter((p) => p.is_bot && appeal.voters.includes(p.id) && !appeal.votes[p.id]);
+  const due = bots.filter((b) => now - openedAt >= 3_000 + seededUnit(`${b.id}:${room.round_number}:appeal`) * 4_000);
+  if (due.length === 0) {
+    if (appealClosed(appeal, now)) await settleAppeal(room);
+    return 0;
+  }
+  const votes = { ...appeal.votes };
+  for (const bot of due) votes[bot.id] = seededUnit(`${bot.id}:${appeal.category}:vote`) < 0.5 ? "aceitar" : "manter";
+  const next: StopAppeal = { ...appeal, votes };
+  const updated = await guardedUpdate(room, { public_state: asJson({ ...state, appeal: next }) });
+  if (updated && appealClosed(next, Date.now())) await settleAppeal(updated);
+  return due.length;
+}
+
+/** Host device heartbeat while bots play: each due bot acts once; the server re-checks phase and timing. */
+export async function tickPartyBots(input: { roomId: string; playerId: string; sessionId: string }) {
+  const [, room] = await Promise.all([requireHost(input.roomId, input.playerId, input.sessionId), loadRoom(input.roomId)]);
+  if (room.status !== "playing") return { ok: true, acted: 0 };
+  const players = await loadPlayers(room.id);
+  if (!players.some((p) => p.is_bot)) return { ok: true, acted: 0 };
+  const state = readPublicState(room.public_state);
+  if (room.phase === "reveal") return { ok: true, acted: await botsVoteOnAppeal(room, state, players) };
+  if (room.game === "stop") {
+    if (room.phase !== "write" || !state.stop) return { ok: true, acted: 0 };
+    const eligible = new Set(state.eligible ?? []);
+    await botStopAnswers(room, state.stop, players.filter((p) => p.is_bot && eligible.has(p.id)));
+    const rows = await fillStopBots(room, state, false, players);
+    if (rows.length > 0) {
+      const humans = players.filter((p) => !p.is_bot && eligible.has(p.id));
+      const subs = await submissionsFor(room, "write");
+      const humansDone = humans.every((h) => subs.some((s) => s.player_id === h.id && s.payload?.done === true));
+      const shouter = rows.find((r) => stopAnswersComplete(r.answers, state.stop!.categories) && seededUnit(`${r.bot.id}:${room.round_number}:shout`) < 0.3);
+      if (shouter && !state.stop.stopBy && !humansDone) await botShoutStop(room.id, shouter.bot.id, room.round_number);
+      await syncSubmitted(room.id);
+    }
+    return { ok: true, acted: rows.length };
+  }
+  if (!isPartyGame(room.game)) return { ok: true, acted: 0 };
+  const acted = await tickPartyGameBots(room, state, players);
+  if (acted > 0) await syncSubmitted(room.id);
+  return { ok: true, acted };
+}
+
+/* ------------------------ Developer room controls -------------------------- */
+
+export type DevRoomAction = "addBot" | "removeBots" | "kick" | "forceAdvance" | "toLobby";
+
+/** Developer tools for the room the developer is in: training bots, skipping a stuck step, kicking, resetting. */
+export async function devRoomAction(input: { token?: string | undefined; roomId: string; playerId: string; sessionId: string; action: DevRoomAction; targetId?: string | undefined }) {
+  await requireDeveloper(input.token);
+  const me = await requireSession(input.roomId, input.playerId, input.sessionId);
+  const room = await loadRoom(input.roomId);
+  const players = await loadPlayers(room.id);
+
+  if (input.action === "addBot") {
+    if (room.status === "playing") throw new Error("Adicione robôs antes de a partida começar.");
+    if (players.filter((p) => p.is_bot).length >= MAX_BOTS) throw new Error(`No máximo ${MAX_BOTS} robôs por sala.`);
+    if (players.length >= MAX_PLAYERS) throw new Error(`A sala está cheia (máximo de ${MAX_PLAYERS}).`);
+    const { error } = await db().from("party_players").insert({ room_id: room.id, nickname: nextBotName(players.map((p) => p.nickname)), is_bot: true, is_host: false });
+    if (error) throw new Error("Não foi possível adicionar o robô.");
+    return { ok: true };
+  }
+  if (input.action === "removeBots") {
+    await db().from("party_players").delete().eq("room_id", room.id).eq("is_bot", true);
+    if (room.status === "playing") await syncSubmitted(room.id);
+    return { ok: true };
+  }
+  if (input.action === "kick") {
+    const target = players.find((p) => p.id === input.targetId);
+    if (!target) throw new Error("Esse jogador já saiu.");
+    if (target.id === me.id) throw new Error("Para sair, use o botão Sair da sala.");
+    await db().from("party_players").delete().eq("id", target.id);
+    if (target.is_host) {
+      const heir = players.find((p) => p.id !== target.id && !p.is_bot);
+      if (heir) await db().from("party_players").update({ is_host: true }).eq("id", heir.id);
+    }
+    if (room.status === "playing") await syncSubmitted(room.id);
+    return { ok: true };
+  }
+  if (input.action === "toLobby") {
+    await clearRoundData(room.id);
+    const updated = await guardedUpdate(room, { ...RESET_TO_LOBBY, game: "lobby" });
+    if (!updated) throw new Error("A sala mudou ao mesmo tempo. Tente de novo.");
+    return { ok: true };
+  }
+  // forceAdvance: close the current step now, whatever the clock says.
+  if (room.status !== "playing") throw new Error("Nenhuma partida em andamento.");
+  if (room.phase === "reveal") {
+    let current = room;
+    if (readPublicState(room.public_state).appeal?.status === "open") current = (await settleAppeal(room)) ?? (await loadRoom(room.id));
+    await nextRoundFor(current);
+    return { ok: true };
+  }
+  if (room.phase === "evaluating") {
+    // Let a stuck judge be retried right away by expiring its claim.
+    const expired = await guardedUpdate(room, { phase_ends_at: new Date(Date.now() - 1_000).toISOString() });
+    if (expired) await advance(expired);
+    return { ok: true };
+  }
+  await advance(room);
+  return { ok: true };
+}
+
+/* --------------------------- Stop: "Recorrer ao Juiz" --------------------------- */
+
+function isStopReveal(room: RoomRow, round: number) {
+  return room.game === "stop" && room.status === "playing" && room.phase === "reveal" && room.round_number === round;
+}
+
+export async function openStopAppeal(input: { roomId: string; playerId: string; sessionId: string; round: number; category: string }) {
+  const player = await requireSession(input.roomId, input.playerId, input.sessionId);
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    const room = await loadRoom(input.roomId);
+    if (!isStopReveal(room, input.round)) throw new Error("O resultado desta rodada já foi encerrado.");
+    const state = readPublicState(room.public_state);
+    const results = state.results?.stop ?? [];
+    const blocker = appealBlocker({ results, playerId: player.id, category: input.category, current: state.appeal, used: state.appealsUsed ?? [] });
+    if (blocker) throw new Error(blocker);
+    const players = await loadPlayers(room.id);
+    const voters = players.map((p) => p.id).filter((id) => id !== player.id);
+    if (voters.length === 0) throw new Error("Não há ninguém para votar no recurso.");
+    const row = results.find((r) => r.jogador_id === player.id && r.categoria === input.category)!;
+    const appeal: StopAppeal = { playerId: player.id, category: input.category, answer: row.resposta, voters, votes: {}, endsAt: new Date(Date.now() + APPEAL_SECONDS * 1000).toISOString(), status: "open" };
+    const updated = await guardedUpdate(room, { public_state: asJson({ ...state, appeal, appealsUsed: [...(state.appealsUsed ?? []), player.id] }) });
+    if (updated) return { ok: true };
+  }
+  throw new Error("A sala mudou ao mesmo tempo. Tente de novo.");
+}
+
+export async function voteStopAppeal(input: { roomId: string; playerId: string; sessionId: string; round: number; vote: AppealVote }) {
+  const player = await requireSession(input.roomId, input.playerId, input.sessionId);
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    const room = await loadRoom(input.roomId);
+    if (!isStopReveal(room, input.round)) throw new Error("O resultado desta rodada já foi encerrado.");
+    const state = readPublicState(room.public_state);
+    const appeal = state.appeal;
+    if (appeal?.status !== "open") throw new Error("Esse recurso já foi decidido.");
+    if (!appeal.voters.includes(player.id)) throw new Error("Só os outros jogadores votam neste recurso.");
+    if (appealClosed(appeal, Date.now())) {
+      await settleAppeal(room);
+      return { ok: true };
+    }
+    const next: StopAppeal = { ...appeal, votes: { ...appeal.votes, [player.id]: input.vote } };
+    const updated = await guardedUpdate(room, { public_state: asJson({ ...state, appeal: next }) });
+    if (updated) {
+      if (appealClosed(next, Date.now())) await settleAppeal(updated);
+      return { ok: true };
+    }
+  }
+  throw new Error("A sala mudou ao mesmo tempo. Tente de novo.");
+}
+
+/** Any player may close an appeal once its time is up; the server re-checks the deadline. */
+export async function resolveStopAppeal(input: { roomId: string; playerId: string; sessionId: string; round: number }) {
+  await requireSession(input.roomId, input.playerId, input.sessionId);
+  const room = await loadRoom(input.roomId);
+  if (!isStopReveal(room, input.round)) return { ok: true };
+  const appeal = readPublicState(room.public_state).appeal;
+  if (appeal?.status === "open" && appealClosed(appeal, Date.now())) await settleAppeal(room);
+  return { ok: true };
+}
+
+/** Version-guarded: applies the group's decision once; an accepted appeal adds its points to the round and the match. */
+async function settleAppeal(room: RoomRow): Promise<RoomRow | null> {
+  const state = readPublicState(room.public_state);
+  const appeal = state.appeal;
+  if (appeal?.status !== "open") return room;
+  const { accepted } = appealOutcome(appeal.votes);
+  if (!accepted) return guardedUpdate(room, { public_state: asJson({ ...state, appeal: { ...appeal, status: "rejected" } }) });
+  const results = state.results?.stop ?? [];
+  const points = appealPoints(results, appeal.playerId, appeal.category, appeal.answer);
+  const nextResults = results.map((r) => r.jogador_id === appeal.playerId && r.categoria === appeal.category ? { ...r, pontos: points, comentario: `⚖️ Recurso aceito pela galera: +${points}.` } : r);
+  const deltas = { ...(state.deltas ?? {}), [appeal.playerId]: (state.deltas?.[appeal.playerId] ?? 0) + points };
+  return guardedUpdate(room, {
+    public_state: asJson({
+      ...state,
+      results: { ...(state.results ?? {}), stop: nextResults },
+      deltas,
+      scores: addScores(state.scores ?? {}, { [appeal.playerId]: points }),
+      appeal: { ...appeal, status: "accepted", points },
+    }),
+  });
 }

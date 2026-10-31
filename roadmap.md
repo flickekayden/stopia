@@ -126,3 +126,14 @@
 - [x] Stop: letra gigante com contagem 3-2-1 e alarme de STOP para todos
 - [x] Extras: dado de apelidos, Rei da Noite, tempo e bônus do blefe no Quem Escreveu, tema do Infiltrado, reações da plateia nos resultados
 - [x] Testes e partidas reais (Stop com STOP, Tribunal em dupla de 3 rodadas)
+
+## Treino, voz e extras (prompt-15: implementar todas)
+- [x] Painel admin sem cores, com controles úteis da sala (bots, pular etapa, expulsar, voltar ao lobby, teste da IA)
+- [x] Bots de treino em todos os jogos (Stop e jogos da galera)
+- [x] Tela cheia de avaliação do Stop com frases, dicas e status de entrega
+- [x] Voz ao vivo na sala com mute e silêncio automático (Stop escrevendo, pistas do Infiltrado)
+- [x] Boletim da Vergonha: imagem do pódio para compartilhar
+- [x] Sons por jogo: martelo do Tribunal, tique nos 10s finais do Stop, aplausos/vaias da torcida
+- [x] Rei da Noite com coroa visível no topo da sala e no chat
+- [x] Recorrer ao Juiz: contestar resposta com 0 no Stop e a galera vota
+- [x] Testes e partida real

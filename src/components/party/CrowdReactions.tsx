@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { vibrate } from "@/lib/haptics";
+import { soundManager } from "@/lib/sound-manager";
 import { CROWD_REACTIONS } from "@/lib/party-games";
 
 type Float = { id: number; emoji: string; left: number };
@@ -17,10 +18,14 @@ export function CrowdReactions({ roomId }: { roomId: string }) {
   const channelRef = useRef<RealtimeChannel | null>(null);
   const lastSent = useRef(0);
   const nextId = useRef(0);
+  const lastSound = useRef(0);
 
   useEffect(() => {
     const show = (emoji: string) => {
       if (!(CROWD_REACTIONS as readonly string[]).includes(emoji)) return;
+      // Each reaction has its own sound; at most one every 250 ms so a burst never turns into noise.
+      const now = Date.now();
+      if (now - lastSound.current > 250) { lastSound.current = now; soundManager.playCrowd(emoji); }
       const id = nextId.current++;
       const left = 10 + Math.random() * 80;
       setFloats((list) => [...list.slice(-14), { id, emoji, left }]);

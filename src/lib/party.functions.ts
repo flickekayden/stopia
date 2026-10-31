@@ -129,3 +129,35 @@ export const listPartyChat = createServerFn({ method: "POST" })
 export const sendPartyChat = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => z.object({ ...session, content: z.string().max(400) }).parse(input))
   .handler(async ({ data }) => (await server()).sendPartyChat(data));
+
+/* Training bots: the host's device ticks them; the server decides what each due bot plays. */
+export const tickPartyBots = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => z.object(session).parse(input))
+  .handler(async ({ data }) => (await server()).tickPartyBots(data));
+
+/** Developer-only controls for the room the developer is in (dev token + room session both verified). */
+export const devRoomAction = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        ...session,
+        token: z.string().max(200).optional(),
+        action: z.enum(["addBot", "removeBots", "kick", "forceAdvance", "toLobby"]),
+        targetId: z.string().uuid().optional(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }) => (await server()).devRoomAction(data));
+
+/* Stop "Recorrer ao Juiz": open an appeal on your own zero, vote on someone else's, close it after the deadline. */
+export const openStopAppeal = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => z.object({ ...session, round: z.number().int().min(1), category: z.string().min(1).max(160) }).parse(input))
+  .handler(async ({ data }) => (await server()).openStopAppeal(data));
+
+export const voteStopAppeal = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => z.object({ ...session, round: z.number().int().min(1), vote: z.enum(["aceitar", "manter"]) }).parse(input))
+  .handler(async ({ data }) => (await server()).voteStopAppeal(data));
+
+export const resolveStopAppeal = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => z.object({ ...session, round: z.number().int().min(1) }).parse(input))
+  .handler(async ({ data }) => (await server()).resolveStopAppeal(data));

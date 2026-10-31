@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
 import { listPartyChat, sendPartyChat } from "@/lib/party.functions";
 import { PARTY_CHAT_MAX, PARTY_CHAT_QUICK } from "@/lib/party-games";
+import { nightKingId } from "@/lib/ranking";
 import { cn } from "@/lib/utils";
 
 type ChatRow = Tables<"party_chat">;
@@ -112,6 +113,7 @@ export function PartyChat({ roomId, playerId, sessionId, players, quickOnly }: {
   }, []);
 
   const hostIds = useMemo(() => new Set(players.filter((p) => p.is_host).map((p) => p.id)), [players]);
+  const kingId = useMemo(() => nightKingId(players), [players]);
 
   async function send(content: string) {
     const clean = content.replace(/\s+/g, " ").trim().slice(0, PARTY_CHAT_MAX);
@@ -182,7 +184,7 @@ export function PartyChat({ roomId, playerId, sessionId, players, quickOnly }: {
               return (
                 <div key={m.id} className={cn("flex", mine ? "justify-end" : "justify-start")}>
                   <div className={cn("max-w-[85%] rounded-2xl px-3 py-2", mine ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground")}>
-                    {!mine && <p className="text-xs font-bold opacity-80">{m.nickname}{m.player_id && hostIds.has(m.player_id) ? " · mestre" : ""}</p>}
+                    {!mine && <p className="text-xs font-bold opacity-80">{m.player_id && m.player_id === kingId ? "👑 " : ""}{m.nickname}{m.player_id && hostIds.has(m.player_id) ? " · mestre" : ""}</p>}
                     <p className="whitespace-pre-wrap break-words text-sm">{m.content}</p>
                   </div>
                 </div>

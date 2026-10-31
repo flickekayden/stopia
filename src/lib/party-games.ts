@@ -1,5 +1,6 @@
 /** Browser-safe catalogue and shared types for the group-room games (Stop included as a native group game). */
 import { DEFAULT_CATEGORIES } from "./game";
+import type { StopAppeal } from "./stop-appeal";
 
 export type PartyGameId = "tribunal" | "autor" | "infiltrado" | "debate" | "roleta";
 
@@ -410,6 +411,9 @@ export type PartyPublicState = {
   stopCode?: string;
   /** Final podium: AI awards for the match (Debate, Tribunal). Absent when the AI is off for the room. */
   finalCommentary?: FinalCommentary;
+  /** Stop reveal: the "Recorrer ao Juiz" vote in progress (or its outcome) and who already appealed this round. */
+  appeal?: StopAppeal;
+  appealsUsed?: string[];
 };
 
 export type FinalCommentary = {

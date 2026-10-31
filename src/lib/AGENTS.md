@@ -1,0 +1,12 @@
+# Game logic and server rules
+
+- Built-in category presets live in a browser-safe constants module alongside a deduplicating merge helper; shared saved lists remain database-backed so built-ins require no migration or page-load seeding.
+- Round selection uses a shuffled least-recently-used category pool capped at eight, so unused categories are exhausted before repeats.
+- Results reuse round ends_at as a server-issued viewing deadline and shared pacing constants; startNextRound validates the host session, expected round and readiness/override before advancing or ending to keep multiplayer transitions authoritative without changing the schema.
+- Independent server reads and score writes run in parallel with at most six outbound requests per batch to respect the deployed runtime budget.
+- Training bots are `party_players.is_bot` rows with no session, driven by a host-device heartbeat (`tickPartyBots`) with deterministic per-bot delays (`party-bots.ts`); their AI/fallback content is cached in party_private at round_number = -round so it never races round data, and bots never become host or keep a room alive.
+- Stop "Recorrer ao Juiz" lives in public_state.appeal during reveal (rules in `stop-appeal.ts`), is version-guarded, and must settle before the next round.
+- Final rankings use a browser-safe competition-rank helper so equal totals share a place without changing stored scoring rules.
+- Party transitions are version-guarded, recompute submissions from the table and keep scores inside public_state, so concurrent advances resolve once; party AI prompts stay isolated in `party-ai.server.ts` with built-in fallbacks; with the AI judge (Tribunal/Debate/Roleta, `effectiveJudgeFor`) the AI only chooses among neutrally labelled entries via a version-claimed `evaluating` phase, points come from the deterministic engine, and failures fall back to a group vote (a Tribunal duel draws instead) so rounds never stall; podium AI awards are written to public_state after "final", so the ranking never waits on them.
+- Stop's AI judge lives only in `stop-judge.server.ts`, shared by both Stops so they judge identically; scoring mode and intensity are host room rules (`PartySettings`), not developer settings.
+- "Rei da Noite" reuses `party_players.score`, added only by the caller whose version-guarded update ended the match, so nothing double counts.

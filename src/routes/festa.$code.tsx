@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { PartyFinal, PartyLobby, PartyPlay, type LobbyCtx, type PartyActions, type PartyCtx } from "@/components/party/PartyStage";
 import { PartyChat } from "@/components/party/PartyChat";
 import { StopPartyPlay } from "@/components/party/StopParty";
+import { VoiceControl } from "@/components/party/VoiceControl";
 import { useSound } from "@/components/SoundProvider";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
@@ -14,10 +15,17 @@ import { Input } from "@/components/ui/input";
 import { usePartyRoom } from "@/hooks/use-party-room";
 import { vibrate } from "@/lib/haptics";
 import { randomNickname } from "@/lib/nicknames";
-import { setDevGameContext } from "@/lib/dev-settings";
+import { getDevToken, setDevGameContext, setDevRoom } from "@/lib/dev-settings";
+import { soundManager } from "@/lib/sound-manager";
+import { voiceLockReason } from "@/lib/voice-rules";
 import {
   advancePartyPhase,
+  devRoomAction,
   joinPartyRoom,
+  openStopAppeal,
+  resolveStopAppeal,
+  tickPartyBots,
+  voteStopAppeal,
   leavePartyRoom,
   nextPartyRound,
   replayPartyGame,
@@ -70,6 +78,11 @@ function PartyRoomPage() {
   const replayFn = useServerFn(replayPartyGame);
   const lobbyFn = useServerFn(returnPartyToLobby);
   const stopFn = useServerFn(stopPartyRound);
+  const appealFn = useServerFn(openStopAppeal);
+  const appealVoteFn = useServerFn(voteStopAppeal);
+  const appealResolveFn = useServerFn(resolveStopAppeal);
+  const tickFn = useServerFn(tickPartyBots);
+  const devFn = useServerFn(devRoomAction);
 
   useEffect(() => {
     const sessionId = getOrCreateSessionId();
@@ -132,8 +145,53 @@ function PartyRoomPage() {
         }
       },
       stopNow: (answers) => run("stop", async () => { await stopFn({ data: { ...base, round: room.round_number, answers } }); vibrate(40); }),
+      appeal: (category) => run("appeal", () => appealFn({ data: { ...base, round: room.round_number, category } })),
+      appealVote: (vote) => run("appealVote", () => appealVoteFn({ data: { ...base, round: room.round_number, vote } })),
+      appealResolve: async () => {
+        try { await appealResolveFn({ data: { ...base, round: room.round_number } }); } catch { /* someone else closed it */ }
+        await refresh();
+      },
+      devBots: (action) => run("bots", async () => { await devFn({ data: { ...base, token: getDevToken(), action } }); vibrate(10); }),
     };
-  }, [room, identity, run, submitFn, advanceFn, nextFn, skipFn, startFn, restartFn, settingsFn, selectFn, replayFn, lobbyFn, stopFn, refresh, play]);
+  }, [room, identity, run, submitFn, advanceFn, nextFn, skipFn, startFn, restartFn, settingsFn, selectFn, replayFn, lobbyFn, stopFn, appealFn, appealVoteFn, appealResolveFn, devFn, refresh, play]);
+
+  // Training bots act only when the host's device asks: a light heartbeat while a match with bots is on.
+  const hasBots = players.some((p) => p.is_bot);
+  const isHost = Boolean(me?.is_host);
+  const playing = room?.status === "playing";
+  const roomId = room?.id;
+  useEffect(() => {
+    if (!hasBots || !isHost || !playing || !roomId || !identity) return;
+    let inFlight = false;
+    const tick = async () => {
+      if (inFlight || document.hidden) return;
+      inFlight = true;
+      try {
+        const res = await tickFn({ data: { roomId, ...identity } });
+        if (res.acted > 0) await refresh();
+      } catch { /* the next heartbeat retries */ }
+      finally { inFlight = false; }
+    };
+    void tick();
+    const id = window.setInterval(() => void tick(), 2_000);
+    return () => window.clearInterval(id);
+  }, [hasBots, isHost, playing, roomId, identity, tickFn, refresh]);
+
+  // The developer panel's room controls work on the room on screen.
+  useEffect(() => {
+    if (!room || !identity) { setDevRoom(null); return; }
+    setDevRoom({
+      roomId: room.id,
+      code: room.code,
+      playerId: identity.playerId,
+      sessionId: identity.sessionId,
+      game: room.game,
+      status: room.status,
+      phase: room.phase,
+      players: players.map((p) => ({ id: p.id, nickname: p.nickname, isBot: p.is_bot, isHost: p.is_host })),
+    });
+  }, [room, identity, players]);
+  useEffect(() => () => setDevRoom(null), []);
 
   // Phase-change feedback without new game states.
   const lastPhase = useRef<string | null>(null);
@@ -142,7 +200,9 @@ function PartyRoomPage() {
     const key = `${room.round_number}:${room.phase}`;
     if (lastPhase.current && lastPhase.current !== key) {
       vibrate(20);
-      play(room.phase === "reveal" || room.phase === "final" ? "allReady" : "click");
+      // The Tribunal's verdict lands with the judge's gavel.
+      if (room.game === "tribunal" && room.phase === "reveal") soundManager.playGavel();
+      else play(room.phase === "reveal" || room.phase === "final" ? "allReady" : "click");
     }
     lastPhase.current = key;
   }, [room, play]);
@@ -263,6 +323,7 @@ function PartyRoomPage() {
       )}
 
       <PartyChat roomId={room.id} playerId={identity.playerId} sessionId={identity.sessionId} players={players} quickOnly={game === "stop" && room.status === "playing" && room.phase === "write"} />
+      <VoiceControl roomId={room.id} playerId={identity.playerId} players={players} lockReason={voiceLockReason(room.game, room.status, room.phase)} />
 
       <AlertDialog open={leaveOpen} onOpenChange={setLeaveOpen}>
         <AlertDialogContent className="w-[calc(100%_-_2rem)] rounded-2xl border-border bg-card">
