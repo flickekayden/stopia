@@ -673,7 +673,9 @@ function TribunalRole({ ctx, isDefendant, duel }: { ctx: PartyCtx; isDefendant: 
 }
 
 function TextSubmit({ ctx, actions, label, placeholder }: { ctx: PartyCtx; actions: PartyActions; label: string; placeholder: string }) {
-  const phaseKey = `${ctx.room.round_number}:${ctx.room.phase}`;
+  // Roleta "Pular desafio" keeps round and phase but swaps the challenge: start a fresh answer.
+  const challengeKey = ctx.game === "roleta" ? `:${ctx.state.skipsLeft ?? 0}` : "";
+  const phaseKey = `${ctx.room.round_number}:${ctx.room.phase}${challengeKey}`;
   const [text, setText] = useState("");
   const [touched, setTouched] = useState(false);
   const [sentText, setSentText] = useState<string | null>(null);
