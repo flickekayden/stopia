@@ -6,16 +6,15 @@ import { toast } from "sonner";
 
 import { InstallApp } from "@/components/InstallApp";
 import { PartyIcon } from "@/components/party/PartyIcon";
-import { RulesList, StopRules } from "@/components/party/RulesList";
+import { GameRulesDialog } from "@/components/party/RulesList";
 import { useSound } from "@/components/SoundProvider";
 import { ThemePicker } from "@/components/ThemePicker";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { vibrate } from "@/lib/haptics";
 import { randomNickname } from "@/lib/nicknames";
 import { createPartyRoom, joinPartyRoom } from "@/lib/party.functions";
-import { LOBBY_GAMES, PARTY_GAMES, STOP_LOBBY_META, type LobbyGameId } from "@/lib/party-games";
+import { LOBBY_GAMES, type LobbyGameId } from "@/lib/party-games";
 import { getLastNickname, getOrCreateSessionId, savePlayer } from "@/lib/session";
 
 export const Route = createFileRoute("/")({
@@ -96,7 +95,6 @@ function GamesHub() {
     }
   }
 
-  const rules = rulesFor && rulesFor !== "stop" ? PARTY_GAMES[rulesFor] : null;
 
   return (
     <main className="game-screen mx-auto flex min-h-[100dvh] w-full max-w-md flex-col gap-6 px-5 pb-[calc(2rem+env(safe-area-inset-bottom))] pt-[calc(1.25rem+env(safe-area-inset-top))]">
@@ -173,28 +171,7 @@ function GamesHub() {
         ))}
       </section>
 
-      <Dialog open={rulesFor !== null} onOpenChange={(open) => !open && setRulesFor(null)}>
-        <DialogContent className="max-h-[85dvh] w-[calc(100%_-_2rem)] overflow-y-auto rounded-2xl border-border bg-card" data-game={rulesFor ?? undefined}>
-          {rulesFor === "stop" ? (
-            <>
-              <DialogHeader>
-                <DialogTitle className="party-accent">{STOP_LOBBY_META.name}</DialogTitle>
-                <DialogDescription>{STOP_LOBBY_META.short} Jogado dentro da sala da galera: o mestre escolhe pontuação, intensidade da IA, rodadas, tempo e categorias.</DialogDescription>
-              </DialogHeader>
-              <StopRules />
-              <p className="text-xs text-muted-foreground">Mínimo de {STOP_LOBBY_META.minPlayers} jogadores · tudo é escrito no app.</p>
-            </>
-          ) : rules && (
-            <>
-              <DialogHeader>
-                <DialogTitle className="party-accent">{rules.name}</DialogTitle>
-                <DialogDescription>{rules.description}</DialogDescription>
-              </DialogHeader>
-              <RulesList game={rules.id} />
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
+      <GameRulesDialog game={rulesFor} onClose={() => setRulesFor(null)} />
 
       <InstallApp />
     </main>
