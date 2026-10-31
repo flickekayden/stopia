@@ -25,6 +25,7 @@ export function useVoiceRoom(roomId: string, playerId: string, locked: boolean) 
   const [participants, setParticipants] = useState<Record<string, Presence>>({});
   const [speaking, setSpeaking] = useState<string[]>([]);
   const [connected, setConnected] = useState<string[]>([]);
+  const [retry, setRetry] = useState(0);
 
   const channelRef = useRef<RealtimeChannel | null>(null);
   const localRef = useRef<MediaStream | null>(null);
@@ -94,7 +95,11 @@ export function useVoiceRoom(roomId: string, playerId: string, locked: boolean) 
     };
     pc.onconnectionstatechange = () => {
       if (pc.connectionState === "connected") setConnected((list) => (list.includes(id) ? list : [...list, id]));
-      if (pc.connectionState === "failed" || pc.connectionState === "closed") closePeer(id);
+      if (pc.connectionState === "failed") {
+        closePeer(id);
+        // Try again shortly: networks often recover (e.g. switching from Wi-Fi to mobile data).
+        window.setTimeout(() => setRetry((n) => n + 1), 3_000);
+      }
     };
     if (initiator) {
       void (async () => {
@@ -162,7 +167,7 @@ export function useVoiceRoom(roomId: string, playerId: string, locked: boolean) 
     const inVoice = Object.entries(participants).filter(([id, p]) => p.inVoice && id !== playerId).map(([id]) => id);
     for (const id of inVoice) if (!peers.current.has(id) && playerId < id) createPeer(id, true);
     for (const id of [...peers.current.keys()]) if (!inVoice.includes(id)) closePeer(id);
-  }, [joined, participants, playerId, createPeer, closePeer]);
+  }, [joined, participants, playerId, createPeer, closePeer, retry]);
 
   // Mute / auto-silence: the microphone track is switched off and everyone sees the muted state.
   useEffect(() => {
