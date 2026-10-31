@@ -8,13 +8,13 @@ import { cn } from "@/lib/utils";
 type Props = {
   status: "loading" | "ready" | "refreshing" | "error";
   summary: WalletSummary | null;
-  freeCredits?: number;
-  packCredits?: number;
-  priceLabel?: string;
-  onRetry?: () => void;
+  freeCredits?: number | undefined;
+  packCredits?: number | undefined;
+  priceLabel?: string | undefined;
+  onRetry?: (() => void) | undefined;
   /** Hides the buy link (e.g. on the purchase screen itself). */
-  hideBuy?: boolean;
-  className?: string;
+  hideBuy?: boolean | undefined;
+  className?: string | undefined;
 };
 
 /**
