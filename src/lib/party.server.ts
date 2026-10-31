@@ -680,9 +680,10 @@ async function nextRoundFor(initial: RoomRow) {
     if (withAwards) await (room.game === "debate" ? buildDebateCommentary(ended) : buildTribunalCommentary(ended));
     return { ok: true };
   }
-  const players = await loadPlayers(room.id);
+  // Long-silent players sit the round out (scores kept); they rejoin the next round once back.
+  const players = activePlayers(await loadPlayers(room.id));
   const min = room.game === "stop" ? lobbyGameMeta("stop").minPlayers : PARTY_GAMES[gameOf(room)].minPlayers;
-  if (players.length < min) throw new Error(`Faltam jogadores: este jogo precisa de pelo menos ${min}.`);
+  if (players.length < min) throw new Error(`Faltam jogadores conectados: este jogo precisa de pelo menos ${min}. Quem saiu do app pode voltar pelo mesmo link.`);
   if (room.game === "stop") await startStopRound(room, players, room.round_number + 1, state.scores ?? {});
   else await startRound(room, players, room.round_number + 1, state.scores ?? {}, state.skipsLeft);
   return { ok: true };
