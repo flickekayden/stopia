@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { getAccessToken } from "@/lib/account-client";
 import { setDevKey, setDevToken, useDevSettings } from "@/lib/dev-settings";
+import { friendlyError } from "@/lib/friendly-error";
 import { unlockDeveloper } from "@/lib/room-admin.functions";
 
 /**
