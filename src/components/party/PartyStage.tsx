@@ -385,7 +385,15 @@ function SelectedGame({ ctx, actions, selected }: { ctx: LobbyCtx; actions: Part
             <p className="mt-1 text-sm text-muted-foreground">{selected === "stop" ? meta.short : PARTY_GAMES[selected].description}</p>
           </div>
         </div>
-        {selected === "stop" ? <StopRules /> : <RulesList game={selected} />}
+        {/* The host sees settings first; rules stay one tap away. Players waiting see them open. */}
+        <details className="group" open={!ctx.isHost}>
+          <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-lg text-sm font-semibold party-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
+            <BookOpen className="size-4" aria-hidden="true" />
+            <span className="group-open:hidden">Ver regras</span>
+            <span className="hidden group-open:inline">Esconder regras</span>
+          </summary>
+          <div className="pt-2">{selected === "stop" ? <StopRules /> : <RulesList game={selected} />}</div>
+        </details>
       </section>
       {selected === "stop" ? <StopLobbySettings ctx={ctx} actions={actions} /> : <PartySettingsPanel ctx={ctx} actions={actions} game={selected} />}
     </div>
