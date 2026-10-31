@@ -1636,6 +1636,7 @@ async function tickPartyGameBots(room: RoomRow, state: PartyPublicState, players
         const pick = seededPick(INFILTRADO_WORDS.filter((w) => w.category === rp.category), `${bot.id}:${room.round_number}:guess`);
         payload = { text: pick?.word ?? "Não faço ideia" };
       } else payload = textPayload({ text: texts[bot.id] || fallbackBotLine(botRole(game, bot, state, rp).fallback, bot.id) }, textMaxFor(game));
+      if (payload && game === "roleta" && phase === "respond") payload.challenge = roletaChallengeKey(state.skipsLeft);
       return payload ? { bot, payload } : null;
     })
     .filter((row): row is { bot: PlayerRow; payload: Record<string, unknown> } => row !== null);
