@@ -518,10 +518,11 @@ function PhaseHeader({ ctx }: { ctx: PartyCtx }) {
   const seconds = endsAt ? Math.max(0, Math.ceil((endsAt - now) / 1000)) : null;
   return (
     <div className="round-hud sticky top-0 z-20 -mx-4 flex items-center gap-3 border-b border-border/70 pb-3 pl-4 pr-[calc(var(--top-actions-space)+0.5rem)] pt-[calc(0.75rem+env(safe-area-inset-top))]">
-      <span className="party-icon size-11"><PartyIcon name={lobbyGameMeta(ctx.game).icon} className="size-5" /></span>
+      {/* On narrow phones the icon steps aside so the fixed top-right controls never squeeze the phase name. */}
+      <span className="party-icon size-11 shrink-0 max-[420px]:hidden"><PartyIcon name={lobbyGameMeta(ctx.game).icon} className="size-5" /></span>
       <div className="min-w-0 flex-1">
-        <p className="section-label">Rodada <span className="tabular-nums text-foreground">{ctx.room.round_number}</span> de {ctx.settings.rounds}</p>
-        <p className="text-balance-safe font-bold leading-tight">{PHASE_LABELS[phase]}</p>
+        <p className="section-label truncate">Rodada <span className="tabular-nums text-foreground">{ctx.room.round_number}</span>/{ctx.settings.rounds}</p>
+        <p className="truncate font-bold leading-tight">{PHASE_LABELS[phase]}</p>
       </div>
       {seconds !== null && phase !== "evaluating" && (
         <p role="timer" aria-label={`${seconds} segundos restantes`} data-state={seconds <= 10 ? "critical" : seconds <= 20 ? "low" : "normal"} className="round-timer text-3xl">

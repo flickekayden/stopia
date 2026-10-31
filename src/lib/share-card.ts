@@ -87,13 +87,18 @@ export async function drawShareCard(input: ShareCardInput): Promise<Blob> {
     ctx.roundRect(x, baseY - h, colW, h, 24);
     ctx.fill();
     ctx.fillStyle = i === 1 ? onPrimary : text;
-    ctx.font = `80px ${display}`;
+    ctx.font = `800 76px ${sans}`;
     ctx.fillText(`${row.place}º`, x + colW / 2, baseY - h + 100);
     ctx.font = `700 34px ${sans}`;
     ctx.fillText(`${row.score} pts`, x + colW / 2, baseY - h + 150);
     ctx.fillStyle = text;
-    ctx.font = `700 36px ${sans}`;
-    ctx.fillText(wrap(ctx, `${row.nickname === input.king ? "👑 " : ""}${row.nickname}`, colW, 1)[0] ?? "", x + colW / 2, baseY - h - 24);
+    ctx.font = `700 32px ${sans}`;
+    const lines = wrap(ctx, row.nickname, colW + 20, 2);
+    lines.forEach((line, j) => ctx.fillText(line, x + colW / 2, baseY - h - 24 - (lines.length - 1 - j) * 38));
+    if (row.nickname === input.king) {
+      ctx.font = `56px ${sans}`;
+      ctx.fillText("👑", x + colW / 2, baseY - h - 34 - lines.length * 38);
+    }
   });
 
   let y = baseY + 80;
@@ -113,7 +118,11 @@ export async function drawShareCard(input: ShareCardInput): Promise<Blob> {
     y += 170;
   }
   if (highlights.length === 0) {
-    const rest = input.ranked.slice(3, 9);
+    const rest = input.ranked.slice(0, 8);
+    ctx.fillStyle = muted;
+    ctx.font = `700 26px ${sans}`;
+    ctx.fillText("CLASSIFICAÇÃO FINAL", 112, y + 10);
+    y += 30;
     ctx.font = `600 32px ${sans}`;
     for (const row of rest) {
       ctx.fillStyle = muted;
