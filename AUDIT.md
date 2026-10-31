@@ -38,3 +38,15 @@ The existing AI evaluation, final analysis, explanation services, prompts, model
 - Native share cancellation is handled, but native mobile share was not exercised; clipboard fallback was exercised.
 
 These limitations require separate coordinated security work or real-device testing; the audit is not a certification of complete multiplayer security.
+## Audit pass — integrity, presence and abuse limits (2026-10-31)
+
+Fixed and verified:
+- Room creation checks every insert (room, host, session) and removes a half-created room; code collisions retry on the database UNIQUE constraint.
+- Joining checks the session insert and removes the seat on failure; repeating a join from the same device reuses the seat.
+- Wrong-code joins (20 per 10 min) and room creation (15 per hour) are limited per network address.
+- Start / restart / back-to-lobby update the room first (version-guarded) and only then clear old round data; a repeated start no longer wipes a round that already began.
+- Stop "STOP!" only locks the round after the answers are confirmed saved.
+- Roleta "Pular desafio": answers are tagged per challenge, retries are idempotent, and the answer box resets for everyone (verified with two phones).
+- Presence heartbeat: lobby shows "Ausente" for players silent over 3 minutes; they stop counting toward minimums and "everyone done" but keep their scores and seat.
+
+Known limitation (not changed): party_rooms, party_players and party_chat stay readable by anyone holding the public key (USING (true)) because live updates depend on it and players have no sign-in. They contain only public state, nicknames, scores and chat; secrets live in party_private / party_submissions / party_sessions, which have no client access. Scoping reads per room would need real sign-in or a broadcast-only realtime redesign.
