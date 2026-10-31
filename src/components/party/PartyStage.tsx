@@ -44,6 +44,8 @@ import {
 import { vibrate } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
 import { localShareImageFor } from "@/lib/share-images";
+import { aiRequestEstimate } from "@/lib/billing";
+import { HostCreditLine } from "@/components/credits/CreditBadge";
 
 export type PartyCtx = {
   room: PartyRoom;
@@ -105,6 +107,8 @@ export type LobbyCtx = {
   selected: LobbyGameId | null;
   settings: PartySettings;
   busy: string | null;
+  /** Host only: AI requests left in the room creator's wallet (null while unknown or for guests). */
+  credits?: { balance: number; billed: boolean } | null;
 };
 
 /** "Rei da Noite": points from every finished match in this room (party_players.score). */
@@ -566,6 +570,9 @@ export function PartyLobby({ ctx, actions }: { ctx: LobbyCtx; actions: PartyActi
       <div data-game={selected ?? undefined} className="mobile-bottom-bar fixed inset-x-0 bottom-0 mx-auto w-full max-w-md border-t border-border bg-background/95 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
         {ctx.isHost ? (
           <div className="space-y-2">
+            {selected && ctx.credits && (
+              <HostCreditLine balance={ctx.credits.balance} billed={ctx.credits.billed} stop={selected === "stop"} estimate={aiRequestEstimate(selected, ctx.settings, connected)} />
+            )}
             {selected && missing === 0 && <p role="status" className="flex items-center justify-center gap-1.5 text-center text-sm font-semibold text-success"><Check className="size-4" aria-hidden="true" /> Tudo pronto: {connected} jogadores conectados</p>}
             {selected && missing > 0 && <p role="status" className="text-center text-sm text-muted-foreground">Necessário mínimo de {meta!.minPlayers} jogadores conectados{connected < ctx.players.length ? ` (${ctx.players.length - connected} ausente${ctx.players.length - connected > 1 ? "s" : ""})` : ""}. Compartilhe o código!</p>}
             <Button className="party-accent-button h-14 w-full text-lg font-bold shadow-none" disabled={!selected || missing > 0 || ctx.busy !== null} aria-busy={ctx.busy === "start"} onClick={() => void actions.start()}>
