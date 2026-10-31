@@ -43,6 +43,13 @@
       "when": 1793411901579,
       "tag": "0005_party_training_bots",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1793435630225,
+      "tag": "0006_party_rate_limits",
+      "breakpoints": true
     }
   ]
 }

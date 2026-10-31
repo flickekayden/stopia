@@ -246,6 +246,27 @@ export type Database = {
           },
         ]
       }
+      party_rate_events: {
+        Row: {
+          created_at: string
+          id: string
+          key_hash: string
+          kind: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          key_hash: string
+          kind: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          key_hash?: string
+          kind?: string
+        }
+        Relationships: []
+      }
       party_rooms: {
         Row: {
           code: string
