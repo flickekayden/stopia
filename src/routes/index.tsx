@@ -21,8 +21,9 @@ import { getLastNickname, getOrCreateSessionId, savePlayer } from "@/lib/session
 import { friendlyError } from "@/lib/friendly-error";
 import { useMyCredits } from "@/hooks/use-credits";
 import { creditCredentials, setGuestToken } from "@/lib/account-client";
+import { HOME_SHARE_IMAGE } from "@/lib/share-images";
 
-const HOME_OG_IMAGE = "OG_HOME_URL";
+const HOME_OG_IMAGE = HOME_SHARE_IMAGE;
 
 export const Route = createFileRoute("/")({
   head: () => ({
