@@ -23,7 +23,6 @@ import {
   stopAnswersComplete,
   type PartySettings,
 } from "@/lib/party-games";
-import { nightKingId } from "@/lib/ranking";
 import { appealBlocker, appealOutcome } from "@/lib/stop-appeal";
 import { cn } from "@/lib/utils";
 import { RoundScoreboard } from "@/components/party/RoundScoreboard";

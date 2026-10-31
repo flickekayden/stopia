@@ -41,3 +41,14 @@ describe("game invariants", () => {
     expect(RESULTS_VIEW_MS).toBe(120_000);
   });
 });
+
+import { pointsBehind } from "../src/lib/ranking";
+
+describe("scoreboard gap", () => {
+  test("shows how far a player trails the leader", () => {
+    expect(pointsBehind(35, 50)).toBe(15);
+  });
+  test("the leader and anyone tied with them trail by zero", () => {
+    expect(pointsBehind(50, 50)).toBe(0);
+  });
+});
