@@ -314,3 +314,67 @@ export async function aiRoletaChallenge(intensity: "leve" | "media" | "caotica",
   if (!title || !text) throw new Error("vazio");
   return { title, text };
 }
+
+/* ------------------------------- Training bots ------------------------------- */
+
+/** Stop answers for training bots, one set per bot label; quality varies on purpose. Callers fall back to a built-in bank. */
+export async function aiBotStopAnswers(input: { letra: string; categorias: string[]; bots: string[] }) {
+  const result = await withTimeout(
+    generateJsonGemini<{ bots: { rotulo: string; respostas: { categoria: string; resposta: string }[] }[] }>({
+      instructions: `Você simula jogadores de Stop (Adedonha) em português do Brasil para um treino. Para cada robô, escreva uma resposta por categoria começando com a letra indicada. Varie a qualidade: alguns acertos óbvios, algumas respostas criativas e, às vezes, uma resposta em branco ("") ou meio duvidosa. Respostas com no máximo 4 palavras. Robôs diferentes devem repetir respostas só de vez em quando.`,
+      input: JSON.stringify(input),
+      schemaName: "bot_stop_answers",
+      schema: {
+        type: "object",
+        additionalProperties: false,
+        required: ["bots"],
+        properties: {
+          bots: {
+            type: "array",
+            items: {
+              type: "object",
+              additionalProperties: false,
+              required: ["rotulo", "respostas"],
+              properties: {
+                rotulo: { type: "string" },
+                respostas: { type: "array", items: { type: "object", additionalProperties: false, required: ["categoria", "resposta"], properties: { categoria: { type: "string" }, resposta: { type: "string" } } } },
+              },
+            },
+          },
+        },
+      },
+    }),
+    PROMPT_TIMEOUT_MS,
+  );
+  const out: Record<string, Record<string, string>> = {};
+  for (const bot of result.bots ?? []) {
+    const answers: Record<string, string> = {};
+    for (const row of bot.respostas ?? []) if (input.categorias.includes(row.categoria)) answers[row.categoria] = clean(row.resposta, 60);
+    out[bot.rotulo] = answers;
+  }
+  return out;
+}
+
+/** Short texts for training bots in the party games (defenses, accusations, clues, arguments, answers). */
+export async function aiBotTexts(input: { jogo: string; contexto: string; papeis: { rotulo: string; papel: string }[] }) {
+  const result = await withTimeout(
+    generateJsonGemini<{ textos: { rotulo: string; texto: string }[] }>({
+      instructions: `Você simula amigos jogando um jogo de festa por escrito (treino com robôs). Para cada papel, escreva o texto que esse jogador enviaria: curto (até 30 palavras), engraçado e coerente com o papel. Uma "pista" do Infiltrado nunca diz a palavra secreta; quem é "infiltrado" não sabe a palavra e blefa. ${SAFETY}`,
+      input: JSON.stringify(input),
+      schemaName: "bot_texts",
+      schema: {
+        type: "object",
+        additionalProperties: false,
+        required: ["textos"],
+        properties: { textos: { type: "array", items: { type: "object", additionalProperties: false, required: ["rotulo", "texto"], properties: { rotulo: { type: "string" }, texto: { type: "string" } } } } },
+      },
+    }),
+    PROMPT_TIMEOUT_MS,
+  );
+  const out: Record<string, string> = {};
+  for (const row of result.textos ?? []) {
+    const text = clean(row.texto, 300);
+    if (text) out[row.rotulo] = text;
+  }
+  return out;
+}
