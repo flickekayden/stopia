@@ -663,8 +663,9 @@ function StopReveal({ ctx, actions }: { ctx: PartyCtx; actions: PartyActions }) 
   const categories = stop?.categories ?? [];
   const results = useMemo(() => ctx.state.results?.stop ?? [], [ctx.state.results?.stop]);
   const [index, setIndex] = useState(0);
+  const [seenAll, setSeenAll] = useState(false);
   const round = ctx.room.round_number;
-  useEffect(() => { setIndex(0); }, [round]);
+  useEffect(() => { setIndex(0); setSeenAll(false); }, [round]);
   const category = categories[Math.min(index, Math.max(0, categories.length - 1))] ?? "";
   const cards = useMemo<AnswerCardData[]>(() => results
     .filter((r) => r.categoria === category)
@@ -672,6 +673,13 @@ function StopReveal({ ctx, actions }: { ctx: PartyCtx; actions: PartyActions }) 
     .map((r) => ({ roundId: `${ctx.room.id}-${round}`, category, playerId: r.jogador_id, playerName: nick(ctx.players, r.jogador_id), response: r.resposta, points: r.pontos, comment: r.comentario })), [results, category, ctx.room.id, round, ctx.players]);
   const last = round >= ctx.settings.rounds;
   const lastCategory = index >= categories.length - 1;
+  // "Próxima rodada" only appears once this player has reached the last category.
+  useEffect(() => { if (lastCategory) setSeenAll(true); }, [lastCategory]);
+  const goNextCategory = () => {
+    vibrate(10);
+    setIndex((i) => Math.min(categories.length - 1, i + 1));
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
   const myRow = results.find((r) => r.jogador_id === ctx.me.id && r.categoria === category);
   const canAppeal = appealBlocker({ results, playerId: ctx.me.id, category, current: ctx.state.appeal, used: ctx.state.appealsUsed ?? [] }) === null;
   const appealOpen = ctx.state.appeal?.status === "open";
@@ -704,11 +712,6 @@ function StopReveal({ ctx, actions }: { ctx: PartyCtx; actions: PartyActions }) 
             <Scale /> Recorrer ao juiz: a galera decide se “{myRow?.resposta}” vale ponto
           </Button>
         )}
-        {!lastCategory && (
-          <Button variant="secondary" className="h-12 w-full font-semibold" onClick={() => { setIndex((i) => i + 1); window.scrollTo({ top: 0, behavior: "smooth" }); }}>
-            Próxima categoria <ChevronRight />
-          </Button>
-        )}
       </section>
 
       <AppealPanel ctx={ctx} actions={actions} />
@@ -716,7 +719,11 @@ function StopReveal({ ctx, actions }: { ctx: PartyCtx; actions: PartyActions }) 
       <StopScoreboard ctx={ctx} />
 
       <div className="mobile-bottom-bar fixed inset-x-0 bottom-0 mx-auto w-full max-w-md border-t border-border bg-background/95 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
-        {ctx.isHost ? (
+        {!seenAll ? (
+          <Button className="h-14 w-full text-lg font-bold" onClick={goNextCategory}>
+            Próxima categoria <span className="tabular-nums text-sm font-semibold opacity-80">({index + 1}/{categories.length})</span> <ChevronRight />
+          </Button>
+        ) : ctx.isHost ? (
           <Button className="party-accent-button h-14 w-full text-lg font-bold shadow-none" disabled={ctx.busy !== null || appealOpen} aria-busy={ctx.busy === "next"} onClick={() => void actions.next()}>
             {ctx.busy === "next" ? <><Loader2 className="animate-spin" /> Preparando…</> : appealOpen ? <><Scale /> Votação do recurso…</> : last ? "Ver resultado final" : "Próxima rodada"}
           </Button>
