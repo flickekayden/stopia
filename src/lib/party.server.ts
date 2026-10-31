@@ -121,6 +121,32 @@ function asJson(value: unknown) {
   return value as Json;
 }
 
+/* ------------------------------- AI credits -------------------------------- */
+
+/** Thrown when the room creator has no AI requests left; every caller already falls back without AI. */
+class NoAiCredits extends Error {
+  constructor() {
+    super("Acabaram as solicitações de IA do mestre da sala.");
+  }
+}
+
+/**
+ * Runs one AI request paid by the room creator's wallet. The usage key is derived from the room version
+ * that triggered the request, so racing or repeated calls for the same step are charged once (the
+ * loser falls back without calling the AI). A failed request is refunded.
+ */
+async function withAiCredit<T>(roomId: string, usageKey: string, label: string, run: () => Promise<T>): Promise<T> {
+  const credits = await import("./credits.server");
+  const charge = await credits.chargeRoomAi(roomId, usageKey, label);
+  if (charge.status !== "charged") throw new NoAiCredits();
+  try {
+    return await run();
+  } catch (err) {
+    await credits.refundRoomAi(charge.walletId!, usageKey).catch(() => undefined);
+    throw err;
+  }
+}
+
 function gameOf(room: RoomRow): PartyGameId {
   return (PARTY_GAME_IDS as readonly string[]).includes(room.game) ? (room.game as PartyGameId) : "tribunal";
 }
@@ -288,7 +314,7 @@ async function recordRate(key: string, kind: keyof typeof RATE_LIMITS) {
 
 /* ---------------------------------- Rooms --------------------------------- */
 
-export async function createPartyRoom(input: { game?: PartyGameId | undefined; nickname: string; sessionId: string }) {
+export async function createPartyRoom(input: { game?: PartyGameId | undefined; nickname: string; sessionId: string; accessToken?: string | undefined; guestToken?: string | undefined }) {
   const nickname = input.nickname.trim();
   if (!nickname) throw new Error("Coloca um apelido primeiro");
   const key = await rateKey(input.sessionId);
@@ -324,7 +350,20 @@ export async function createPartyRoom(input: { game?: PartyGameId | undefined; n
     throw new Error("Não foi possível criar a sala. Nada foi salvo, tente de novo.");
   }
   await recordRate(key, "create");
-  return { code: room.code, roomId: room.id, playerId: player.id };
+  // The creator's wallet pays this room's AI requests. If it cannot be opened, the room still works
+  // with the built-in (non-AI) content.
+  let newGuestToken: string | null = null;
+  let freeDenied = false;
+  try {
+    const credits = await import("./credits.server");
+    const wallet = await credits.ensureHostWallet({ accessToken: input.accessToken, guestToken: input.guestToken });
+    await credits.bindRoomWallet(room.id, wallet.wallet.id);
+    newGuestToken = wallet.newGuestToken ?? null;
+    freeDenied = "freeDenied" in wallet ? Boolean(wallet.freeDenied) : false;
+  } catch (err) {
+    console.error("createPartyRoom: wallet binding failed", err instanceof Error ? err.message : err);
+  }
+  return { code: room.code, roomId: room.id, playerId: player.id, newGuestToken, freeDenied };
 }
 
 export async function joinPartyRoom(input: { code: string; nickname: string; sessionId: string }) {
@@ -483,6 +522,11 @@ export async function startPartyGame(input: { roomId: string; playerId: string; 
   const players = activePlayers(await loadPlayers(room.id));
   const min = lobbyGameMeta(game).minPlayers;
   if (players.length < min) throw new Error(`Este jogo precisa de pelo menos ${min} jogadores conectados.`);
+  if (game === "stop") {
+    const { roomBalance } = await import("./credits.server");
+    const { balance } = await roomBalance(room.id);
+    if (balance < 1) throw new Error("O Stop é julgado pela IA e o mestre da sala está sem solicitações de IA. Compre um pacote no app ou escolha outro jogo.");
+  }
   // Claim the start (version bump) before touching round data: a repeated or concurrent
   // start loses here and leaves the winner's fresh round alone.
   const claimed = await guardedUpdate(room, RESET_TO_LOBBY);
@@ -518,6 +562,7 @@ async function buildPrompt(room: RoomRow, players: PlayerRow[], round: number, s
   const history = [...(roomPrivate.history ?? [])];
   const ai = settings.ai;
   const data: RoundPrivate = { playerIds: players.map((p) => p.id), salt: randomUUID() };
+  const charged = <T,>(run: () => Promise<T>) => withAiCredit(room.id, `prompt:${room.id}:v${room.version}:r${round}`, `${game}: conteúdo da rodada`, run);
 
   const remember = (key: keyof NonNullable<RoomPrivate["used"]>, index: number) => {
     used[key] = [...(used[key] ?? []), index];
@@ -530,7 +575,7 @@ async function buildPrompt(room: RoomRow, players: PlayerRow[], round: number, s
     let prompt: PartyPrompt | null = null;
     if (ai) {
       try {
-        const made = await (await import("./party-ai.server")).aiTribunalCase(defendant, history, tone);
+        const made = await charged(async () => (await import("./party-ai.server")).aiTribunalCase(defendant, history, tone));
         prompt = { ...made, source: "ai" };
       } catch { prompt = null; }
     }
@@ -545,7 +590,7 @@ async function buildPrompt(room: RoomRow, players: PlayerRow[], round: number, s
     let prompt: PartyPrompt | null = null;
     if (ai) {
       try {
-        const text = await (await import("./party-ai.server")).aiAutorPrompt(history, tone);
+        const text = await charged(async () => (await import("./party-ai.server")).aiAutorPrompt(history, tone));
         prompt = { title: "A pergunta é…", text, source: "ai" };
       } catch { prompt = null; }
     }
@@ -575,7 +620,7 @@ async function buildPrompt(room: RoomRow, players: PlayerRow[], round: number, s
     let prompt: PartyPrompt | null = null;
     if (ai) {
       try {
-        const made = await (await import("./party-ai.server")).aiDebateTopic(history, tone);
+        const made = await charged(async () => (await import("./party-ai.server")).aiDebateTopic(history, tone));
         prompt = { title: made.title, text: debateHelp, sideA: made.sideA, sideB: made.sideB, source: "ai" };
       } catch { prompt = null; }
     }
@@ -588,7 +633,7 @@ async function buildPrompt(room: RoomRow, players: PlayerRow[], round: number, s
     data.prompt = prompt;
     data.sides = assignSides(players.map((p) => p.id));
   } else {
-    data.prompt = await roletaPrompt(settings, used, history, remember, admin);
+    data.prompt = await roletaPrompt(settings, used, history, remember, admin, charged);
   }
 
   if (data.prompt) history.push(data.prompt.text);
@@ -602,6 +647,7 @@ async function roletaPrompt(
   history: string[],
   remember: (key: keyof NonNullable<RoomPrivate["used"]>, index: number) => void,
   admin: PartyAdminConfig,
+  charged: <T>(run: () => Promise<T>) => Promise<T>,
 ): Promise<PartyPrompt> {
   // Developer can switch chaos events off: every round then scores normally (×1).
   const event = admin.roleta?.events === false
@@ -609,7 +655,7 @@ async function roletaPrompt(
     : ROLETA_EVENTS[Math.floor(Math.random() * ROLETA_EVENTS.length)] ?? ROLETA_EVENTS[0]!;
   if (settings.ai) {
     try {
-      const made = await (await import("./party-ai.server")).aiRoletaChallenge(settings.intensity, history, admin.roleta?.tone);
+      const made = await charged(async () => (await import("./party-ai.server")).aiRoletaChallenge(settings.intensity, history, admin.roleta?.tone));
       return { ...made, event, source: "ai" };
     } catch { /* fall back to the built-in list */ }
   }
@@ -700,7 +746,8 @@ export async function skipRoletaChallenge(input: { roomId: string; playerId: str
   const roomPrivate = await readPrivate<RoomPrivate>(room.id, 0);
   const used = { ...(roomPrivate.used ?? {}) };
   const history = [...(roomPrivate.history ?? [])];
-  const prompt = await roletaPrompt(settings, used, history, (key, index) => { used[key] = [...(used[key] ?? []), index]; }, admin);
+  const charged = <T,>(run: () => Promise<T>) => withAiCredit(room.id, `skip:${room.id}:v${room.version}`, "roleta: novo desafio", run);
+  const prompt = await roletaPrompt(settings, used, history, (key, index) => { used[key] = [...(used[key] ?? []), index]; }, admin, charged);
   history.push(prompt.text);
   const roundPrivate = await readPrivate<RoundPrivate>(room.id, room.round_number);
   const updated = await guardedUpdate(room, {
@@ -915,10 +962,10 @@ async function advanceOnce(room: RoomRow): Promise<boolean> {
     if (!comment || !settings.ai) return true;
     let aiState: PartyPublicState["ai"];
     try {
-      const text = await comment();
+      const text = await withAiCredit(room.id, `comment:${room.id}:v${updated.version}`, `${game}: comentário`, comment);
       aiState = text ? { status: "done", text } : { status: "failed" };
-    } catch {
-      aiState = { status: "failed" };
+    } catch (err) {
+      aiState = err instanceof NoAiCredits ? { status: "off" } : { status: "failed" };
     }
     await guardedUpdate(updated, { public_state: asJson({ ...readPublicState(updated.public_state), ai: aiState }) });
     return true;
@@ -1076,6 +1123,8 @@ async function runPartyJudge(room: RoomRow, presentIds: string[], settings: Part
   const idOf = (label: string) => labelled.find((l) => l.label === label)?.id ?? null;
   const tone = admin[game]?.tone;
   const defendantId = state.defendantId ?? "";
+  const judgeKey = `judge:${room.id}:v${room.version}`;
+  const paid = <T,>(run: () => Promise<T>) => withAiCredit(room.id, judgeKey, `${game}: juiz de IA`, run);
   try {
     const ai = await import("./party-ai.server");
     let results: PartyResults;
@@ -1084,11 +1133,11 @@ async function runPartyJudge(room: RoomRow, presentIds: string[], settings: Part
     if (game === "tribunal") {
       const defense = labelled.find((l) => l.id === defendantId)?.text ?? "(o réu ficou em silêncio)";
       const accusations = labelled.filter((l) => l.id !== defendantId).map((l, index) => ({ ...l, label: String(index + 1) }));
-      const made = await ai.aiJudgeTribunal({
+      const made = await paid(() => ai.aiJudgeTribunal({
         caso: state.prompt?.text ?? "",
         defesa: defense,
         acusacoes: accusations.map((a) => ({ rotulo: a.label, texto: a.text })),
-      }, tone);
+      }, tone));
       const bestAccuserId = made.bestLabel ? accusations.find((a) => a.label === made.bestLabel)?.id ?? null : null;
       const scored = scoreTribunalJudge({ defendantId, accuserIds: accusations.map((a) => a.id), verdict: made.verdict, bestAccuserId, bonus: made.bonus });
       results = {
@@ -1099,12 +1148,12 @@ async function runPartyJudge(room: RoomRow, presentIds: string[], settings: Part
       text = made.reasoning;
     } else if (game === "debate") {
       const sides = Object.fromEntries(Object.entries(state.sides ?? {}).filter(([id]) => labelled.some((l) => l.id === id)));
-      const made = await ai.aiJudgeDebate({
+      const made = await paid(() => ai.aiJudgeDebate({
         tema: state.prompt?.title ?? "",
         lado_a: state.prompt?.sideA ?? "",
         lado_b: state.prompt?.sideB ?? "",
         argumentos: labelled.filter((l) => sides[l.id]).map((l) => ({ rotulo: l.label, lado: sides[l.id]!, texto: l.text })),
-      }, tone);
+      }, tone));
       const winnerId = idOf(made.winner);
       const scored = scoreDebateJudge(sides, winnerId, made.bonus);
       results = { votes: {}, counts: {}, winnerSide: scored.winnerSide, judge: { by: "ia", bestId: winnerId, bonus: Math.max(0, Math.min(2, Math.round(made.bonus))) } };
@@ -1112,7 +1161,7 @@ async function runPartyJudge(room: RoomRow, presentIds: string[], settings: Part
       text = made.verdict;
     } else {
       const multiplier = state.prompt?.event?.multiplier ?? 1;
-      const made = await ai.aiJudgeRoleta({ desafio: state.prompt?.text ?? "", respostas: labelled.map((l) => ({ rotulo: l.label, texto: l.text })) }, tone);
+      const made = await paid(() => ai.aiJudgeRoleta({ desafio: state.prompt?.text ?? "", respostas: labelled.map((l) => ({ rotulo: l.label, texto: l.text })) }, tone));
       const points: Record<string, number> = {};
       const notes: Record<string, string> = {};
       for (const l of labelled) {
@@ -1132,7 +1181,8 @@ async function runPartyJudge(room: RoomRow, presentIds: string[], settings: Part
       phase_ends_at: null,
       public_state: asJson({ ...state, submitted: [], results, deltas, scores: addScores(state.scores ?? {}, deltas), ai: text ? { status: "done", text } : { status: "off" } }),
     });
-  } catch {
+  } catch (err) {
+    const noCredits = err instanceof NoAiCredits;
     if (game === "tribunal" && presentIds.length <= 2) {
       const scored = scoreTribunalJudge({ defendantId, accuserIds: presentIds.filter((id) => id !== defendantId), verdict: null, bonus: 0 });
       await guardedUpdate(room, {
@@ -1142,7 +1192,7 @@ async function runPartyJudge(room: RoomRow, presentIds: string[], settings: Part
         public_state: asJson({
           ...state,
           submitted: [],
-          results: { notice: "O Juiz de IA não respondeu a tempo. Empate técnico: +2 para cada um." },
+          results: { notice: noCredits ? "O mestre da sala está sem solicitações de IA. Empate técnico: +2 para cada um." : "O Juiz de IA não respondeu a tempo. Empate técnico: +2 para cada um." },
           deltas: scored.deltas,
           scores: addScores(state.scores ?? {}, scored.deltas),
           ai: { status: "off" },
@@ -1155,7 +1205,7 @@ async function runPartyJudge(room: RoomRow, presentIds: string[], settings: Part
       phase: "vote",
       phase_started_at: new Date().toISOString(),
       phase_ends_at: deadline(game, "vote", admin, settings),
-      public_state: asJson({ ...state, eligible: voters, submitted: [], ai: { status: "failed", text: "O juiz de IA não respondeu. Desta vez, votem vocês!" } }),
+      public_state: asJson({ ...state, eligible: voters, submitted: [], ai: { status: "failed", text: noCredits ? "O mestre da sala está sem solicitações de IA. Desta vez, votem vocês!" : "O juiz de IA não respondeu. Desta vez, votem vocês!" } }),
     });
   }
 }
@@ -1186,10 +1236,10 @@ async function buildDebateCommentary(room: RoomRow) {
       return { tema: data.prompt?.title ?? "", lado_a: data.prompt?.sideA ?? "", lado_b: data.prompt?.sideB ?? "", argumentos: args };
     }).filter((r) => r.argumentos.length > 0);
     if (rodadas.length === 0) throw new Error("sem argumentos");
-    const made = await (await import("./party-ai.server")).aiMatchSummaryDebate({
+    const made = await withAiCredit(room.id, `summary:${room.id}:v${room.version}`, "debate: prêmios finais", async () => (await import("./party-ai.server")).aiMatchSummaryDebate({
       rodadas,
       jogadores: players.map((p) => ({ rotulo: label.get(p.id)!, apelido: p.nickname, pontos: scores[p.id] ?? 0 })),
-    }, admin.debate?.tone);
+    }, admin.debate?.tone));
     const highlights = made.highlights.map((h) => ({ playerId: idOf(h.label) ?? "", title: h.title, text: h.text })).filter((h) => h.playerId);
     finalCommentary = { status: "ready", title: "Sentença Final da Corte", highlights, summary: made.summary };
   } catch {
@@ -1225,10 +1275,10 @@ async function buildTribunalCommentary(room: RoomRow) {
       };
     }).filter((c) => c.defesa || c.acusacoes.length > 0);
     if (casos.length === 0) throw new Error("sem casos");
-    const made = await (await import("./party-ai.server")).aiMatchSummaryTribunal({
+    const made = await withAiCredit(room.id, `summary:${room.id}:v${room.version}`, "tribunal: prêmios finais", async () => (await import("./party-ai.server")).aiMatchSummaryTribunal({
       casos,
       jogadores: players.map((p) => ({ rotulo: label.get(p.id)!, apelido: p.nickname, pontos: scores[p.id] ?? 0 })),
-    }, admin.tribunal?.tone);
+    }, admin.tribunal?.tone));
     const highlights = made.highlights.map((h) => ({ playerId: idOf(h.label) ?? "", title: h.title, text: h.text })).filter((h) => h.playerId);
     finalCommentary = { status: "ready", title: "Veredito da História", highlights, summary: made.summary };
   } catch {
@@ -1397,12 +1447,12 @@ async function judgeStop(room: RoomRow) {
   });
   const judge = await import("./stop-judge.server");
   try {
-    const { evaluation } = await judge.judgeRound({
+    const { evaluation } = await withAiCredit(room.id, `stop:${room.id}:v${room.version}`, `stop: juiz da rodada ${room.round_number}`, () => judge.judgeRound({
       letter: stop.letter,
       categories: stop.categories,
       players: list,
       dev: { ...judge.readSavedJudge(saved.data?.value), sarcasm: STOP_INTENSITY_SARCASM[settings.aiIntensity], scoringMode: settings.scoring },
-    });
+    }));
     const deltas = stopRoundDeltas(evaluation.resultados);
     await guardedUpdate(room, {
       phase: "reveal",
@@ -1411,7 +1461,9 @@ async function judgeStop(room: RoomRow) {
       public_state: asJson({ ...state, submitted: [], results: { stop: evaluation.resultados }, deltas, scores: addScores(state.scores ?? {}, deltas), ai: { status: "off" } }),
     });
   } catch (err) {
-    const text = err instanceof Error ? err.message : "A IA não respondeu.";
+    const text = err instanceof NoAiCredits
+      ? "Acabaram as solicitações de IA do mestre da sala. Depois de comprar mais no app, toque em tentar de novo — ou encerre a partida."
+      : err instanceof Error ? err.message : "A IA não respondeu.";
     await guardedUpdate(room, { phase_ends_at: null, public_state: asJson({ ...state, ai: { status: "failed", text } }) });
   }
 }
@@ -1464,7 +1516,7 @@ async function botStopAnswers(room: RoomRow, stop: StopRoundState, bots: PlayerR
   let made: Record<string, Record<string, string>> = {};
   try {
     const labels = missing.map((_, i) => `R${i + 1}`);
-    const ai = await (await import("./party-ai.server")).aiBotStopAnswers({ letra: stop.letter, categorias: stop.categories, bots: labels });
+    const ai = await withAiCredit(room.id, `bots:${room.id}:r${room.round_number}:v${room.version}`, "bots: respostas do Stop", async () => (await import("./party-ai.server")).aiBotStopAnswers({ letra: stop.letter, categorias: stop.categories, bots: labels }));
     made = Object.fromEntries(missing.map((b, i) => [b.id, ai[labels[i]!] ?? {}]));
   } catch { made = {}; }
   const next = { ...known };
@@ -1571,11 +1623,11 @@ async function botTexts(room: RoomRow, state: PartyPublicState, rp: RoundPrivate
     let made: Record<string, string> = {};
     if (readPartySettings(room.settings).ai) {
       try {
-        made = await (await import("./party-ai.server")).aiBotTexts({
+        made = await withAiCredit(room.id, `bottext:${room.id}:${prefix}:v${room.version}`, "bots: textos", async () => (await import("./party-ai.server")).aiBotTexts({
           jogo: lobbyGameMeta(game).name,
           contexto: roles[0]?.contexto ?? "",
           papeis: missing.map((_, i) => ({ rotulo: `R${i + 1}`, papel: roles[i]!.papel })),
-        });
+        }));
       } catch { made = {}; }
     }
     missing.forEach((bot, i) => {
@@ -1837,4 +1889,45 @@ async function settleAppeal(room: RoomRow): Promise<RoomRow | null> {
       appeal: { ...appeal, status: "accepted", points },
     }),
   });
+}
+
+/* ------------------------------ Credits & moderation ------------------------------ */
+
+/** The host sees how many AI requests the room creator's wallet has left (other players see nothing). */
+export async function getRoomCredits(input: { roomId: string; playerId: string; sessionId: string }) {
+  await requireHost(input.roomId, input.playerId, input.sessionId);
+  const { roomBalance } = await import("./credits.server");
+  return roomBalance(input.roomId);
+}
+
+const REPORT_REASONS = ["ofensa", "assedio", "spam", "conteudo_improprio", "outro"] as const;
+
+/** A player reports a chat message or another player; the report goes to the admin queue. */
+export async function reportPartyContent(input: { roomId: string; playerId: string; sessionId: string; targetPlayerId?: string | undefined; messageId?: string | undefined; reason: (typeof REPORT_REASONS)[number]; detail: string }) {
+  const player = await requireSession(input.roomId, input.playerId, input.sessionId);
+  const [room, players] = await Promise.all([loadRoom(input.roomId), loadPlayers(input.roomId)]);
+  let excerpt = "";
+  let targetId = input.targetPlayerId ?? null;
+  if (input.messageId) {
+    const { data: message } = await db().from("party_chat").select("content, player_id").eq("id", input.messageId).eq("room_id", room.id).maybeSingle();
+    excerpt = message?.content?.slice(0, 400) ?? "";
+    targetId = targetId ?? message?.player_id ?? null;
+  }
+  if (targetId === player.id) throw new Error("Não dá para denunciar você mesmo.");
+  // Light spam guard: a few reports per player per room.
+  const { count } = await db().from("content_reports").select("id", { count: "exact", head: true }).eq("room_id", room.id).eq("reporter_player_id", player.id);
+  if ((count ?? 0) >= 10) throw new Error("Você já enviou muitas denúncias nesta sala.");
+  const { error } = await db().from("content_reports").insert({
+    room_id: room.id,
+    room_code: room.code,
+    reporter_player_id: player.id,
+    target_player_id: targetId,
+    target_nickname: players.find((p) => p.id === targetId)?.nickname ?? "",
+    message_id: input.messageId ?? null,
+    excerpt,
+    reason: input.reason,
+    detail: input.detail.slice(0, 500),
+  });
+  if (error) throw new Error("Não foi possível enviar a denúncia. Tente de novo.");
+  return { ok: true as const };
 }
