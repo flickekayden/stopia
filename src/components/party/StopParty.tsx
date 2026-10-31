@@ -1,11 +1,10 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Check, ChevronLeft, ChevronRight, Loader2, Pencil, Plus, RefreshCw, ShieldAlert, X } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Gavel, Lightbulb, Loader2, Pencil, Plus, RefreshCw, Scale, ShieldAlert, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { AnswerCard, type AnswerCardData } from "@/components/game/AnswerCard";
 import { CategoryPresets } from "@/components/game/CategoryPresets";
 import { CrowdReactions } from "@/components/party/CrowdReactions";
-import { EvaluationLoading } from "@/components/game/EvaluationLoading";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { LobbyCtx, PartyActions, PartyCtx } from "@/components/party/PartyStage";
@@ -24,6 +23,8 @@ import {
   stopAnswersComplete,
   type PartySettings,
 } from "@/lib/party-games";
+import { nightKingId } from "@/lib/ranking";
+import { APPEAL_SECONDS, appealBlocker, appealOutcome } from "@/lib/stop-appeal";
 import { cn } from "@/lib/utils";
 
 function useNow(intervalMs: number) {
@@ -307,6 +308,15 @@ function StopBoard({ ctx, actions }: { ctx: PartyCtx; actions: PartyActions }) {
     soundManager.playStopAlarm();
     vibrate([60, 40, 60, 40, 120]);
   }, [stopBy, phase, round]);
+  // Clock tick in the last 10 seconds (sharper in the final 3).
+  const tickedAt = useRef<string | null>(null);
+  useEffect(() => {
+    if (phase !== "write" || starting || secondsLeft === null || secondsLeft > 10 || secondsLeft <= 0) return;
+    const key = `${round}:${secondsLeft}`;
+    if (tickedAt.current === key) return;
+    tickedAt.current = key;
+    soundManager.playTick(secondsLeft <= 3);
+  }, [phase, starting, secondsLeft, round]);
   const filled = categories.filter((c) => (values[c] ?? "").trim()).length;
   const complete = stopAnswersComplete(values, categories);
 
@@ -485,21 +495,7 @@ function StopBoard({ ctx, actions }: { ctx: PartyCtx; actions: PartyActions }) {
 
       <div ref={actionsBar} className="round-actions mt-6 flex w-full flex-wrap gap-3 border-t border-border/70 pt-5 pb-[calc(2rem+env(safe-area-inset-bottom))]">
         {evaluating ? (
-          failed ? (
-            <div role="alert" className="w-full space-y-3 text-center">
-              <p className="font-bold">A IA não conseguiu avaliar a rodada.</p>
-              {ctx.state.ai?.text && <p className="text-sm text-muted-foreground">{ctx.state.ai.text}</p>}
-              {ctx.isHost ? (
-                <Button className="h-14 w-full text-base font-bold" disabled={ctx.busy !== null} aria-busy={ctx.busy === "advance"} onClick={() => void actions.advance(true)}>
-                  {ctx.busy === "advance" ? <Loader2 className="animate-spin" /> : <RefreshCw />} Avaliar de novo
-                </Button>
-              ) : (
-                <p className="text-sm text-muted-foreground">Esperando o mestre tentar de novo…</p>
-              )}
-            </div>
-          ) : (
-            <EvaluationLoading />
-          )
+          <StopJudgingScreen ctx={ctx} actions={actions} failed={failed} />
         ) : eligible ? (
           <>
             <Button variant="secondary" disabled={sending || locked} onClick={() => void finish()} aria-busy={sending} className={cn("h-16 flex-1 rounded-xl text-base font-bold", done && "border-success/50 text-success")}>
@@ -522,13 +518,14 @@ function StopScoreboard({ ctx }: { ctx: PartyCtx }) {
   const deltas = ctx.state.deltas ?? {};
   const scores = ctx.state.scores ?? {};
   const rows = ctx.players.map((p) => ({ ...p, score: scores[p.id] ?? 0, delta: deltas[p.id] ?? 0 })).sort((a, b) => b.score - a.score);
+  const king = nightKingId(ctx.players);
   return (
     <section className="party-panel space-y-2" aria-label="Placar da sala">
       <p className="section-label">Placar da sala</p>
       <ul className="space-y-1.5">
         {rows.map((p) => (
           <li key={p.id} className="flex items-center justify-between gap-3">
-            <span className="min-w-0 truncate font-semibold">{p.nickname}{p.id === ctx.me.id && <span className="text-muted-foreground"> (você)</span>}</span>
+            <span className="min-w-0 truncate font-semibold">{p.id === king && <span title="Rei da Noite" aria-label="Rei da Noite">👑 </span>}{p.nickname}{p.id === ctx.me.id && <span className="text-muted-foreground"> (você)</span>}</span>
             <span className="flex shrink-0 items-center gap-2 tabular-nums">
               {p.delta > 0 && <span className="points-badge rounded-md bg-success/15 px-1.5 text-sm font-bold text-success">+{p.delta}</span>}
               <span className="font-display text-xl">{p.score}</span>
@@ -536,6 +533,127 @@ function StopScoreboard({ ctx }: { ctx: PartyCtx }) {
           </li>
         ))}
       </ul>
+    </section>
+  );
+}
+
+/* --------------------------- Full-screen judging --------------------------- */
+
+const JUDGE_PHRASES = [
+  "Consultando o dicionário dos desesperados...",
+  "Checando se essa palavra realmente existe...",
+  "Desmascarando quem inventou resposta...",
+  "Comparando respostas repetidas com lupa...",
+  "Calculando o vexame com rigor científico...",
+  "Ouvindo as testemunhas de cada categoria...",
+  "Quase pronto! Somando a pontuação da rodada...",
+];
+
+const STOP_TIPS = [
+  "Palavras raras e inesperadas costumam valer 20. Clichês como “Cachorro” quase sempre empatam e rendem só 5 ou 10.",
+  "Tem 3 respostas fortes e a letra é difícil? Preencher tudo rápido e gritar STOP pode pegar a galera com campos em branco.",
+  "Resposta repetida divide a glória: se todo mundo pensou nela, pense em outra.",
+  "Comece pelas categorias fáceis e volte nas difíceis: campo em branco é zero garantido.",
+  "Capriche na grafia. O juiz de IA não perdoa palavra inventada nem letra errada.",
+  "Nomes compostos e regionais contam! “Pão de queijo” começa com P, sim.",
+  "Ficou com zero injusto? Na tela de resultado você pode Recorrer ao Juiz e a galera vota.",
+  "Use Enter para pular para o próximo campo sem tirar o dedo do teclado.",
+];
+
+function StopJudgingScreen({ ctx, actions, failed }: { ctx: PartyCtx; actions: PartyActions; failed: boolean }) {
+  const now = useNow(500);
+  const startedAt = Date.parse(ctx.room.phase_started_at ?? "") || now;
+  const elapsed = Math.max(0, now - startedAt);
+  const progress = failed ? 100 : Math.min(95, Math.round(100 * (1 - Math.exp(-elapsed / 9_000))));
+  const phrase = JUDGE_PHRASES[Math.floor(elapsed / 2_600) % JUDGE_PHRASES.length]!;
+  const tipIndex = Math.floor(elapsed / 6_500) % STOP_TIPS.length;
+  const stop = ctx.state.stop;
+  const delivered = (ctx.state.eligible ?? []).filter((id) => ctx.players.some((p) => p.id === id));
+  return (
+    <div className="judge-poster fixed inset-y-0 left-1/2 z-30 flex w-full max-w-md -translate-x-1/2 flex-col overflow-y-auto bg-background px-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-[calc(4.5rem+env(safe-area-inset-top))]" role="status" aria-live="polite" aria-label={failed ? "A IA não conseguiu avaliar" : "Avaliando respostas"}>
+      <div className="flex items-center gap-3">
+        <div className="letter-tile flex size-12 shrink-0 items-center justify-center rounded-xl" aria-hidden="true"><span className="font-display text-3xl leading-none">{stop?.letter}</span></div>
+        <p className="section-label">Rodada <span className="tabular-nums text-foreground">{ctx.room.round_number}</span> de {ctx.settings.rounds} · IA {STOP_INTENSITY_LABELS[ctx.settings.aiIntensity].name}</p>
+      </div>
+      <div className="flex flex-1 flex-col items-center justify-center gap-5 py-6 text-center">
+        <span className="party-icon size-24" aria-hidden="true">{failed ? <Scale className="size-12" /> : <Gavel className="judge-gavel size-12" />}</span>
+        <h2 className="font-display text-4xl leading-tight">{failed ? "O juiz travou!" : "O juiz de IA está deliberando"}</h2>
+        {failed ? (
+          <div className="w-full space-y-3">
+            <p className="text-muted-foreground">{ctx.state.ai?.text || "A IA não conseguiu avaliar a rodada."}</p>
+            {ctx.isHost ? (
+              <Button className="h-14 w-full text-base font-bold" disabled={ctx.busy !== null} aria-busy={ctx.busy === "advance"} onClick={() => void actions.advance(true)}>
+                {ctx.busy === "advance" ? <Loader2 className="animate-spin" /> : <RefreshCw />} Avaliar de novo
+              </Button>
+            ) : (
+              <p className="text-sm text-muted-foreground">Esperando o mestre tentar de novo…</p>
+            )}
+          </div>
+        ) : (
+          <>
+            <p key={phrase} className="evaluation-phrase min-h-12 text-lg font-semibold text-muted-foreground">{phrase}</p>
+            <div className="h-2 w-full overflow-hidden rounded-full bg-secondary" aria-hidden="true"><div className="judge-progress h-full rounded-full bg-primary" style={{ width: `${progress}%` }} /></div>
+          </>
+        )}
+      </div>
+      <section key={tipIndex} className="evaluation-phrase party-panel space-y-1.5" aria-label="Dica de mestre">
+        <p className="section-label inline-flex items-center gap-1.5 text-primary"><Lightbulb className="size-3.5" aria-hidden="true" /> Dica de mestre</p>
+        <p className="text-balance-safe text-sm font-semibold leading-snug">{STOP_TIPS[tipIndex]}</p>
+      </section>
+      <ul className="mt-4 flex flex-wrap justify-center gap-2" aria-label="Respostas entregues">
+        {delivered.map((id) => (
+          <li key={id} className="game-chip flex items-center gap-1.5 border-success/40 text-success"><Check className="size-3.5" aria-hidden="true" />{nick(ctx.players, id)}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/* ---------------------------- Recorrer ao Juiz ---------------------------- */
+
+function AppealPanel({ ctx, actions }: { ctx: PartyCtx; actions: PartyActions }) {
+  const appeal = ctx.state.appeal;
+  const now = useNow(500);
+  const resolvedFor = useRef<string | null>(null);
+  const endsAt = appeal ? Date.parse(appeal.endsAt) : 0;
+  const open = appeal?.status === "open";
+  useEffect(() => {
+    if (!appeal || !open || now < endsAt + 300) return;
+    const key = `${appeal.playerId}:${appeal.category}`;
+    if (resolvedFor.current === key) return;
+    resolvedFor.current = key;
+    void actions.appealResolve();
+  }, [appeal, open, now, endsAt, actions]);
+  if (!appeal) return null;
+  const { accept, keep } = appealOutcome(appeal.votes);
+  const mine = appeal.playerId === ctx.me.id;
+  const canVote = open && appeal.voters.includes(ctx.me.id) && !appeal.votes[ctx.me.id];
+  const myVote = appeal.votes[ctx.me.id];
+  const secondsLeft = Math.max(0, Math.ceil((endsAt - now) / 1000));
+  return (
+    <section className={cn("party-panel space-y-3 border", appeal.status === "accepted" ? "border-success/60" : appeal.status === "rejected" ? "border-destructive/50" : "border-primary/60")} aria-live="polite" aria-label="Recurso ao juiz">
+      <div className="flex items-center justify-between gap-2">
+        <p className="section-label inline-flex items-center gap-1.5 text-primary"><Scale className="size-3.5" aria-hidden="true" /> Recurso ao juiz</p>
+        {open && <span className="tabular-nums text-sm font-bold" aria-label={`${secondsLeft} segundos para votar`}>{secondsLeft}s</span>}
+      </div>
+      <p className="text-balance-safe"><strong>@{nick(ctx.players, appeal.playerId)}</strong> quer pontos por <strong>“{appeal.answer}”</strong> em {appeal.category}.</p>
+      {open ? (
+        <>
+          {canVote ? (
+            <div className="grid grid-cols-2 gap-2">
+              <Button className="h-12 font-bold" disabled={ctx.busy !== null} onClick={() => { vibrate(10); void actions.appealVote("aceitar"); }}>✅ Aceitar</Button>
+              <Button variant="secondary" className="h-12 font-bold" disabled={ctx.busy !== null} onClick={() => { vibrate(10); void actions.appealVote("manter"); }}>❌ Manter zero</Button>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">{mine ? "Aguardando a galera votar…" : myVote ? `Seu voto: ${myVote === "aceitar" ? "aceitar" : "manter o zero"}.` : "Votação em andamento."}</p>
+          )}
+          <p className="text-xs font-semibold text-muted-foreground">Aceitar {accept} · Manter {keep} · empate mantém o zero</p>
+        </>
+      ) : appeal.status === "accepted" ? (
+        <p className="font-bold text-success">Recurso aceito! +{appeal.points ?? 0} para @{nick(ctx.players, appeal.playerId)} ({accept} a {keep}).</p>
+      ) : (
+        <p className="font-bold text-destructive">Recurso negado: o zero foi mantido ({accept} a {keep}).</p>
+      )}
     </section>
   );
 }
@@ -554,6 +672,9 @@ function StopReveal({ ctx, actions }: { ctx: PartyCtx; actions: PartyActions }) 
     .map((r) => ({ roundId: `${ctx.room.id}-${round}`, category, playerId: r.jogador_id, playerName: nick(ctx.players, r.jogador_id), response: r.resposta, points: r.pontos, comment: r.comentario })), [results, category, ctx.room.id, round, ctx.players]);
   const last = round >= ctx.settings.rounds;
   const lastCategory = index >= categories.length - 1;
+  const myRow = results.find((r) => r.jogador_id === ctx.me.id && r.categoria === category);
+  const canAppeal = appealBlocker({ results, playerId: ctx.me.id, category, current: ctx.state.appeal, used: ctx.state.appealsUsed ?? [] }) === null;
+  const appealOpen = ctx.state.appeal?.status === "open";
 
   return (
     <div className="dock-clearance space-y-4" data-game="stop">
@@ -578,6 +699,11 @@ function StopReveal({ ctx, actions }: { ctx: PartyCtx; actions: PartyActions }) 
         <ul className="space-y-2">
           {cards.map((card) => <li key={card.playerId}><AnswerCard data={card} /></li>)}
         </ul>
+        {canAppeal && (
+          <Button variant="outline" className="h-12 w-full font-semibold" disabled={ctx.busy !== null} onClick={() => { vibrate(10); void actions.appeal(category); }}>
+            <Scale /> Recorrer ao juiz: a galera decide se “{myRow?.resposta}” vale ponto
+          </Button>
+        )}
         {!lastCategory && (
           <Button variant="secondary" className="h-12 w-full font-semibold" onClick={() => { setIndex((i) => i + 1); window.scrollTo({ top: 0, behavior: "smooth" }); }}>
             Próxima categoria <ChevronRight />
@@ -585,13 +711,14 @@ function StopReveal({ ctx, actions }: { ctx: PartyCtx; actions: PartyActions }) 
         )}
       </section>
 
+      <AppealPanel ctx={ctx} actions={actions} />
       <CrowdReactions roomId={ctx.room.id} />
       <StopScoreboard ctx={ctx} />
 
       <div className="mobile-bottom-bar fixed inset-x-0 bottom-0 mx-auto w-full max-w-md border-t border-border bg-background/95 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
         {ctx.isHost ? (
-          <Button className="party-accent-button h-14 w-full text-lg font-bold shadow-none" disabled={ctx.busy !== null} aria-busy={ctx.busy === "next"} onClick={() => void actions.next()}>
-            {ctx.busy === "next" ? <><Loader2 className="animate-spin" /> Preparando…</> : last ? "Ver resultado final" : "Próxima rodada"}
+          <Button className="party-accent-button h-14 w-full text-lg font-bold shadow-none" disabled={ctx.busy !== null || appealOpen} aria-busy={ctx.busy === "next"} onClick={() => void actions.next()}>
+            {ctx.busy === "next" ? <><Loader2 className="animate-spin" /> Preparando…</> : appealOpen ? <><Scale /> Votação do recurso…</> : last ? "Ver resultado final" : "Próxima rodada"}
           </Button>
         ) : (
           <p role="status" className="flex h-14 items-center justify-center text-sm text-muted-foreground">Esperando o mestre seguir…</p>
