@@ -54,3 +54,18 @@ Known limitation (not changed): party_rooms, party_players and party_chat stay r
 - "Encerrar etapa agora" asks the host to confirm when someone has not sent yet, showing how many already did.
 - Verified this pass in the preview: Tribunal (2 phones) and Debate (2 phones) through the AI verdict; Quem Escreveu, Infiltrado and Roleta (3 phones) from writing into voting; Stop (2 phones) through the AI judge to the results.
 - Results polish: one shared round scoreboard with shared tie places, "a N do líder" and a short staggered entrance; final ranking shows the gap to 1st and podium scores; lobby confirms "Tudo pronto" with the connected count. Verified on Stop and Debate rounds.
+
+## Security and database audit (2026-10-31, afternoon)
+
+Fixed:
+- **High — old Stop room tables were open to anyone** (read, change and delete rooms, players, rounds, answers; read chat and voice notes). The old rooms were already closed to new games; their screen now redirects home, their server actions were removed, and the tables have no browser access at all.
+- **High — unauthenticated AI and data actions on old rooms** (`finalAnalysis` spent AI with no check, legacy chat accepted any player id, `finalizeStopRound`, `listRooms`/`deleteRoom` leftovers, cached evaluations returned before the admin check). All removed with the old room actions.
+- **Medium — anyone could add shared category lists directly**. Saving now goes through a validated server action (name ≤ 40, ≤ 100 categories, duplicates refused) limited to 10 saves per hour per network.
+- **Medium — oversized game input**. Game payloads are capped at 40 fields / 8,000 characters, Stop answers at 30 categories × 400 characters, developer timings at 0–3600 s.
+- **Low — wide table privileges**. Group-room tables are read-only for browsers; server-only tables (settings, private game data, sessions, submissions, rate counters) have no browser privileges; signed-out visitors can no longer call the role check.
+- **Database** — indexes added for player/wallet/room foreign keys, the report queue, the audit log and the room list.
+- Developer access tokens are renewed or switched off automatically (see the developer-mode rule).
+
+Verified: direct requests with the public key are refused for old tables, private game tables, settings, category-list inserts, group-room updates and the role check; a two-phone Stop round ran through AI judging; saving a category list and refusing a duplicate name worked; 104 automated tests pass.
+
+Accepted, unchanged: group-room state, player nicknames/scores and room chat stay readable by anyone with the app's technical address, because live updates work without login. No secrets are in those tables (roles, words, authors, votes and unrevealed answers stay server-only). Closing it fully needs signed-in players or server-relayed live updates. The unused `DEVELOPER_PASSWORD` secret can be deleted.
