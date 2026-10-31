@@ -39,7 +39,7 @@ export const RoundScoreboard = memo(function RoundScoreboard({
               style={{ "--enter-index": index } as CSSProperties}
               aria-label={`${place}º lugar: ${p.nickname}, ${p.score} pontos${p.delta > 0 ? `, mais ${p.delta} nesta rodada` : ""}`}
             >
-              <span className="rank-badge !size-7 !text-sm" data-place={place} aria-hidden="true">{place}</span>
+              <span className="rank-badge" data-size="sm" data-place={place} aria-hidden="true">{place}</span>
               <span className="min-w-0 flex-1" aria-hidden="true">
                 <span className="block truncate font-semibold">
                   {p.id === king && <span title="Rei da Noite">👑 </span>}

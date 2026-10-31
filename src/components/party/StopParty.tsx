@@ -26,6 +26,7 @@ import {
 import { nightKingId } from "@/lib/ranking";
 import { appealBlocker, appealOutcome } from "@/lib/stop-appeal";
 import { cn } from "@/lib/utils";
+import { RoundScoreboard } from "@/components/party/RoundScoreboard";
 
 function useNow(intervalMs: number) {
   const [now, setNow] = useState(() => Date.now());
@@ -515,26 +516,7 @@ function StopBoard({ ctx, actions }: { ctx: PartyCtx; actions: PartyActions }) {
 /* --------------------------------- Reveal --------------------------------- */
 
 function StopScoreboard({ ctx }: { ctx: PartyCtx }) {
-  const deltas = ctx.state.deltas ?? {};
-  const scores = ctx.state.scores ?? {};
-  const rows = ctx.players.map((p) => ({ ...p, score: scores[p.id] ?? 0, delta: deltas[p.id] ?? 0 })).sort((a, b) => b.score - a.score);
-  const king = nightKingId(ctx.players);
-  return (
-    <section className="party-panel space-y-2" aria-label="Placar da sala">
-      <p className="section-label">Placar da sala</p>
-      <ul className="space-y-1.5">
-        {rows.map((p) => (
-          <li key={p.id} className="flex items-center justify-between gap-3">
-            <span className="min-w-0 truncate font-semibold">{p.id === king && <span title="Rei da Noite" aria-label="Rei da Noite">👑 </span>}{p.nickname}{p.id === ctx.me.id && <span className="text-muted-foreground"> (você)</span>}</span>
-            <span className="flex shrink-0 items-center gap-2 tabular-nums">
-              {p.delta > 0 && <span className="points-badge rounded-md bg-success/15 px-1.5 text-sm font-bold text-success">+{p.delta}</span>}
-              <span className="font-display text-xl">{p.score}</span>
-            </span>
-          </li>
-        ))}
-      </ul>
-    </section>
-  );
+  return <RoundScoreboard players={ctx.players} scores={ctx.state.scores ?? {}} deltas={ctx.state.deltas ?? {}} meId={ctx.me.id} title="Placar da sala" />;
 }
 
 /* --------------------------- Full-screen judging --------------------------- */
