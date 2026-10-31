@@ -663,8 +663,9 @@ function StopReveal({ ctx, actions }: { ctx: PartyCtx; actions: PartyActions }) 
   const categories = stop?.categories ?? [];
   const results = useMemo(() => ctx.state.results?.stop ?? [], [ctx.state.results?.stop]);
   const [index, setIndex] = useState(0);
+  const [seenAll, setSeenAll] = useState(false);
   const round = ctx.room.round_number;
-  useEffect(() => { setIndex(0); }, [round]);
+  useEffect(() => { setIndex(0); setSeenAll(false); }, [round]);
   const category = categories[Math.min(index, Math.max(0, categories.length - 1))] ?? "";
   const cards = useMemo<AnswerCardData[]>(() => results
     .filter((r) => r.categoria === category)
@@ -672,6 +673,13 @@ function StopReveal({ ctx, actions }: { ctx: PartyCtx; actions: PartyActions }) 
     .map((r) => ({ roundId: `${ctx.room.id}-${round}`, category, playerId: r.jogador_id, playerName: nick(ctx.players, r.jogador_id), response: r.resposta, points: r.pontos, comment: r.comentario })), [results, category, ctx.room.id, round, ctx.players]);
   const last = round >= ctx.settings.rounds;
   const lastCategory = index >= categories.length - 1;
+  // "Próxima rodada" only appears once this player has reached the last category.
+  useEffect(() => { if (lastCategory) setSeenAll(true); }, [lastCategory]);
+  const goNextCategory = () => {
+    vibrate(10);
+    setIndex((i) => Math.min(categories.length - 1, i + 1));
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
   const myRow = results.find((r) => r.jogador_id === ctx.me.id && r.categoria === category);
   const canAppeal = appealBlocker({ results, playerId: ctx.me.id, category, current: ctx.state.appeal, used: ctx.state.appealsUsed ?? [] }) === null;
   const appealOpen = ctx.state.appeal?.status === "open";
