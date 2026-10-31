@@ -4,7 +4,7 @@
  * panel is used the token is checked and silently renewed from the signed-in admin account; when the
  * account is gone or is no longer an admin, developer mode is switched off instead of failing later.
  */
-import { getAccessToken } from "./account-client";
+import { getAccessToken, supabaseClient } from "./account-client";
 import { devTokenNeedsRenewal, getDevToken, setDevKey, setDevToken } from "./dev-settings";
 import { getDeveloperStatus, unlockDeveloper } from "./room-admin.functions";
 
@@ -35,7 +35,6 @@ export async function ensureDevAccess({ matchAccount = false } = {}): Promise<De
     const token = getDevToken();
     let accountChanged = false;
     if (matchAccount) {
-      const { supabaseClient } = await import("./account-client");
       const { data } = await (await supabaseClient()).auth.getSession();
       accountChanged = (data.session?.user.id ?? null) !== tokenAccountId(token);
     }
