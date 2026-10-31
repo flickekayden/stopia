@@ -137,3 +137,15 @@
 - [x] Rei da Noite com coroa visível no topo da sala e no chat
 - [x] Recorrer ao Juiz: contestar resposta com 0 no Stop e a galera vota
 - [x] Testes e partida real
+
+## Comercial (prompt-21)
+- [ ] Banco: carteiras, movimentações, uso de IA, transações, perfis, papéis, denúncias, auditoria
+- [ ] Cobrança de 1 solicitação de IA do mestre por chamada (idempotente, com estorno em falha)
+- [ ] Contador de saldo (início, escolha de jogo, lobby, perfil, compra)
+- [ ] Tela de compra com Google Play Billing (TWA) e verificação no servidor
+- [ ] Login opcional (e-mail/senha, Google), convidado, recuperação de senha, perfil
+- [ ] Admin por papel no servidor (sem senha fixa) + painel comercial auditado
+- [ ] Compartilhamento: cartões por jogo, metadados da sala, convite com código
+- [ ] Termos, privacidade, suporte, denúncia e bloqueio
+- [ ] Android: assetlinks, twa-manifest, guia de publicação
+- [ ] Testes, regressão do juiz e relatório
