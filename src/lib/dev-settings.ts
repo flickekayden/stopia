@@ -228,6 +228,21 @@ export function getDevToken() {
   return devToken();
 }
 
+/** Renew the developer token this long before it expires, so open panels never hold a dead token. */
+export const DEV_TOKEN_RENEW_MARGIN_MS = 30 * 60_000;
+
+/** Expiry (ms) written at the start of a developer token, or null for missing/old-format tokens. */
+export function devTokenExpiry(token?: string | null) {
+  const exp = Number(token?.split(".")[0]);
+  return token && Number.isFinite(exp) && exp > 0 ? exp : null;
+}
+
+/** True when the stored token is missing, from an older format, expired or about to expire. */
+export function devTokenNeedsRenewal(token: string | null | undefined, now: number) {
+  const exp = devTokenExpiry(token);
+  return exp === null || exp - now < DEV_TOKEN_RENEW_MARGIN_MS;
+}
+
 /* The group room the developer is in right now (set by /festa/$code), for the panel's room controls. */
 export type DevRoom = {
   roomId: string;

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { getAccessToken } from "@/lib/account-client";
 import { setDevKey, setDevToken, useDevSettings } from "@/lib/dev-settings";
+import { friendlyError } from "@/lib/friendly-error";
 import { unlockDeveloper } from "@/lib/room-admin.functions";
 
 /**
@@ -48,7 +49,7 @@ export function DevUnlock({ children }: { children: ReactNode }) {
       setOpen(false);
       toast.success("Modo desenvolvedor ligado neste aparelho");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Não foi possível entrar.");
+      toast.error(friendlyError(err, "Não foi possível ligar o modo desenvolvedor. Tente de novo."));
     } finally {
       setBusy(false);
     }
