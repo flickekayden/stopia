@@ -48,7 +48,7 @@ export function DevUnlock({ children }: { children: ReactNode }) {
       setOpen(false);
       toast.success("Modo desenvolvedor ligado neste aparelho");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Não foi possível entrar.");
+      toast.error(friendlyError(err, "Não foi possível ligar o modo desenvolvedor. Tente de novo."));
     } finally {
       setBusy(false);
     }
