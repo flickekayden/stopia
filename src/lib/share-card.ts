@@ -77,7 +77,7 @@ export async function drawShareCard(input: ShareCardInput): Promise<Blob> {
   const order = [top[1], top[0], top[2]];
   const heights = [220, 300, 160];
   const colW = 280;
-  const baseY = 640;
+  const baseY = 680;
   order.forEach((row, i) => {
     if (!row) return;
     const x = W / 2 + (i - 1) * (colW + 30) - colW / 2;
