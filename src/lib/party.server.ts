@@ -69,9 +69,14 @@ import {
   ROLETA_EVENTS,
   TRIBUNAL_CASES,
 } from "./party-content.server";
+import { MAX_BOTS, botDelayMs, fallbackBotLine, fallbackStopAnswers, nextBotName, seededPick, seededUnit, type BotActionKind } from "./party-bots";
+import { APPEAL_SECONDS, appealBlocker, appealClosed, appealOutcome, appealPoints, type AppealVote, type StopAppeal } from "./stop-appeal";
 
 type RoomRow = Tables<"party_rooms">;
 type PlayerRow = Tables<"party_players">;
+
+/** Training bots' per-round cache (stored at round_number = -round, never in public state). */
+type BotCache = { stop?: Record<string, Record<string, string>>; texts?: Record<string, string> };
 
 type RoundPrivate = {
   prompt?: PartyPrompt;
@@ -304,8 +309,17 @@ export async function leavePartyRoom(input: { roomId: string; playerId: string; 
     await db().from("party_rooms").delete().eq("id", input.roomId);
     return { ok: true };
   }
-  if (player.is_host && !remaining.some((p) => p.is_host)) {
-    await db().from("party_players").update({ is_host: true }).eq("id", remaining[0]!.id);
+  // Bots never keep a room alive or become host: with no people left, the room closes.
+  const humans = remaining.filter((p) => !p.is_bot);
+  if (humans.length === 0) {
+    await db().from("party_rooms").delete().eq("id", input.roomId);
+    return { ok: true };
+  }
+  if (!humans.some((p) => p.is_host)) {
+    await Promise.all([
+      db().from("party_players").update({ is_host: true }).eq("id", humans[0]!.id),
+      ...remaining.filter((p) => p.is_bot && p.is_host).map((p) => db().from("party_players").update({ is_host: false }).eq("id", p.id)),
+    ]);
   }
   const room = await loadRoom(input.roomId);
   if (room.status === "playing" && (isPartyGame(room.game) || room.game === "stop")) await syncSubmitted(room.id);
@@ -326,7 +340,8 @@ const RESET_TO_LOBBY = {
 async function clearRoundData(roomId: string) {
   await Promise.all([
     db().from("party_submissions").delete().eq("room_id", roomId),
-    db().from("party_private").delete().eq("room_id", roomId).gt("round_number", 0),
+    // Positive rows are rounds, negative rows are the training bots' per-round cache; 0 is room history.
+    db().from("party_private").delete().eq("room_id", roomId).neq("round_number", 0),
   ]);
 }
 
@@ -377,10 +392,7 @@ export async function startPartyGame(input: { roomId: string; playerId: string; 
   const players = await loadPlayers(room.id);
   const min = lobbyGameMeta(game).minPlayers;
   if (players.length < min) throw new Error(`Este jogo precisa de pelo menos ${min} jogadores.`);
-  await Promise.all([
-    db().from("party_submissions").delete().eq("room_id", room.id),
-    db().from("party_private").delete().eq("room_id", room.id).gt("round_number", 0),
-  ]);
+  await clearRoundData(room.id);
   const scores = Object.fromEntries(players.map((p) => [p.id, 0]));
   if (game === "stop") await startStopRound(room, players, 1, scores);
   else await startRound(room, players, 1, scores, readPartySettings(room.settings).skips);
@@ -539,6 +551,18 @@ async function startRound(room: RoomRow, players: PlayerRow[], round: number, sc
 export async function nextPartyRound(input: { roomId: string; playerId: string; sessionId: string; round: number }) {
   const [, room] = await Promise.all([requireHost(input.roomId, input.playerId, input.sessionId), loadRoom(input.roomId)]);
   if (room.phase !== "reveal" || room.round_number !== input.round) return { ok: true };
+  return nextRoundFor(room);
+}
+
+/** Moves a revealed round on (next round or final podium); an open Stop appeal is settled first. */
+async function nextRoundFor(initial: RoomRow) {
+  let room = initial;
+  const open = readPublicState(room.public_state).appeal;
+  if (open?.status === "open") {
+    if (!appealClosed(open, Date.now())) throw new Error("Espere a votação do recurso terminar.");
+    room = (await settleAppeal(room)) ?? (await loadRoom(room.id));
+    if (room.phase !== "reveal") return { ok: true };
+  }
   const settings = readPartySettings(room.settings);
   const state = readPublicState(room.public_state);
   if (room.round_number >= settings.rounds) {
@@ -1202,6 +1226,8 @@ async function advanceStop(room: RoomRow): Promise<boolean> {
       public_state: asJson({ ...state, submitted: [], ai: { status: "pending" } }),
     });
     if (!claimed) return false;
+    // Training bots that were still "writing" hand in what they had when the round closed.
+    await fillStopBots(room, state, true).catch(() => undefined);
     await judgeStop(claimed);
     return true;
   }
