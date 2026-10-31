@@ -183,6 +183,7 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          is_bot: boolean
           is_host: boolean
           last_seen: string
           nickname: string
@@ -192,6 +193,7 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          is_bot?: boolean
           is_host?: boolean
           last_seen?: string
           nickname: string
@@ -201,6 +203,7 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          is_bot?: boolean
           is_host?: boolean
           last_seen?: string
           nickname?: string

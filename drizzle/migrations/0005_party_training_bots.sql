@@ -1,0 +1,2 @@
+ALTER TABLE public.party_players ADD COLUMN IF NOT EXISTS is_bot boolean NOT NULL DEFAULT false;
+COMMENT ON COLUMN public.party_players.is_bot IS 'Training bot added by the developer; acts only through host-driven server ticks and has no session.';
