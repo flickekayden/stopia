@@ -19,6 +19,7 @@ import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as StopRouteImport } from './routes/stop'
 import { Route as SuporteRouteImport } from './routes/suporte'
 import { Route as TermosRouteImport } from './routes/termos'
+import { Route as DotwellKnownAssetlinksDotjsonRouteImport } from './routes/[.]well-known/assetlinks[.]json'
 import { Route as FestaCodeRouteImport } from './routes/festa.$code'
 import { Route as SalaCodeRouteImport } from './routes/sala.$code'
 
@@ -72,6 +73,12 @@ const TermosRoute = TermosRouteImport.update({
   path: '/termos',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DotwellKnownAssetlinksDotjsonRoute =
+  DotwellKnownAssetlinksDotjsonRouteImport.update({
+    id: '/.well-known/assetlinks.json',
+    path: '/.well-known/assetlinks.json',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const FestaCodeRoute = FestaCodeRouteImport.update({
   id: '/festa/$code',
   path: '/festa/$code',
@@ -94,6 +101,7 @@ export interface FileRoutesByFullPath {
   '/stop': typeof StopRoute
   '/suporte': typeof SuporteRoute
   '/termos': typeof TermosRoute
+  '/.well-known/assetlinks.json': typeof DotwellKnownAssetlinksDotjsonRoute
   '/festa/$code': typeof FestaCodeRoute
   '/sala/$code': typeof SalaCodeRoute
 }
@@ -108,6 +116,7 @@ export interface FileRoutesByTo {
   '/stop': typeof StopRoute
   '/suporte': typeof SuporteRoute
   '/termos': typeof TermosRoute
+  '/.well-known/assetlinks.json': typeof DotwellKnownAssetlinksDotjsonRoute
   '/festa/$code': typeof FestaCodeRoute
   '/sala/$code': typeof SalaCodeRoute
 }
@@ -123,6 +132,7 @@ export interface FileRoutesById {
   '/stop': typeof StopRoute
   '/suporte': typeof SuporteRoute
   '/termos': typeof TermosRoute
+  '/.well-known/assetlinks.json': typeof DotwellKnownAssetlinksDotjsonRoute
   '/festa/$code': typeof FestaCodeRoute
   '/sala/$code': typeof SalaCodeRoute
 }
@@ -139,6 +149,7 @@ export interface FileRouteTypes {
     | '/stop'
     | '/suporte'
     | '/termos'
+    | '/.well-known/assetlinks.json'
     | '/festa/$code'
     | '/sala/$code'
   fileRoutesByTo: FileRoutesByTo
@@ -153,6 +164,7 @@ export interface FileRouteTypes {
     | '/stop'
     | '/suporte'
     | '/termos'
+    | '/.well-known/assetlinks.json'
     | '/festa/$code'
     | '/sala/$code'
   id:
@@ -167,6 +179,7 @@ export interface FileRouteTypes {
     | '/stop'
     | '/suporte'
     | '/termos'
+    | '/.well-known/assetlinks.json'
     | '/festa/$code'
     | '/sala/$code'
   fileRoutesById: FileRoutesById
@@ -182,6 +195,7 @@ export interface RootRouteChildren {
   StopRoute: typeof StopRoute
   SuporteRoute: typeof SuporteRoute
   TermosRoute: typeof TermosRoute
+  DotwellKnownAssetlinksDotjsonRoute: typeof DotwellKnownAssetlinksDotjsonRoute
   FestaCodeRoute: typeof FestaCodeRoute
   SalaCodeRoute: typeof SalaCodeRoute
 }
@@ -258,6 +272,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TermosRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/.well-known/assetlinks.json': {
+      id: '/.well-known/assetlinks.json'
+      path: '/.well-known/assetlinks.json'
+      fullPath: '/.well-known/assetlinks.json'
+      preLoaderRoute: typeof DotwellKnownAssetlinksDotjsonRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/festa/$code': {
       id: '/festa/$code'
       path: '/festa/$code'
@@ -286,6 +307,7 @@ const rootRouteChildren: RootRouteChildren = {
   StopRoute: StopRoute,
   SuporteRoute: SuporteRoute,
   TermosRoute: TermosRoute,
+  DotwellKnownAssetlinksDotjsonRoute: DotwellKnownAssetlinksDotjsonRoute,
   FestaCodeRoute: FestaCodeRoute,
   SalaCodeRoute: SalaCodeRoute,
 }
