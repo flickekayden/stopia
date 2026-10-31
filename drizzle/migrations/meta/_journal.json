@@ -64,6 +64,13 @@
       "when": 1793452824668,
       "tag": "0008_credit_merge_and_store_consume",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1793453994761,
+      "tag": "0009_revoke_client_access_commercial",
+      "breakpoints": true
     }
   ]
 }
