@@ -1230,6 +1230,40 @@ export function NightBoard({ players, me }: { players: PartyPlayer[]; me: PartyP
   );
 }
 
+/** "Boletim da Vergonha": the podium and AI awards as an image for the group's WhatsApp. */
+function ShareBulletin({ ctx, ranked }: { ctx: PartyCtx; ranked: { player: PartyPlayer & { score: number }; place: number }[] }) {
+  const [busy, setBusy] = useState(false);
+  async function share() {
+    setBusy(true);
+    try {
+      const { drawShareCard, shareImage } = await import("@/lib/share-card");
+      const commentary = ctx.state.finalCommentary?.status === "ready" ? ctx.state.finalCommentary : null;
+      const nick = (id: string) => ctx.players.find((p) => p.id === id)?.nickname ?? "Alguém";
+      const king = ctx.players.find((p) => p.id === nightKingId(ctx.players))?.nickname ?? null;
+      const blob = await drawShareCard({
+        gameName: lobbyGameMeta(ctx.game).name,
+        code: ctx.room.code,
+        ranked: ranked.map((r) => ({ nickname: r.player.nickname, score: r.player.score, place: r.place })),
+        highlights: (commentary?.highlights ?? []).map((h) => ({ name: nick(h.playerId), title: h.title, text: h.text })),
+        summary: commentary?.summary,
+        king,
+      });
+      const result = await shareImage(blob, `boletim-${ctx.room.code}.png`, `Boletim da Vergonha · ${lobbyGameMeta(ctx.game).name} na sala ${ctx.room.code}`);
+      vibrate(15);
+      if (result === "downloaded") toast.success("Imagem salva! Agora é só mandar no grupo.");
+    } catch (err) {
+      if (!(err instanceof DOMException && err.name === "AbortError")) toast.error(err instanceof Error ? err.message : "Não foi possível gerar o boletim.");
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <Button variant="outline" className="h-14 w-full text-base font-bold" disabled={busy} aria-busy={busy} onClick={() => void share()}>
+      {busy ? <Loader2 className="animate-spin" /> : <Share2 />} Boletim da Vergonha
+    </Button>
+  );
+}
+
 export function PartyFinal({ ctx, actions, onHub }: { ctx: PartyCtx; actions: PartyActions; onHub: () => void }) {
   const scores = ctx.state.scores ?? {};
   const ranked = useMemo(() => rankPlayers(ctx.players.map((p) => ({ ...p, score: scores[p.id] ?? 0 }))), [ctx.players, scores]);
@@ -1255,6 +1289,7 @@ export function PartyFinal({ ctx, actions, onHub }: { ctx: PartyCtx; actions: Pa
         </div>
       )}
       <FinalCommentaryCard ctx={ctx} />
+      <ShareBulletin ctx={ctx} ranked={ranked} />
       <NightBoard players={ctx.players} me={ctx.me} />
       <ol className="space-y-2" aria-label="Classificação final">
         {ranked.map((row, index) => (
