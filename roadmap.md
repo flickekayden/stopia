@@ -128,12 +128,12 @@
 - [x] Testes e partidas reais (Stop com STOP, Tribunal em dupla de 3 rodadas)
 
 ## Treino, voz e extras (prompt-15: implementar todas)
-- [ ] Painel admin sem cores, com controles úteis da sala (bots, pular etapa, expulsar, voltar ao lobby, teste da IA)
-- [ ] Bots de treino em todos os jogos (Stop e jogos da galera)
-- [ ] Tela cheia de avaliação do Stop com frases, dicas e status de entrega
-- [ ] Voz ao vivo na sala com mute e silêncio automático (Stop escrevendo, pistas do Infiltrado)
-- [ ] Boletim da Vergonha: imagem do pódio para compartilhar
-- [ ] Sons por jogo: martelo do Tribunal, tique nos 10s finais do Stop, aplausos/vaias da torcida
-- [ ] Rei da Noite com coroa visível no topo da sala e no chat
-- [ ] Recorrer ao Juiz: contestar resposta com 0 no Stop e a galera vota
-- [ ] Testes e partida real
+- [x] Painel admin sem cores, com controles úteis da sala (bots, pular etapa, expulsar, voltar ao lobby, teste da IA)
+- [x] Bots de treino em todos os jogos (Stop e jogos da galera)
+- [x] Tela cheia de avaliação do Stop com frases, dicas e status de entrega
+- [x] Voz ao vivo na sala com mute e silêncio automático (Stop escrevendo, pistas do Infiltrado)
+- [x] Boletim da Vergonha: imagem do pódio para compartilhar
+- [x] Sons por jogo: martelo do Tribunal, tique nos 10s finais do Stop, aplausos/vaias da torcida
+- [x] Rei da Noite com coroa visível no topo da sala e no chat
+- [x] Recorrer ao Juiz: contestar resposta com 0 no Stop e a galera vota
+- [x] Testes e partida real
