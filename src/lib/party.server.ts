@@ -707,12 +707,22 @@ export async function skipRoletaChallenge(input: { roomId: string; playerId: str
     phase_ends_at: deadline("roleta", "respond", admin, settings),
     public_state: asJson({ ...state, prompt, submitted: [], skipsLeft: (state.skipsLeft ?? 1) - 1 }),
   });
-  if (!updated) throw new Error("A rodada mudou ao mesmo tempo. Tente de novo.");
-  await Promise.all([
+  if (!updated) {
+    // A retried request after a network failure: the skip already happened.
+    const fresh = await loadRoom(room.id);
+    if (fresh.round_number === room.round_number && readPublicState(fresh.public_state).skipsLeft !== state.skipsLeft) return { ok: true };
+    throw new Error("A rodada mudou ao mesmo tempo. Tente de novo.");
+  }
+  // The new challenge is live (public state is authoritative). Old answers are tagged with the
+  // previous challenge key and ignored everywhere, so this cleanup is tidy-up, not a correctness step.
+  const results = await Promise.allSettled([
     writePrivate(room.id, 0, { used, history: history.slice(-30) }),
     writePrivate(room.id, room.round_number, { ...roundPrivate, prompt }),
     db().from("party_submissions").delete().eq("room_id", room.id).eq("round_number", room.round_number).eq("phase", "respond"),
   ]);
+  if (results.some((r) => r.status === "rejected" || (r.status === "fulfilled" && (r.value as { error?: unknown } | undefined)?.error))) {
+    console.error("skipRoletaChallenge: post-skip cleanup incomplete");
+  }
   return { ok: true };
 }
 
