@@ -20,10 +20,13 @@
 - All routes share a smartphone-width shell, and portal sheets/fixed controls use the same width and safe-area offsets so desktop preserves mobile ergonomics.
 - The installation worker is network-only for navigations and never caches game/session data so multiplayer state remains authoritative.
 - Device haptics and installation prompts run only in effects or user handlers with capability checks so SSR and unsupported browsers stay safe.
-- Presentation uses game-screen-scoped classes, unframed game-section bands, shared Button variants and semantic tokens, kept separate from multiplayer state; player colour schemes are device-local `html[data-theme]` token sets (list in `src/lib/themes.ts`, boot script avoids flashes) and admin colour overrides only tint the default scheme.
+- Presentation uses game-screen-scoped classes, unframed game-section bands, shared Button variants and semantic tokens, kept separate from multiplayer state; player colour schemes are device-local `html[data-theme]` token sets (list in `src/lib/themes.ts`, boot script avoids flashes); admin colour overrides are retired and cleared, never applied.
 - Round starts use a future server-issued started_at and matching ends_at; shared timing helpers gate inputs and STOP without a schema change or device-local countdown origin.
 - Fixed top-right controls (sound, developer gear) are reserved through the `--top-actions-space` variable (`top-actions-clear`); the page clips sideways overflow so hidden labels inside horizontal scrollers never make phones zoom out.
-- Developer room management for group rooms goes through dev-token/session-verified server functions in `party.server.ts`; deletes rely on table cascades so secrets and submissions go with the room.
+- Developer room tools (room list/delete, training bots, skip step, kick, reset) go through dev-token/session-verified server functions in `party.server.ts`; deletes rely on table cascades. Developer mode is unlocked by five taps on the home title plus the server-checked password.
+- Training bots are `party_players.is_bot` rows with no session, driven by a host-device heartbeat (`tickPartyBots`) with deterministic per-bot delays (`party-bots.ts`); their AI/fallback content is cached in party_private at round_number = -round so it never races round data, and bots never become host or keep a room alive.
+- Live voice is a WebRTC mesh signalled over a room realtime broadcast/presence channel (no media server, STUN only); `voice-rules.ts` decides when every microphone is auto-silenced.
+- Stop "Recorrer ao Juiz" lives in public_state.appeal during reveal (rules in `stop-appeal.ts`), is version-guarded, and must settle before the next round.
 - Final rankings use a browser-safe competition-rank helper so equal totals share a place without changing stored scoring rules.
 - Answer saves are serialized per round and late hydration preserves locally edited fields so slow acknowledgements cannot overwrite newer input.
 - Non-AI game actions verify the existing hashed player session in addition to host membership; direct table policies remain a separately audited security boundary.
