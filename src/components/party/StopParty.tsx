@@ -24,7 +24,7 @@ import {
   type PartySettings,
 } from "@/lib/party-games";
 import { nightKingId } from "@/lib/ranking";
-import { APPEAL_SECONDS, appealBlocker, appealOutcome } from "@/lib/stop-appeal";
+import { appealBlocker, appealOutcome } from "@/lib/stop-appeal";
 import { cn } from "@/lib/utils";
 
 function useNow(intervalMs: number) {
