@@ -70,6 +70,7 @@ import {
   TRIBUNAL_CASES,
 } from "./party-content.server";
 import { MAX_BOTS, botDelayMs, fallbackBotLine, fallbackStopAnswers, nextBotName, seededPick, seededUnit, type BotActionKind } from "./party-bots";
+import { TOUCH_THROTTLE_MS, activePlayers, forChallenge, roletaChallengeKey } from "./party-presence";
 import { APPEAL_SECONDS, appealBlocker, appealClosed, appealOutcome, appealPoints, type AppealVote, type StopAppeal } from "./stop-appeal";
 
 type RoomRow = Tables<"party_rooms">;
@@ -718,7 +719,13 @@ export async function skipRoletaChallenge(input: { roomId: string; playerId: str
   const results = await Promise.allSettled([
     writePrivate(room.id, 0, { used, history: history.slice(-30) }),
     writePrivate(room.id, room.round_number, { ...roundPrivate, prompt }),
-    db().from("party_submissions").delete().eq("room_id", room.id).eq("round_number", room.round_number).eq("phase", "respond"),
+    db()
+      .from("party_submissions")
+      .delete()
+      .eq("room_id", room.id)
+      .eq("round_number", room.round_number)
+      .eq("phase", "respond")
+      .or(`payload->>challenge.is.null,payload->>challenge.neq.${roletaChallengeKey((state.skipsLeft ?? 1) - 1)}`),
   ]);
   if (results.some((r) => r.status === "rejected" || (r.status === "fulfilled" && (r.value as { error?: unknown } | undefined)?.error))) {
     console.error("skipRoletaChallenge: post-skip cleanup incomplete");
@@ -762,6 +769,7 @@ export async function submitPartyAction(input: { roomId: string; playerId: strin
     payload = { answers: sanitizeStopAnswers(raw?.answers, state.stop.categories), done: raw?.done === true };
   } else if (TEXT_PHASES.includes(phase)) {
     payload = textPayload(input.payload, textMaxFor(game));
+    if (game === "roleta" && phase === "respond") payload.challenge = roletaChallengeKey(state.skipsLeft);
   } else if (phase === "vote" && game === "tribunal") {
     const verdict = (input.payload as { verdict?: unknown })?.verdict;
     if (verdict !== "culpado" && verdict !== "inocente") throw new Error("Voto inválido.");
