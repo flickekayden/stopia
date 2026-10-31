@@ -44,18 +44,37 @@ import { HEARTBEAT_MS } from "@/lib/party-presence";
 import { isPartyGame, lobbyGameMeta, readPartySettings, readPublicState, readRoomGame } from "@/lib/party-games";
 import { getLastNickname, getOrCreateSessionId, getPlayer, removePlayer, savePlayer } from "@/lib/session";
 import { friendlyError } from "@/lib/friendly-error";
+import { getRoomPreview } from "@/lib/room-preview.functions";
+import { shareImageFor } from "@/lib/share-images";
 
 export const Route = createFileRoute("/festa/$code")({
-  head: () => ({
-    meta: [
-      { title: "Sala da Galera — Central de Jogos do Stopia" },
-      { name: "description", content: "Entre na sala da galera e joguem juntos Stop, Tribunal dos Amigos, Quem Escreveu Essa Desgraça?, Infiltrado, Debate Impossível ou Roleta do Caos." },
-      { property: "og:title", content: "Bora jogar? Sala da Central de Jogos do Stopia" },
-      { property: "og:description", content: "Entre com o código e jogue com a galera pelo celular." },
-      { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary" },
-    ],
-  }),
+  loader: async ({ params }) => ({ preview: await getRoomPreview({ data: { code: params.code } }).catch(() => null) }),
+  head: ({ params, loaderData }) => {
+    const preview = loaderData?.preview ?? null;
+    const code = params.code.toUpperCase();
+    const gameName = preview && preview.game !== "lobby" ? readRoomGame(preview.game) === "lobby" ? "Sala da Galera" : lobbyGameMeta(readRoomGame(preview.game) as Exclude<ReturnType<typeof readRoomGame>, "lobby">).name : "Sala da Galera";
+    const title = preview ? `Sala ${code} · ${gameName} — Stopia` : "Sala da Galera — Central de Jogos do Stopia";
+    const description = preview
+      ? preview.status === "ended"
+        ? `A partida de ${gameName} na sala ${code} terminou. Entre para a revanche com a galera.`
+        : `Bora jogar ${gameName}? Toque para entrar na sala ${code} pelo celular${preview.players > 0 ? ` — ${preview.players} na sala` : ""}.`
+      : "Entre com o código e jogue com a galera pelo celular: Stop, Tribunal dos Amigos, Infiltrado e mais.";
+    const image = shareImageFor(preview?.game);
+    return {
+      meta: [
+        { title },
+        { name: "description", content: description },
+        { property: "og:title", content: preview ? `Bora jogar ${gameName}? Sala ${code}` : "Bora jogar? Sala da Central de Jogos do Stopia" },
+        { property: "og:description", content: description },
+        { property: "og:type", content: "website" },
+        { property: "og:image", content: image },
+        { property: "og:image:width", content: "1200" },
+        { property: "og:image:height", content: "630" },
+        { name: "twitter:card", content: "summary_large_image" },
+        { name: "twitter:image", content: image },
+      ],
+    };
+  },
   component: PartyRoomPage,
 });
 
