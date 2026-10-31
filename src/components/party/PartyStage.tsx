@@ -3,6 +3,7 @@ import { Award, BookOpen, Bot, Check, Clock, Copy, Crown, EyeOff, Eye, Gavel, La
 import { toast } from "sonner";
 
 import { CrowdReactions } from "@/components/party/CrowdReactions";
+import { RoundScoreboard } from "@/components/party/RoundScoreboard";
 import { PartyIcon } from "@/components/party/PartyIcon";
 import { GameRulesDialog, RulesList } from "@/components/party/RulesList";
 import { StopLobbySettings, StopRules } from "@/components/party/StopParty";
@@ -12,7 +13,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import type { PartyPlayer, PartyPrivateView, PartyRoom } from "@/hooks/use-party-room";
 import { activePlayers, isActivePlayer } from "@/lib/party-presence";
-import { nightKingId, rankPlayers } from "@/lib/ranking";
+import { nightKingId, pointsBehind, rankPlayers } from "@/lib/ranking";
 import { useDevSettings } from "@/lib/dev-settings";
 import { MAX_BOTS } from "@/lib/party-bots";
 import {
@@ -506,6 +507,7 @@ export function PartyLobby({ ctx, actions }: { ctx: LobbyCtx; actions: PartyActi
       <div data-game={selected ?? undefined} className="mobile-bottom-bar fixed inset-x-0 bottom-0 mx-auto w-full max-w-md border-t border-border bg-background/95 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
         {ctx.isHost ? (
           <div className="space-y-2">
+            {selected && missing === 0 && <p role="status" className="flex items-center justify-center gap-1.5 text-center text-sm font-semibold text-success"><Check className="size-4" aria-hidden="true" /> Tudo pronto: {connected} jogadores conectados</p>}
             {selected && missing > 0 && <p role="status" className="text-center text-sm text-muted-foreground">Necessário mínimo de {meta!.minPlayers} jogadores conectados{connected < ctx.players.length ? ` (${ctx.players.length - connected} ausente${ctx.players.length - connected > 1 ? "s" : ""})` : ""}. Compartilhe o código!</p>}
             <Button className="party-accent-button h-14 w-full text-lg font-bold shadow-none" disabled={!selected || missing > 0 || ctx.busy !== null} aria-busy={ctx.busy === "start"} onClick={() => void actions.start()}>
               {ctx.busy === "start" ? <><Loader2 className="animate-spin" /> Preparando…</> : !selected ? "Escolha um jogo" : `Iniciar ${meta!.name}`}
@@ -1021,26 +1023,7 @@ function AiCard({ ctx, title }: { ctx: PartyCtx; title: string }) {
 }
 
 function Deltas({ ctx }: { ctx: PartyCtx }) {
-  const deltas = ctx.state.deltas ?? {};
-  const scores = ctx.state.scores ?? {};
-  const rows = ctx.players.map((p) => ({ ...p, score: scores[p.id] ?? 0, delta: deltas[p.id] ?? 0 })).sort((a, b) => b.score - a.score);
-  const king = nightKingId(ctx.players);
-  return (
-    <section className="party-panel space-y-2" aria-label="Placar">
-      <p className="section-label">Placar</p>
-      <ul className="space-y-1.5">
-        {rows.map((p) => (
-          <li key={p.id} className="flex items-center justify-between gap-3">
-            <span className="min-w-0 truncate font-semibold">{p.id === king && <span title="Rei da Noite" aria-label="Rei da Noite">👑 </span>}{p.nickname}{p.id === ctx.me.id && <span className="text-muted-foreground"> (você)</span>}</span>
-            <span className="flex shrink-0 items-center gap-2 tabular-nums">
-              {p.delta > 0 && <span className="points-badge rounded-md bg-success/15 px-1.5 text-sm font-bold text-success">+{p.delta}</span>}
-              <span className="font-display text-xl">{p.score}</span>
-            </span>
-          </li>
-        ))}
-      </ul>
-    </section>
-  );
+  return <RoundScoreboard players={ctx.players} scores={ctx.state.scores ?? {}} deltas={ctx.state.deltas ?? {}} meId={ctx.me.id} />;
 }
 
 function RevealBody({ ctx }: { ctx: PartyCtx }) {
@@ -1325,7 +1308,7 @@ export function PartyFinal({ ctx, actions, onHub }: { ctx: PartyCtx; actions: Pa
             <div key={row.player.id} className="text-center">
               <p className="truncate text-sm font-bold">{row.player.nickname}</p>
               <div className={cn("podium-step mt-1 grid place-items-center", row.place === 1 ? "h-32" : row.place === 2 ? "h-24" : "h-16")} data-place={row.place}>
-                <span className="font-display text-2xl">{row.place}º</span>
+                <span className="font-display text-2xl leading-none">{row.place}º<span className="block font-sans text-xs font-semibold tabular-nums text-muted-foreground">{row.player.score} pts</span></span>
               </div>
             </div>
           ))}
@@ -1338,7 +1321,10 @@ export function PartyFinal({ ctx, actions, onHub }: { ctx: PartyCtx; actions: Pa
         {ranked.map((row, index) => (
           <li key={row.player.id} className="ranking-row flex items-center gap-3 p-3" data-first={row.place === 1} style={{ "--enter-index": index } as CSSProperties}>
             <span className="rank-badge" data-place={row.place}>{row.place}</span>
-            <span className="min-w-0 flex-1 truncate font-semibold">{row.player.nickname}{row.player.id === ctx.me.id && <span className="text-primary"> (você)</span>}</span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate font-semibold">{row.player.nickname}{row.player.id === ctx.me.id && <span className="text-primary"> (você)</span>}</span>
+              {pointsBehind(row.player.score, ranked[0]?.player.score ?? 0) > 0 && <span className="block text-xs text-muted-foreground tabular-nums">a {pointsBehind(row.player.score, ranked[0]?.player.score ?? 0)} pts do 1º</span>}
+            </span>
             <span className="font-display text-2xl tabular-nums">{row.player.score}</span>
           </li>
         ))}

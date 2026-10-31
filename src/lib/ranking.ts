@@ -14,3 +14,8 @@ export function nightKingId(players: readonly { id: string; score: number }[]) {
   const leaders = players.filter((p) => p.score === top && top > 0);
   return leaders.length === 1 ? leaders[0]!.id : null;
 }
+
+/** Points a player trails the leader by (0 for the leader or anyone tied with them). */
+export function pointsBehind(score: number, leaderScore: number) {
+  return Math.max(0, leaderScore - score);
+}

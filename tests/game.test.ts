@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { DEFAULT_CATEGORIES, pickCategories, pickLetter } from "../src/lib/game";
-import { rankPlayers } from "../src/lib/ranking";
+import { pointsBehind, rankPlayers } from "../src/lib/ranking";
 import { ROUND_COUNTDOWN_MS, roundStartsAt } from "../src/lib/round-pacing";
 import { RESULTS_VIEW_MS, isResultsPlayerActive, resultsDeadline } from "../src/lib/results-pacing";
 
@@ -39,5 +39,15 @@ describe("game invariants", () => {
   });
   test("players get 120 seconds in total to read all round answers", () => {
     expect(RESULTS_VIEW_MS).toBe(120_000);
+  });
+});
+
+
+describe("scoreboard gap", () => {
+  test("shows how far a player trails the leader", () => {
+    expect(pointsBehind(35, 50)).toBe(15);
+  });
+  test("the leader and anyone tied with them trail by zero", () => {
+    expect(pointsBehind(50, 50)).toBe(0);
   });
 });

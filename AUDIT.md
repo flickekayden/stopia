@@ -53,3 +53,4 @@ Known limitation (not changed): party_rooms, party_players and party_chat stay r
 - Error toasts on home, room, and chat hide technical details (validation dumps, network, database) and say what to do next.
 - "Encerrar etapa agora" asks the host to confirm when someone has not sent yet, showing how many already did.
 - Verified this pass in the preview: Tribunal (2 phones) and Debate (2 phones) through the AI verdict; Quem Escreveu, Infiltrado and Roleta (3 phones) from writing into voting; Stop (2 phones) through the AI judge to the results.
+- Results polish: one shared round scoreboard with shared tie places, "a N do líder" and a short staggered entrance; final ranking shows the gap to 1st and podium scores; lobby confirms "Tudo pronto" with the connected count. Verified on Stop and Debate rounds.
