@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { Award, Check, Clock, Copy, Crown, EyeOff, Eye, Gavel, LayoutGrid, Loader2, LogOut, RefreshCw, Share2, SkipForward, Sparkles, Swords, Trophy, Users } from "lucide-react";
+import { Award, BookOpen, Check, Clock, Copy, Crown, EyeOff, Eye, Gavel, LayoutGrid, Loader2, LogOut, RefreshCw, Share2, SkipForward, Sparkles, Swords, Trophy, Users } from "lucide-react";
 import { toast } from "sonner";
 
 import { CrowdReactions } from "@/components/party/CrowdReactions";
 import { PartyIcon } from "@/components/party/PartyIcon";
-import { RulesList } from "@/components/party/RulesList";
+import { GameRulesDialog, RulesList } from "@/components/party/RulesList";
 import { StopLobbySettings, StopRules } from "@/components/party/StopParty";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -138,7 +138,7 @@ function GameMetaLine({ game }: { game: LobbyGameMeta }) {
   );
 }
 
-function GamePicker({ ctx, actions }: { ctx: LobbyCtx; actions: PartyActions }) {
+function GamePicker({ ctx, actions, onRules }: { ctx: LobbyCtx; actions: PartyActions; onRules: (game: LobbyGameId) => void }) {
   return (
     <section className="space-y-3" aria-labelledby="lobby-pick">
       <h2 id="lobby-pick" className="text-lg font-bold">Escolha o jogo</h2>
@@ -146,15 +146,14 @@ function GamePicker({ ctx, actions }: { ctx: LobbyCtx; actions: PartyActions }) 
         {LOBBY_GAMES.map((game, index) => {
           const active = ctx.selected === game.id;
           return (
+            <div key={game.id} data-game={game.id} className="flex flex-col gap-1.5">
             <button
-              key={game.id}
               type="button"
-              data-game={game.id}
               aria-pressed={active}
               disabled={ctx.busy !== null}
               onClick={() => { if (!active) void actions.select(game.id); }}
               className={cn(
-                "party-card flex min-h-36 flex-col items-start gap-2 p-3 text-left transition-transform active:scale-[0.98] disabled:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                "party-card flex min-h-36 flex-1 flex-col items-start gap-2 p-3 text-left transition-transform active:scale-[0.98] disabled:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                 active && "ring-2 ring-[var(--game-accent)]",
               )}
               style={{ "--enter-index": index } as CSSProperties}
@@ -165,6 +164,10 @@ function GamePicker({ ctx, actions }: { ctx: LobbyCtx; actions: PartyActions }) 
               <span className="mt-auto"><GameMetaLine game={game} /></span>
               {active && <span className="inline-flex items-center gap-1 text-xs font-bold party-accent"><Check className="size-3.5" aria-hidden="true" /> Escolhido</span>}
             </button>
+            <Button type="button" variant="ghost" className="h-11 w-full text-sm font-semibold" onClick={() => onRules(game.id)} aria-label={`Regras de ${game.name}`}>
+              <BookOpen /> Regras
+            </Button>
+            </div>
           );
         })}
       </div>
@@ -338,6 +341,28 @@ function SelectedGame({ ctx, actions, selected }: { ctx: LobbyCtx; actions: Part
   );
 }
 
+/** Every game with a rules button, so any player in the room can read how each one works. */
+function RulesShelf({ onRules }: { onRules: (game: LobbyGameId) => void }) {
+  return (
+    <ul className="grid grid-cols-2 gap-2 text-left">
+      {LOBBY_GAMES.map((game) => (
+        <li key={game.id} data-game={game.id}>
+          <button
+            type="button"
+            onClick={() => onRules(game.id)}
+            className="flex min-h-14 w-full items-center gap-2 rounded-lg bg-secondary/60 p-2 text-left text-sm font-semibold transition-transform active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            aria-label={`Regras de ${game.name}`}
+          >
+            <PartyIcon name={game.icon} className="size-4 shrink-0 party-accent" />
+            <span className="min-w-0 flex-1 text-balance-safe leading-tight">{game.name}</span>
+            <BookOpen className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+          </button>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 /** Big room code with the full invite link: copy it or open the phone's share sheet. */
 function RoomShareCard({ code }: { code: string }) {
   const [url, setUrl] = useState(`/festa/${code}`);
@@ -399,6 +424,7 @@ export function PartyLobby({ ctx, actions }: { ctx: LobbyCtx; actions: PartyActi
   const selected = ctx.selected;
   const meta = selected ? lobbyGameMeta(selected) : null;
   const missing = selected ? missingPlayers(selected, ctx.players.length) : 0;
+  const [rulesFor, setRulesFor] = useState<LobbyGameId | null>(null);
 
   return (
     <div className="dock-clearance space-y-4">
@@ -406,26 +432,28 @@ export function PartyLobby({ ctx, actions }: { ctx: LobbyCtx; actions: PartyActi
       <PlayersPanel players={ctx.players} me={ctx.me} />
 
       {ctx.isHost ? (
-        <GamePicker ctx={ctx} actions={actions} />
+        <GamePicker ctx={ctx} actions={actions} onRules={setRulesFor} />
       ) : !selected ? (
         <section className="party-prompt space-y-4 text-center" role="status">
           <span className="party-icon mx-auto size-14 motion-safe:animate-pulse"><Sparkles className="size-7" aria-hidden="true" /></span>
           <div className="space-y-1">
             <h2 className="text-xl font-bold">Aguardando o Mestre escolher o jogo...</h2>
-            <p className="text-sm text-muted-foreground">Enquanto isso, veja o que a galera pode jogar:</p>
+            <p className="text-sm text-muted-foreground">Enquanto isso, toque num jogo para ler as regras:</p>
           </div>
-          <ul className="grid grid-cols-2 gap-2 text-left">
-            {LOBBY_GAMES.map((game) => (
-              <li key={game.id} data-game={game.id} className="flex items-center gap-2 rounded-lg bg-secondary/60 p-2 text-sm font-semibold">
-                <PartyIcon name={game.icon} className="size-4 shrink-0 party-accent" />
-                <span className="min-w-0 text-balance-safe leading-tight">{game.name}</span>
-              </li>
-            ))}
-          </ul>
+          <RulesShelf onRules={setRulesFor} />
         </section>
       ) : null}
 
       {selected && <SelectedGame ctx={ctx} actions={actions} selected={selected} />}
+
+      {!ctx.isHost && selected && (
+        <section className="space-y-3" aria-labelledby="lobby-all-rules">
+          <h2 id="lobby-all-rules" className="section-label">Regras dos jogos</h2>
+          <RulesShelf onRules={setRulesFor} />
+        </section>
+      )}
+
+      <GameRulesDialog game={rulesFor} onClose={() => setRulesFor(null)} />
 
       <div data-game={selected ?? undefined} className="mobile-bottom-bar fixed inset-x-0 bottom-0 mx-auto w-full max-w-md border-t border-border bg-background/95 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
         {ctx.isHost ? (
