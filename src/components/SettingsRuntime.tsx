@@ -26,13 +26,8 @@ export function SettingsRuntime() {
   useEffect(() => {
     const root = document.documentElement;
     applyTheme(theme);
-    // Admin colour overrides only tint the default scheme; a player-chosen theme keeps its own palette.
-    const useOverrides = theme === DEFAULT_THEME;
-    for (const key of ["primary", "secondary", "background", "foreground"] as const) {
-      const value = useOverrides ? effective.colors[key] : "";
-      if (value) root.style.setProperty(`--${key}`, value);
-      else root.style.removeProperty(`--${key}`);
-    }
+    // Colours come only from the player's theme; old admin colour overrides are cleared and no longer applied.
+    for (const key of ["primary", "secondary", "background", "foreground"] as const) root.style.removeProperty(`--${key}`);
     const themeMeta = document.querySelector('meta[name="theme-color"]');
     if (themeMeta) {
       const probe = document.createElement("span");
@@ -41,7 +36,7 @@ export function SettingsRuntime() {
       themeMeta.setAttribute("content", getComputedStyle(probe).color);
       probe.remove();
     }
-  }, [effective.colors, theme]);
+  }, [theme]);
   useEffect(() => {
     let active = true;
     let inFlight = false;
