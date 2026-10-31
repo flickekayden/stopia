@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { Award, BookOpen, Check, Clock, Copy, Crown, EyeOff, Eye, Gavel, LayoutGrid, Loader2, LogOut, RefreshCw, Share2, SkipForward, Sparkles, Swords, Trophy, Users } from "lucide-react";
+import { Award, BookOpen, Bot, Check, Clock, Copy, Crown, EyeOff, Eye, Gavel, LayoutGrid, Loader2, LogOut, RefreshCw, Share2, SkipForward, Sparkles, Swords, Trophy, Users } from "lucide-react";
 import { toast } from "sonner";
 
 import { CrowdReactions } from "@/components/party/CrowdReactions";
@@ -10,7 +10,9 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import type { PartyPlayer, PartyPrivateView, PartyRoom } from "@/hooks/use-party-room";
-import { rankPlayers } from "@/lib/ranking";
+import { nightKingId, rankPlayers } from "@/lib/ranking";
+import { useDevSettings } from "@/lib/dev-settings";
+import { MAX_BOTS } from "@/lib/party-bots";
 import {
   AUTOR_SECONDS_OPTIONS,
   DEBATE_SECONDS_OPTIONS,
@@ -66,6 +68,12 @@ export type PartyActions = {
   stopSave: (answers: Record<string, string>, done: boolean) => Promise<boolean>;
   /** Stop: shouts STOP! with the player's complete answers. */
   stopNow: (answers: Record<string, string>) => Promise<boolean>;
+  /** Stop "Recorrer ao Juiz": contest one of your zeros, vote on someone else's, close it after the deadline. */
+  appeal: (category: string) => Promise<boolean>;
+  appealVote: (vote: "aceitar" | "manter") => Promise<boolean>;
+  appealResolve: () => Promise<void>;
+  /** Developer: add or remove training bots in this room. */
+  devBots: (action: "addBot" | "removeBots") => Promise<boolean>;
 };
 
 function useNow(active: boolean) {
@@ -96,13 +104,39 @@ export type LobbyCtx = {
 };
 
 /** "Rei da Noite": points from every finished match in this room (party_players.score). */
-function nightLeaderId(players: PartyPlayer[]) {
-  const top = Math.max(0, ...players.map((p) => p.score));
-  const leaders = players.filter((p) => p.score === top && top > 0);
-  return leaders.length === 1 ? leaders[0]!.id : null;
+const nightLeaderId = nightKingId;
+
+/** Visible crown at the top of the room for tonight's leader across every game. */
+export function NightCrownBanner({ players, me }: { players: PartyPlayer[]; me: PartyPlayer }) {
+  const king = players.find((p) => p.id === nightKingId(players));
+  if (!king) return null;
+  return (
+    <section className="night-crown flex items-center gap-3 rounded-2xl px-4 py-3" aria-label="Rei da Noite">
+      <span className="text-3xl leading-none motion-safe:animate-bounce" aria-hidden="true">👑</span>
+      <div className="min-w-0 flex-1">
+        <p className="section-label text-primary">Rei da Noite</p>
+        <p className="truncate font-display text-xl">{king.nickname}{king.id === me.id ? " (você!)" : ""}</p>
+      </div>
+      <span className="shrink-0 text-right font-display text-2xl tabular-nums">{king.score}<span className="block font-sans text-[0.625rem] font-semibold text-muted-foreground">pts na noite</span></span>
+    </section>
+  );
 }
 
-function PlayersPanel({ players, me }: { players: PartyPlayer[]; me: PartyPlayer }) {
+/** Developer-only: add training bots right from the lobby (they never count as people). */
+function TrainingBots({ players, actions, busy }: { players: PartyPlayer[]; actions: PartyActions; busy: boolean }) {
+  const { isDev } = useDevSettings();
+  if (!isDev) return null;
+  const bots = players.filter((p) => p.is_bot).length;
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border/60 pt-3">
+      <p className="min-w-0 flex-1 text-xs font-semibold text-muted-foreground">🤖 Treino com robôs · {bots}/{MAX_BOTS}</p>
+      <Button variant="secondary" size="sm" disabled={busy || bots >= MAX_BOTS} onClick={() => void actions.devBots("addBot")}><Bot /> Adicionar robô</Button>
+      {bots > 0 && <Button variant="ghost" size="sm" disabled={busy} onClick={() => void actions.devBots("removeBots")}>Remover robôs</Button>}
+    </div>
+  );
+}
+
+function PlayersPanel({ players, me, actions, busy }: { players: PartyPlayer[]; me: PartyPlayer; actions: PartyActions; busy: boolean }) {
   const king = nightLeaderId(players);
   const anyNight = players.some((p) => p.score > 0);
   return (
@@ -120,12 +154,14 @@ function PlayersPanel({ players, me }: { players: PartyPlayer[]; me: PartyPlayer
               <span className="flex flex-wrap gap-x-2">
                 {p.is_host && <span className="inline-flex items-center gap-1 text-xs font-bold party-accent"><Crown className="size-3.5" aria-hidden="true" /> Mestre da sala</span>}
                 {p.id === king && <span className="inline-flex items-center gap-1 text-xs font-bold text-primary">👑 Rei da Noite</span>}
+                {p.is_bot && <span className="inline-flex items-center gap-1 text-xs font-bold text-muted-foreground"><Bot className="size-3.5" aria-hidden="true" /> Robô de treino</span>}
               </span>
             </span>
             {anyNight && <span className="shrink-0 text-right font-display text-lg tabular-nums" aria-label={`${p.score} pontos na noite`}>{p.score}<span className="block font-sans text-[0.625rem] font-semibold text-muted-foreground">na noite</span></span>}
           </li>
         ))}
       </ul>
+      <TrainingBots players={players} actions={actions} busy={busy} />
     </section>
   );
 }
@@ -428,8 +464,9 @@ export function PartyLobby({ ctx, actions }: { ctx: LobbyCtx; actions: PartyActi
 
   return (
     <div className="dock-clearance space-y-4">
+      <NightCrownBanner players={ctx.players} me={ctx.me} />
       <RoomShareCard code={ctx.room.code} />
-      <PlayersPanel players={ctx.players} me={ctx.me} />
+      <PlayersPanel players={ctx.players} me={ctx.me} actions={actions} busy={ctx.busy !== null} />
 
       {ctx.isHost ? (
         <GamePicker ctx={ctx} actions={actions} onRules={setRulesFor} />
@@ -944,13 +981,14 @@ function Deltas({ ctx }: { ctx: PartyCtx }) {
   const deltas = ctx.state.deltas ?? {};
   const scores = ctx.state.scores ?? {};
   const rows = ctx.players.map((p) => ({ ...p, score: scores[p.id] ?? 0, delta: deltas[p.id] ?? 0 })).sort((a, b) => b.score - a.score);
+  const king = nightKingId(ctx.players);
   return (
     <section className="party-panel space-y-2" aria-label="Placar">
       <p className="section-label">Placar</p>
       <ul className="space-y-1.5">
         {rows.map((p) => (
           <li key={p.id} className="flex items-center justify-between gap-3">
-            <span className="min-w-0 truncate font-semibold">{p.nickname}{p.id === ctx.me.id && <span className="text-muted-foreground"> (você)</span>}</span>
+            <span className="min-w-0 truncate font-semibold">{p.id === king && <span title="Rei da Noite" aria-label="Rei da Noite">👑 </span>}{p.nickname}{p.id === ctx.me.id && <span className="text-muted-foreground"> (você)</span>}</span>
             <span className="flex shrink-0 items-center gap-2 tabular-nums">
               {p.delta > 0 && <span className="points-badge rounded-md bg-success/15 px-1.5 text-sm font-bold text-success">+{p.delta}</span>}
               <span className="font-display text-xl">{p.score}</span>
