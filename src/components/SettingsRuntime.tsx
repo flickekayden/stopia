@@ -58,12 +58,12 @@ export function SettingsRuntime() {
     if (!isDev) return;
     let active = true;
     let running = false;
-    const check = async (forceRenew = false) => {
+    const check = async (matchAccount = false) => {
       if (running || document.hidden) return;
       running = true;
       try {
         const { ensureDevAccess } = await import("@/lib/dev-access");
-        const result = await ensureDevAccess({ forceRenew });
+        const result = await ensureDevAccess({ matchAccount });
         if (!active) return;
         if (result === "signed_out") toast.info("Modo desenvolvedor desligado: entre com a conta de administrador e toque 5 vezes no título para ligar de novo.");
         if (result === "not_admin") toast.info("Modo desenvolvedor desligado: a conta conectada não é administradora.");
