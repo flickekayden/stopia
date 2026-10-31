@@ -75,7 +75,7 @@ export function CreditBadge({ status, summary, freeCredits = 20, packCredits = 2
 }
 
 /** One-line host summary for the lobby: balance and how much this match may use. */
-export function HostCreditLine({ balance, estimate, billed }: { balance: number | null; estimate: number; billed: boolean }) {
+export function HostCreditLine({ balance, estimate, billed, stop }: { balance: number | null; estimate: number; billed: boolean; stop?: boolean }) {
   if (balance === null) return null;
   if (!billed) return <p className="text-center text-xs text-muted-foreground">Esta sala não tem saldo de IA vinculado: os jogos usam o conteúdo próprio, sem IA.</p>;
   const tone = balanceTone(balance);
@@ -83,7 +83,13 @@ export function HostCreditLine({ balance, estimate, billed }: { balance: number 
     <p className="credit-line flex flex-wrap items-center justify-center gap-x-2 text-center text-xs" data-tone={tone}>
       <span className="font-semibold tabular-nums">IA do mestre: {requestsLabel(balance)}</span>
       <span className="text-muted-foreground">· {estimate === 0 ? "este jogo não usa IA" : `esta partida usa até ${estimate}`}</span>
-      {balance < estimate && estimate > 0 && <span className="w-full text-muted-foreground">Quando o saldo acabar, as rodadas seguem sem IA.</span>}
+      {balance < estimate && estimate > 0 && (
+        <span className="w-full text-muted-foreground">
+          {stop
+            ? balance < 1 ? "O Stop precisa da IA para julgar: compre um pacote ou escolha outro jogo." : "O saldo pode acabar antes da última rodada do Stop."
+            : "Quando o saldo acabar, as rodadas seguem sem IA."}
+        </span>
+      )}
     </p>
   );
 }
