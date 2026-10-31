@@ -814,10 +814,13 @@ async function syncSubmitted(roomId: string) {
       db().from("party_submissions").select("player_id, payload").eq("room_id", room.id).eq("round_number", room.round_number).eq("phase", room.phase),
       loadPlayers(room.id),
     ]);
-    const present = new Set(players.map((p) => p.id));
+    // Players silent for minutes (closed tab, dead phone) no longer hold everyone else up;
+    // their answers still count if they come back before the step closes.
+    const present = new Set(activePlayers(players).map((p) => p.id));
     const eligibleNow = (state.eligible ?? []).filter((id) => present.has(id));
+    const current = roomSubs(room, state, subs ?? []);
     // Stop drafts are saved continuously: only "Terminei"/STOP counts as finished.
-    const finished = room.game === "stop" ? (subs ?? []).filter((s) => (s.payload as PartyMine | null)?.done === true) : (subs ?? []);
+    const finished = room.game === "stop" ? current.filter((s) => (s.payload as PartyMine | null)?.done === true) : current;
     const submitted = finished.map((s) => s.player_id).filter((id) => eligibleNow.includes(id));
     if (eligibleNow.every((id) => submitted.includes(id))) {
       // A concurrent submit may have bumped the version first; retry with fresh state instead of stalling.
@@ -842,9 +845,15 @@ export async function advancePartyPhase(input: { roomId: string; playerId: strin
 
 /* --------------------------------- Advance --------------------------------- */
 
+/** Roleta answers count only for the challenge on screen (see skipRoletaChallenge). */
+function roomSubs<T extends { payload: unknown }>(room: RoomRow, state: PartyPublicState, subs: T[], phase = room.phase) {
+  return room.game === "roleta" && phase === "respond" ? forChallenge(subs, roletaChallengeKey(state.skipsLeft)) : subs;
+}
+
 async function submissionsFor(room: RoomRow, phase: string) {
   const { data } = await db().from("party_submissions").select("player_id, payload, created_at").eq("room_id", room.id).eq("round_number", room.round_number).eq("phase", phase).order("created_at");
-  return (data ?? []) as unknown as { player_id: string; payload: PartyMine; created_at: string }[];
+  const subs = (data ?? []) as unknown as { player_id: string; payload: PartyMine; created_at: string }[];
+  return roomSubs(room, readPublicState(room.public_state), subs, phase);
 }
 
 function textEntries(subs: { player_id: string; payload: PartyMine }[], present: Set<string>): PartyEntry[] {
@@ -1320,9 +1329,14 @@ export async function stopPartyRound(input: { roomId: string; playerId: string; 
     if (state.stop.stopBy) return { ok: true };
     const answers = sanitizeStopAnswers(input.answers, state.stop.categories);
     if (!stopAnswersComplete(answers, state.stop.categories)) throw new Error("Preencha todas as categorias para gritar STOP!");
-    await db()
+    // The round is only locked once this player's answers are confirmed saved.
+    const { error: saveError } = await db()
       .from("party_submissions")
       .upsert({ room_id: room.id, round_number: room.round_number, phase: "write", player_id: player.id, payload: asJson({ answers, done: true }) }, { onConflict: "room_id,round_number,phase,player_id" });
+    if (saveError) {
+      console.error("stopPartyRound: answer save failed", saveError.code);
+      throw new Error("Não foi possível salvar suas respostas. Nada foi encerrado, tente o STOP de novo.");
+    }
     const lockAt = Date.now() + STOP_LOCK_MS;
     const endsAt = room.phase_ends_at ? Math.min(Date.parse(room.phase_ends_at), lockAt) : lockAt;
     const updated = await guardedUpdate(room, {
@@ -1412,7 +1426,8 @@ export async function getPartyPrivateView(input: { roomId: string; playerId: str
     readPrivate<RoundPrivate>(room.id, room.round_number),
     db().from("party_submissions").select("payload").eq("room_id", room.id).eq("round_number", room.round_number).eq("phase", room.phase).eq("player_id", player.id).maybeSingle(),
   ]);
-  const view: PartyPrivateViewData = { ...empty, mine: (mine?.payload ?? null) as PartyMine | null };
+  const myCurrent = mine ? roomSubs(room, readPublicState(room.public_state), [mine])[0] : undefined;
+  const view: PartyPrivateViewData = { ...empty, mine: (myCurrent?.payload ?? null) as PartyMine | null };
   const game = gameOf(room);
   if (game === "infiltrado" && room.phase !== "reveal") {
     if (!(roundPrivate.playerIds ?? []).includes(player.id)) view.role = "espectador";
