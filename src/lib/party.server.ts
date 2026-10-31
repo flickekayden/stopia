@@ -283,7 +283,16 @@ async function candidateCode() {
 const RATE_LIMITS = {
   create: { max: 15, windowMs: 60 * 60_000 },
   join_miss: { max: 20, windowMs: 10 * 60_000 },
+  preset_save: { max: 10, windowMs: 60 * 60_000 },
 } as const;
+
+/** Counts one event against a per-network limit; false (nothing recorded) when the limit is reached. */
+export async function consumeRateLimit(sessionId: string, kind: keyof typeof RATE_LIMITS) {
+  const key = await rateKey(sessionId);
+  if (await rateLimited(key, kind)) return false;
+  await recordRate(key, kind);
+  return true;
+}
 
 async function rateKey(sessionId: string) {
   let ip = "";

@@ -4,29 +4,6 @@ import { z } from "zod";
 const devToken = z.string().max(300).optional();
 const adminId = async (token?: string) => (await import("./dev-session.server")).adminUserId(token);
 
-export const listRooms = createServerFn({ method: "GET" }).handler(async () => {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const { data, error } = await supabaseAdmin
-    .from("rooms")
-    .select("id, code, status, current_round, total_rounds, created_at, players(count)")
-    .order("created_at", { ascending: false })
-    .limit(50);
-
-  if (error) throw new Error("Não foi possível carregar as salas");
-  return {
-    rooms: (data ?? []).map((room) => ({
-      id: room.id,
-      code: room.code,
-      status: room.status,
-      currentRound: room.current_round,
-      totalRounds: room.total_rounds,
-      createdAt: room.created_at,
-      playerCount: room.players[0]?.count ?? 0,
-    })),
-    developerUnlocked: await (await import("./dev-session.server")).developerIsUnlocked().catch(() => false),
-  };
-});
-
 /**
  * Developer mode without a shared password: the caller signs in with an account that holds the
  * "admin" role (checked on the server) and receives a short-lived token bound to that account.
@@ -48,37 +25,23 @@ export const unlockDeveloper = createServerFn({ method: "POST" })
     return { ok: true as const, token: dev.createDevToken(userId) };
   });
 
-export const deleteRoom = createServerFn({ method: "POST" })
-  .inputValidator((input: unknown) => z.object({ roomId: z.string().uuid(), token: devToken }).parse(input))
+const presetCategories = z.array(z.string().trim().min(1).max(160)).min(1).max(100);
+
+/** Saves a shared category list. Writes go only through here (validated, limited per network). */
+export const saveCategoryPreset = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) =>
+    z.object({ name: z.string().trim().min(1).max(40), categories: presetCategories, sessionId: z.string().uuid() }).parse(input),
+  )
   .handler(async ({ data }) => {
-    if (!(await adminId(data.token))) throw new Error("Acesso de administrador necessário");
-
+    const { consumeRateLimit } = await import("./party.server");
+    if (!(await consumeRateLimit(data.sessionId, "preset_save"))) return { ok: false as const, reason: "limit" as const };
+    const categories = [...new Map(data.categories.map((c) => [c.toLowerCase(), c] as const)).values()];
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: rounds, error: roundsReadError } = await supabaseAdmin
-      .from("rounds")
-      .select("id")
-      .eq("room_id", data.roomId);
-    if (roundsReadError) throw new Error("Não foi possível localizar os dados da sala");
-
-    const roundIds = (rounds ?? []).map((round) => round.id);
-    if (roundIds.length > 0) {
-      const { error } = await supabaseAdmin.from("answers").delete().in("round_id", roundIds);
-      if (error) throw new Error("Não foi possível apagar as respostas da sala");
-    }
-
-    const { error: chatError } = await supabaseAdmin.from("chat_messages").delete().eq("room_id", data.roomId);
-    if (chatError) throw new Error("Não foi possível apagar o chat da sala");
-
-    const { error: roundsError } = await supabaseAdmin.from("rounds").delete().eq("room_id", data.roomId);
-    if (roundsError) throw new Error("Não foi possível apagar as rodadas da sala");
-
-    const { error: playersError } = await supabaseAdmin.from("players").delete().eq("room_id", data.roomId);
-    if (playersError) throw new Error("Não foi possível apagar os jogadores da sala");
-
-    const { error: roomError } = await supabaseAdmin.from("rooms").delete().eq("id", data.roomId);
-    if (roomError) throw new Error("Não foi possível apagar a sala");
+    const { error } = await supabaseAdmin.from("category_presets").insert({ name: data.name, categories });
+    if (error) return { ok: false as const, reason: error.code === "23505" ? ("duplicate" as const) : ("error" as const) };
     return { ok: true as const };
   });
+
 export const deleteCategoryPreset = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => z.object({ presetId: z.string().uuid(), token: devToken }).parse(input))
   .handler(async ({ data }) => {
@@ -98,7 +61,7 @@ export const updateCategoryPreset = createServerFn({ method: "POST" })
     z
       .object({
         presetId: z.string().uuid(),
-        categories: z.array(z.string().trim().min(1).max(160)).min(1).max(100),
+        categories: presetCategories,
         token: devToken,
       })
       .parse(input),

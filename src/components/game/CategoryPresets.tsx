@@ -13,8 +13,10 @@ import { getDevToken } from "@/lib/dev-settings";
 import {
   deleteCategoryPreset,
   getDeveloperStatus,
+  saveCategoryPreset,
   updateCategoryPreset,
 } from "@/lib/room-admin.functions";
+import { getOrCreateSessionId } from "@/lib/session";
 
 type Preset = { id: string; name: string; categories: string[] };
 
@@ -39,6 +41,7 @@ export function CategoryPresets({
   const remove = useServerFn(deleteCategoryPreset);
   const devStatus = useServerFn(getDeveloperStatus);
   const updatePreset = useServerFn(updateCategoryPreset);
+  const createPreset = useServerFn(saveCategoryPreset);
 
   async function apply(preset: Preset) {
     setApplying(true);
@@ -56,7 +59,8 @@ export function CategoryPresets({
     const { data } = await supabase
       .from("category_presets")
       .select("id, name, categories")
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .limit(100);
     setPresets(data ?? []);
   }
 
@@ -72,9 +76,22 @@ export function CategoryPresets({
     const value = name.trim().slice(0, 40);
     if (!value) { toast.error("Dê um nome para a lista"); return; }
     setSaving(true);
-    const { error } = await supabase.from("category_presets").insert({ name: value, categories });
-    setSaving(false);
-    if (error) { toast.error("Não consegui salvar a lista"); return; }
+    let res: Awaited<ReturnType<typeof createPreset>> | null = null;
+    try {
+      res = await createPreset({ data: { name: value, categories, sessionId: getOrCreateSessionId() } });
+    } catch {
+      res = null;
+    } finally {
+      setSaving(false);
+    }
+    if (!res?.ok) {
+      toast.error(
+        res?.reason === "duplicate" ? "Já existe uma lista com esse nome."
+          : res?.reason === "limit" ? "Muitas listas salvas agora. Tente de novo mais tarde."
+            : "Não consegui salvar a lista",
+      );
+      return;
+    }
     setName("");
     toast.success("Lista salva para todos!");
     void load();

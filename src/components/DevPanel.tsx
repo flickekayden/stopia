@@ -1,6 +1,6 @@
 import { useRouterState } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { Activity, FlaskConical, Loader2, RefreshCw, RotateCcw, Save, Settings } from "lucide-react";
+import { Activity, FlaskConical, Loader2, RotateCcw, Save, Settings } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
@@ -25,13 +25,12 @@ import {
   setGlobalSettings,
   updateDevSettings,
   useDevGameContext,
-  useDevRound,
   useDevSettings,
   type DevGameContext,
   type DevSettings,
   type GeminiModel,
 } from "@/lib/dev-settings";
-import { evaluateRound, saveAiSettings, testJudgment } from "@/lib/game.functions";
+import { saveAiSettings, testJudgment } from "@/lib/game.functions";
 
 
 const SAMPLE_BUBBLES: Array<{ label: string; data: AnswerCardData }> = [
@@ -262,31 +261,13 @@ export function DevPanel() {
 }
 
 function AiTab({ s, patch }: { s: DevSettings; patch: (fn: (p: DevSettings) => DevSettings) => void }) {
-  const roundId = useDevRound();
-  const evaluate = useServerFn(evaluateRound);
   const test = useServerFn(testJudgment);
-  const [redoing, setRedoing] = useState(false);
   const [lastLatency, setLastLatency] = useState<string | null>(null);
   const [lab, setLab] = useState({ letter: "P", category: "Animal", response: "Pato Donald" });
   const [labBusy, setLabBusy] = useState(false);
   const [labResult, setLabResult] = useState<{ pontos: number; comentario: string; latencyMs: number; model: string } | null>(null);
   const ai = s.ai;
   const setAi = (v: Partial<DevSettings["ai"]>) => patch((p) => ({ ...p, ai: { ...p.ai, ...v } }));
-
-  const redo = async () => {
-    if (!roundId) return;
-    setRedoing(true);
-    try {
-      const r = await evaluate({ data: { roundId, dev: devAiOverrides(), force: true } });
-      setLastLatency(`Reavaliação: ${(r.latencyMs / 1000).toFixed(1)}s (${ai.model})`);
-      toast.success("Rodada reavaliada");
-    } catch (e) {
-      setLastLatency("Reavaliação falhou");
-      toast.error(e instanceof Error ? e.message : "Falha ao reavaliar");
-    } finally {
-      setRedoing(false);
-    }
-  };
 
   const runLab = async () => {
     setLabBusy(true);
@@ -365,13 +346,7 @@ function AiTab({ s, patch }: { s: DevSettings; patch: (fn: (p: DevSettings) => D
         )}
       </section>
 
-      <section className="space-y-2">
-        <Button variant="secondary" className="w-full" disabled={!roundId || redoing} onClick={() => void redo()}>
-          {redoing ? <Loader2 className="animate-spin" /> : <RefreshCw />} Refazer validação da rodada
-        </Button>
-        {!roundId && <p className="text-xs text-muted-foreground">Entre numa sala com rodada avaliada para usar.</p>}
-        {lastLatency && <p className="text-xs text-muted-foreground">⏱ {lastLatency}</p>}
-      </section>
+      {lastLatency && <p className="text-xs text-muted-foreground">⏱ {lastLatency}</p>}
     </div>
   );
 }

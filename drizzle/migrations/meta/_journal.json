@@ -71,6 +71,13 @@
       "when": 1793453994761,
       "tag": "0009_revoke_client_access_commercial",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1793462091891,
+      "tag": "0010_security_hardening_legacy_lock",
+      "breakpoints": true
     }
   ]
 }

@@ -1,9 +1,13 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
+import { partyPayloadSchema, stopAnswersSchema } from "./party-input";
+
 const session = { roomId: z.string().uuid(), playerId: z.string().uuid(), sessionId: z.string().uuid() };
 const gameId = z.enum(["tribunal", "autor", "infiltrado", "debate", "roleta"]);
 const server = () => import("./party.server");
+const payload = partyPayloadSchema;
+const stopAnswers = stopAnswersSchema;
 
 export const createPartyRoom = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) =>
@@ -68,7 +72,7 @@ export const skipRoletaChallenge = createServerFn({ method: "POST" })
 
 export const submitPartyAction = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) =>
-    z.object({ ...session, round: z.number().int().min(1), phase: z.string().max(20), payload: z.record(z.string(), z.unknown()) }).parse(input),
+    z.object({ ...session, round: z.number().int().min(1), phase: z.string().max(20), payload }).parse(input),
   )
   .handler(async ({ data }) => (await server()).submitPartyAction(data));
 
@@ -93,7 +97,7 @@ export const replayPartyGame = createServerFn({ method: "POST" })
   .handler(async ({ data }) => (await server()).replayPartyGame(data));
 
 export const stopPartyRound = createServerFn({ method: "POST" })
-  .inputValidator((input: unknown) => z.object({ ...session, round: z.number().int().min(1), answers: z.record(z.string(), z.string().max(400)) }).parse(input))
+  .inputValidator((input: unknown) => z.object({ ...session, round: z.number().int().min(1), answers: stopAnswers }).parse(input))
   .handler(async ({ data }) => (await server()).stopPartyRound(data));
 
 /** Per-game developer settings (timings, AI tone, chaos events); not secret, read by the admin panel. */
@@ -106,7 +110,7 @@ export const savePartyAdmin = createServerFn({ method: "POST" })
         token: z.string().max(200).optional(),
         game: gameId,
         config: z.object({
-          seconds: z.record(z.string(), z.number().int()).optional(),
+          seconds: z.record(z.string().max(40), z.number().int().min(0).max(3600)).refine((value) => Object.keys(value).length <= 20).optional(),
           tone: z.enum(["padrao", "leve", "acido", "teatral"]).optional(),
           events: z.boolean().optional(),
         }),
