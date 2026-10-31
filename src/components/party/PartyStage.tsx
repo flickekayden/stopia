@@ -139,7 +139,12 @@ function TrainingBots({ players, actions, busy }: { players: PartyPlayer[]; acti
 
 function PlayersPanel({ players, me, actions, busy }: { players: PartyPlayer[]; me: PartyPlayer; actions: PartyActions; busy: boolean }) {
   const king = nightLeaderId(players);
-  const now = useNow(30_000);
+  // A slow clock so "Ausente" labels appear without new data.
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(Date.now()), 30_000);
+    return () => window.clearInterval(id);
+  }, []);
   const anyNight = players.some((p) => p.score > 0);
   return (
     <section className="party-panel" aria-labelledby="lobby-players">
