@@ -1,11 +1,12 @@
 import { useRouterState } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { FlaskConical, Loader2, RefreshCw, RotateCcw, Save, Settings } from "lucide-react";
+import { Activity, FlaskConical, Loader2, RefreshCw, RotateCcw, Save, Settings } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { AnswerCard, type AnswerCardData } from "@/components/game/AnswerCard";
 import { PartyAdminPanel } from "@/components/party/PartyAdminPanel";
+import { DevRoomControls } from "@/components/party/DevRoomControls";
 import { PartyRoomsAdmin } from "@/components/party/PartyRoomsAdmin";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,12 +32,6 @@ import {
 } from "@/lib/dev-settings";
 import { evaluateRound, saveAiSettings, testJudgment } from "@/lib/game.functions";
 
-const COLOR_VARS = [
-  ["primary", "Primária", "--primary"],
-  ["secondary", "Secundária", "--secondary"],
-  ["background", "Fundo", "--background"],
-  ["foreground", "Texto", "--foreground"],
-] as const;
 
 const SAMPLE_BUBBLES: Array<{ label: string; data: AnswerCardData }> = [
   { label: "20 pts (criativa)", data: sample(20, "Ornitorrinco", "Até que enfim usou o cérebro.") },
@@ -105,37 +100,17 @@ export function DevPanel() {
               {context === "global" ? "Ajustes gerais do app. As regras de cada jogo aparecem dentro do próprio jogo." : `Só ajustes de ${CONTEXT_LABELS[context]}.`}
             </SheetDescription>
           </SheetHeader>
+          {context !== "global" && (
+            <div className="px-4 pt-3">
+              <DevRoomControls />
+            </div>
+          )}
           {context !== "global" && context !== "stop" ? (
             <PartyAdminPanel key={context} game={context} />
-          ) : (
-          <>
-          {context === "global" ? (
+          ) : context === "global" ? (
             <div className="space-y-5 px-4 pb-6 pt-3">
-              <section className="space-y-2">
-                <Label>Cores</Label>
-                <div className="grid grid-cols-2 gap-2">
-                  {COLOR_VARS.map(([key, label]) => (
-                    <label key={key} className="flex items-center gap-2 rounded-xl border border-border p-2 text-sm">
-                      <input
-                        type="color"
-                        value={s.colors[key] || "#888888"}
-                        onChange={(e) => patch((p) => ({ ...p, colors: { ...p.colors, [key]: e.target.value } }))}
-                        className="size-8 cursor-pointer rounded bg-transparent"
-                      />
-                      <span className="flex-1">{label}</span>
-                      {s.colors[key] && (
-                        <button
-                          type="button"
-                          className="text-xs text-muted-foreground underline"
-                          onClick={() => patch((p) => ({ ...p, colors: { ...p.colors, [key]: "" } }))}
-                        >
-                          limpar
-                        </button>
-                      )}
-                    </label>
-                  ))}
-                </div>
-              </section>
+              <DevRoomControls />
+              <AiHealth />
               <PartyRoomsAdmin />
             </div>
           ) : (
