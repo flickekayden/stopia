@@ -510,7 +510,7 @@ export function PartyLobby({ ctx, actions }: { ctx: LobbyCtx; actions: PartyActi
       <div data-game={selected ?? undefined} className="mobile-bottom-bar fixed inset-x-0 bottom-0 mx-auto w-full max-w-md border-t border-border bg-background/95 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
         {ctx.isHost ? (
           <div className="space-y-2">
-            {selected && missing > 0 && <p role="status" className="text-center text-sm text-muted-foreground">Necessário mínimo de {meta!.minPlayers} jogadores. Compartilhe o código!</p>}
+            {selected && missing > 0 && <p role="status" className="text-center text-sm text-muted-foreground">Necessário mínimo de {meta!.minPlayers} jogadores conectados{connected < ctx.players.length ? ` (${ctx.players.length - connected} ausente${ctx.players.length - connected > 1 ? "s" : ""})` : ""}. Compartilhe o código!</p>}
             <Button className="party-accent-button h-14 w-full text-lg font-bold shadow-none" disabled={!selected || missing > 0 || ctx.busy !== null} aria-busy={ctx.busy === "start"} onClick={() => void actions.start()}>
               {ctx.busy === "start" ? <><Loader2 className="animate-spin" /> Preparando…</> : !selected ? "Escolha um jogo" : `Iniciar ${meta!.name}`}
             </Button>
