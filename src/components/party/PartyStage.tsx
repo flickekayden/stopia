@@ -13,7 +13,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import type { PartyPlayer, PartyPrivateView, PartyRoom } from "@/hooks/use-party-room";
 import { activePlayers, isActivePlayer } from "@/lib/party-presence";
-import { nightKingId, rankPlayers } from "@/lib/ranking";
+import { nightKingId, pointsBehind, rankPlayers } from "@/lib/ranking";
 import { useDevSettings } from "@/lib/dev-settings";
 import { MAX_BOTS } from "@/lib/party-bots";
 import {
