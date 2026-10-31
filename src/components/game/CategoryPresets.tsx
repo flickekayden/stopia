@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { BUILTIN_CATEGORY_PRESETS, mergeCategories } from "@/lib/category-presets";
 import { DEFAULT_CATEGORIES } from "@/lib/game";
 import { supabase } from "@/integrations/supabase/client";
+import { getDevToken } from "@/lib/dev-settings";
 import {
   deleteCategoryPreset,
   getDeveloperStatus,
@@ -34,8 +35,6 @@ export function CategoryPresets({
   const [merging, setMerging] = useState(false);
   const [applying, setApplying] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Preset | null>(null);
-  const [deletePassword, setDeletePassword] = useState("");
-  const [needsPassword, setNeedsPassword] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const remove = useServerFn(deleteCategoryPreset);
   const devStatus = useServerFn(getDeveloperStatus);
@@ -63,7 +62,7 @@ export function CategoryPresets({
 
   useEffect(() => {
     void load();
-    devStatus()
+    devStatus({ data: { token: getDevToken() } })
       .then((r) => setIsDev(r.unlocked))
       .catch(() => setIsDev(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -84,14 +83,12 @@ export function CategoryPresets({
   async function del(p: Preset) {
     setDeleting(true);
     try {
-      const res = await remove({ data: { presetId: p.id, ...(needsPassword ? { password: deletePassword } : {}) } });
-      if (res.needsPassword) {
-        if (needsPassword) toast.error("Senha incorreta");
-        setNeedsPassword(true);
+      const res = await remove({ data: { presetId: p.id, token: getDevToken() } });
+      if (!res.ok) {
+        toast.error("Só administradores podem apagar listas salvas.");
         return;
       }
-      if (needsPassword) setIsDev(true);
-      setDeleteTarget(null); setDeletePassword(""); setNeedsPassword(false);
+      setDeleteTarget(null);
       toast.success("Lista apagada");
       void load();
     } catch {
@@ -121,7 +118,7 @@ export function CategoryPresets({
     const list = draft.map((c) => c.trim()).filter(Boolean);
     if (list.length === 0) { toast.error("Precisa de pelo menos uma categoria"); return; }
     try {
-      await updatePreset({ data: { presetId: editingId, categories: list } });
+      await updatePreset({ data: { presetId: editingId, categories: list, token: getDevToken() } });
       toast.success("Lista atualizada");
       setEditingId(null);
       void load();
@@ -191,7 +188,7 @@ export function CategoryPresets({
                   variant="ghost"
                   size="icon"
                   className="size-12 shrink-0 rounded-2xl text-destructive"
-                  onClick={() => { setDeleteTarget(p); setNeedsPassword(false); setDeletePassword(""); }}
+                  onClick={() => setDeleteTarget(p)}
                   aria-label={`Apagar lista ${p.name}`}
                   title="Apagar lista"
                 >
@@ -251,10 +248,9 @@ export function CategoryPresets({
         </ul>
       )}
     </section>
-    <Dialog open={deleteTarget !== null} onOpenChange={(open) => { if (!open) { setDeleteTarget(null); setDeletePassword(""); } }}>
+    <Dialog open={deleteTarget !== null} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
       <DialogContent><DialogHeader><DialogTitle>Apagar lista {deleteTarget?.name}?</DialogTitle><DialogDescription>A lista salva será removida para todos.</DialogDescription></DialogHeader>
-        {needsPassword && <Input type="password" aria-label="Senha de desenvolvedor" placeholder="Senha de desenvolvedor" value={deletePassword} onChange={(event) => setDeletePassword(event.target.value)} />}
-        <DialogFooter><Button variant="secondary" disabled={deleting} onClick={() => setDeleteTarget(null)}>Cancelar</Button><Button variant="destructive" disabled={deleting || (needsPassword && !deletePassword)} onClick={() => { if (deleteTarget) void del(deleteTarget); }}>{deleting ? "Apagando..." : "Apagar lista"}</Button></DialogFooter>
+        <DialogFooter><Button variant="secondary" disabled={deleting} onClick={() => setDeleteTarget(null)}>Cancelar</Button><Button variant="destructive" disabled={deleting} onClick={() => { if (deleteTarget) void del(deleteTarget); }}>{deleting ? "Apagando..." : "Apagar lista"}</Button></DialogFooter>
       </DialogContent>
     </Dialog>
     </div>
