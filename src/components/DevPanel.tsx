@@ -1,6 +1,6 @@
 import { useRouterState } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { Activity, FlaskConical, Loader2, RefreshCw, RotateCcw, Save, Settings } from "lucide-react";
+import { Activity, FlaskConical, Loader2, RotateCcw, Save, Settings } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
