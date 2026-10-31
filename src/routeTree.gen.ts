@@ -10,8 +10,10 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ComprarRouteImport } from './routes/comprar'
 import { Route as EntrarRouteImport } from './routes/entrar'
 import { Route as JogosRouteImport } from './routes/jogos'
+import { Route as PerfilRouteImport } from './routes/perfil'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as StopRouteImport } from './routes/stop'
 import { Route as FestaCodeRouteImport } from './routes/festa.$code'
@@ -22,6 +24,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ComprarRoute = ComprarRouteImport.update({
+  id: '/comprar',
+  path: '/comprar',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const EntrarRoute = EntrarRouteImport.update({
   id: '/entrar',
   path: '/entrar',
@@ -30,6 +37,11 @@ const EntrarRoute = EntrarRouteImport.update({
 const JogosRoute = JogosRouteImport.update({
   id: '/jogos',
   path: '/jogos',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PerfilRoute = PerfilRouteImport.update({
+  id: '/perfil',
+  path: '/perfil',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
@@ -55,8 +67,10 @@ const SalaCodeRoute = SalaCodeRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/comprar': typeof ComprarRoute
   '/entrar': typeof EntrarRoute
   '/jogos': typeof JogosRoute
+  '/perfil': typeof PerfilRoute
   '/reset-password': typeof ResetPasswordRoute
   '/stop': typeof StopRoute
   '/festa/$code': typeof FestaCodeRoute
@@ -64,8 +78,10 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/comprar': typeof ComprarRoute
   '/entrar': typeof EntrarRoute
   '/jogos': typeof JogosRoute
+  '/perfil': typeof PerfilRoute
   '/reset-password': typeof ResetPasswordRoute
   '/stop': typeof StopRoute
   '/festa/$code': typeof FestaCodeRoute
@@ -74,8 +90,10 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/comprar': typeof ComprarRoute
   '/entrar': typeof EntrarRoute
   '/jogos': typeof JogosRoute
+  '/perfil': typeof PerfilRoute
   '/reset-password': typeof ResetPasswordRoute
   '/stop': typeof StopRoute
   '/festa/$code': typeof FestaCodeRoute
@@ -85,8 +103,10 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/comprar'
     | '/entrar'
     | '/jogos'
+    | '/perfil'
     | '/reset-password'
     | '/stop'
     | '/festa/$code'
@@ -94,8 +114,10 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/comprar'
     | '/entrar'
     | '/jogos'
+    | '/perfil'
     | '/reset-password'
     | '/stop'
     | '/festa/$code'
@@ -103,8 +125,10 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/comprar'
     | '/entrar'
     | '/jogos'
+    | '/perfil'
     | '/reset-password'
     | '/stop'
     | '/festa/$code'
@@ -113,8 +137,10 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ComprarRoute: typeof ComprarRoute
   EntrarRoute: typeof EntrarRoute
   JogosRoute: typeof JogosRoute
+  PerfilRoute: typeof PerfilRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   StopRoute: typeof StopRoute
   FestaCodeRoute: typeof FestaCodeRoute
@@ -130,6 +156,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/comprar': {
+      id: '/comprar'
+      path: '/comprar'
+      fullPath: '/comprar'
+      preLoaderRoute: typeof ComprarRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/entrar': {
       id: '/entrar'
       path: '/entrar'
@@ -142,6 +175,13 @@ declare module '@tanstack/react-router' {
       path: '/jogos'
       fullPath: '/jogos'
       preLoaderRoute: typeof JogosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/perfil': {
+      id: '/perfil'
+      path: '/perfil'
+      fullPath: '/perfil'
+      preLoaderRoute: typeof PerfilRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/reset-password': {
@@ -177,8 +217,10 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ComprarRoute: ComprarRoute,
   EntrarRoute: EntrarRoute,
   JogosRoute: JogosRoute,
+  PerfilRoute: PerfilRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   StopRoute: StopRoute,
   FestaCodeRoute: FestaCodeRoute,
