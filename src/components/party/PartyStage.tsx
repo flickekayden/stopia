@@ -129,7 +129,7 @@ function TrainingBots({ players, actions, busy }: { players: PartyPlayer[]; acti
   const bots = players.filter((p) => p.is_bot).length;
   return (
     <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border/60 pt-3">
-      <p className="min-w-0 flex-1 text-xs font-semibold text-muted-foreground">🤖 Treino com robôs · {bots}/{MAX_BOTS}</p>
+      <p className="w-full text-xs font-semibold text-muted-foreground">🤖 Treino com robôs (só desenvolvedor) · {bots}/{MAX_BOTS}</p>
       <Button variant="secondary" size="sm" disabled={busy || bots >= MAX_BOTS} onClick={() => void actions.devBots("addBot")}><Bot /> Adicionar robô</Button>
       {bots > 0 && <Button variant="ghost" size="sm" disabled={busy} onClick={() => void actions.devBots("removeBots")}>Remover robôs</Button>}
     </div>
