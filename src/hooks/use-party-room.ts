@@ -124,7 +124,8 @@ export function usePartyRoom(code: string, identity: { playerId: string; session
     };
   }, [roomId, refresh]);
 
-  const privateKey = room ? `${room.id}:${room.round_number}:${room.phase}:${room.status}` : null;
+  // phase_started_at also changes when Roleta swaps the challenge within the same phase.
+  const privateKey = room ? `${room.id}:${room.round_number}:${room.phase}:${room.status}:${room.phase_started_at ?? ""}` : null;
   const playerId = identity?.playerId;
   const sessionId = identity?.sessionId;
   const isMember = Boolean(playerId && players.some((p) => p.id === playerId));
