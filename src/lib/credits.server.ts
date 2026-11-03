@@ -7,6 +7,7 @@ import { createHash } from "node:crypto";
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { readBillingConfig, type BillingConfig, type CreditCredentials, type WalletSummary } from "./billing";
+import { abuseKindForBonus, noteCreditAbuse } from "./credit-monitor";
 import { bonusAllowedNow, walletMayPayAi, type BonusStatus } from "./signup-bonus";
 
 const db = () => supabaseAdmin;
@@ -87,18 +88,28 @@ async function applySignupBonus(userId: string, wallet: WalletRow): Promise<Bonu
     if (!bonusAllowedNow(count ?? 0)) {
       // Only postpone accounts that could still receive it.
       const { data: marker } = await db().from("credit_ledger").select("id").eq("kind", "free_grant").eq("reference", `free:user:${userId}`).maybeSingle();
-      return marker ? "identity_used" : "deferred";
+      const status: BonusStatus = marker ? "identity_used" : "deferred";
+      await monitor(status, userId, "rate_limit", `rede:${count ?? 0}`);
+      return status;
     }
   }
   const config = await loadBillingConfig();
   const { data, error } = await db().rpc("credit_grant_signup", { p_user: userId, p_amount: config.freeCredits });
   if (error) {
     console.error("credit_grant_signup failed", error.code);
+    await monitor("deferred", userId, "error", error.code || "desconhecido");
     return "deferred";
   }
   const status = String(data) as BonusStatus | "no_user";
   if (status === "granted" && key) await db().from("party_rate_events").insert({ key_hash: key, kind: "signup_bonus" });
+  if (status === "identity_used") await monitor(status, userId);
   return status === "no_user" ? "no_identity" : status;
+}
+
+/** Records abuse signals for admins; best effort, never blocks or fails the bonus flow. */
+async function monitor(status: BonusStatus, userId: string, reason: "rate_limit" | "error" | null = null, detail?: string) {
+  const kind = abuseKindForBonus(status, reason);
+  if (kind) await noteCreditAbuse(db(), kind, userId, detail);
 }
 
 async function accountWallet(userId: string): Promise<{ wallet: WalletRow; bonus: BonusStatus }> {
