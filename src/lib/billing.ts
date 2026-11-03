@@ -161,6 +161,8 @@ export type WalletSummary = {
   consumedTotal: number;
   packsBought: number;
   kind: "guest" | "account";
+  /** Accounts only: state of the one-time signup bonus. */
+  bonus?: import("./signup-bonus").BonusStatus | null;
 };
 
 export type CreditCredentials = { accessToken?: string | undefined; guestToken?: string | undefined };
