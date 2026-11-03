@@ -8,14 +8,14 @@ import { CreditBadge } from "@/components/credits/CreditBadge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { useMyCredits } from "@/hooks/use-credits";
-import { creditCredentials, setGuestToken } from "@/lib/account-client";
+import { creditCredentials } from "@/lib/account-client";
 import { cancelPackPurchase, getBillingInfo, startPackPurchase, verifyPackPurchase } from "@/lib/account.functions";
 import { playBillingAvailable, playPrice, purchaseWithPlay } from "@/lib/play-billing";
 
 export const Route = createFileRoute("/comprar")({
   head: () => ({
     meta: [
-      { title: "Comprar solicitações de IA — Stopia" },
+      { title: "Comprar créditos de IA — Stopia" },
       { name: "description", content: "Libere mais solicitações de IA para as salas que você cria no Stopia. Pagamento único, sem assinatura e sem cobrança automática." },
       { property: "og:title", content: "Continue jogando Stopia com IA" },
       { property: "og:description", content: "Pacotes de solicitações de IA com pagamento único, sem assinatura." },
@@ -83,7 +83,6 @@ function BuyPage() {
     try {
       const started = await start({ data: await creditCredentials() });
       transactionId = started.transactionId;
-      if (started.newGuestToken) setGuestToken(started.newGuestToken);
       const outcome = await purchaseWithPlay(started.productId);
       if (outcome.kind === "canceled") {
         await cancel({ data: { ...(await creditCredentials()), transactionId } }).catch(() => undefined);
@@ -166,7 +165,7 @@ function BuyPage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Confirmar compra</AlertDialogTitle>
-            <AlertDialogDescription>{pack} solicitações de IA por {price}, pagamento único pela Google Play. Sem assinatura e sem cobrança automática.</AlertDialogDescription>
+            <AlertDialogDescription>{pack} créditos de IA por {price}, pagamento único pela Google Play. Sem assinatura e sem cobrança automática.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Agora não</AlertDialogCancel>
