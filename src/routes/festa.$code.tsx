@@ -39,7 +39,9 @@ import {
   updatePartySettings,
   touchPartyPresence,
   getRoomCredits,
+  linkRoomCredits,
 } from "@/lib/party.functions";
+import { getAccessToken, onAccountChange, wireAuthEvents } from "@/lib/account-client";
 import { HEARTBEAT_MS } from "@/lib/party-presence";
 import { isPartyGame, lobbyGameMeta, readPartySettings, readPublicState, readRoomGame } from "@/lib/party-games";
 import { getLastNickname, getOrCreateSessionId, getPlayer, removePlayer, savePlayer } from "@/lib/session";
@@ -109,6 +111,7 @@ function PartyRoomPage() {
   const devFn = useServerFn(devRoomAction);
   const touchFn = useServerFn(touchPartyPresence);
   const creditsFn = useServerFn(getRoomCredits);
+  const linkFn = useServerFn(linkRoomCredits);
   const [hostCredits, setHostCredits] = useState<{ balance: number; billed: boolean } | null>(null);
 
   useEffect(() => {
@@ -228,17 +231,32 @@ function PartyRoomPage() {
     return () => window.clearInterval(id);
   }, [hasBots, isHost, playing, roomId, identity, tickFn, refresh]);
 
-  // Host: the room creator's AI balance, refreshed whenever the room returns to the lobby or a match ends.
+  // Host: the room creator's AI balance, refreshed whenever the room returns to the lobby, a match ends
+  // or the account changes. A host who signed in after creating the room links their account here.
   const roomStatus = room?.status;
   const roomGame = room?.game;
+  const [accountVersion, setAccountVersion] = useState(0);
+  useEffect(() => {
+    void wireAuthEvents();
+    return onAccountChange(() => setAccountVersion((v) => v + 1));
+  }, []);
   useEffect(() => {
     if (!isHost || !roomId || !identity || roomStatus === "playing") return;
     let alive = true;
-    creditsFn({ data: { roomId, ...identity } })
-      .then((res) => { if (alive) setHostCredits(res); })
-      .catch(() => { if (alive) setHostCredits(null); });
+    void (async () => {
+      try {
+        let res = await creditsFn({ data: { roomId, ...identity } });
+        if (!res.billed) {
+          const accessToken = await getAccessToken().catch(() => undefined);
+          if (accessToken) res = await linkFn({ data: { roomId, ...identity, accessToken } });
+        }
+        if (alive) setHostCredits(res);
+      } catch {
+        if (alive) setHostCredits(null);
+      }
+    })();
     return () => { alive = false; };
-  }, [isHost, roomId, identity, roomStatus, roomGame, creditsFn]);
+  }, [isHost, roomId, identity, roomStatus, roomGame, creditsFn, linkFn, accountVersion]);
 
   // The developer panel's room controls work on the room on screen.
   useEffect(() => {
