@@ -9,15 +9,19 @@ import { currentUser, markTermsAccepted, supabaseClient } from "@/lib/account-cl
 import { safeReturnPath } from "@/lib/signup-bonus";
 
 type Mode = "entrar" | "criar" | "esqueci";
-type AuthSearch = { modo?: "entrar" | "criar"; voltar?: string };
+type AuthSearch = { modo?: "entrar" | "criar" | undefined; voltar?: string | undefined };
 
 const RETURN_KEY = "stopia-auth-return";
 
 export const Route = createFileRoute("/entrar")({
-  validateSearch: (search: Record<string, unknown>): AuthSearch => ({
-    modo: search.modo === "criar" ? "criar" : search.modo === "entrar" ? "entrar" : undefined,
-    voltar: typeof search.voltar === "string" ? safeReturnPath(search.voltar, "") || undefined : undefined,
-  }),
+  validateSearch: (search: Record<string, unknown>): AuthSearch => {
+    const modo = search["modo"];
+    const voltar = search["voltar"];
+    return {
+      modo: modo === "criar" ? "criar" : modo === "entrar" ? "entrar" : undefined,
+      voltar: typeof voltar === "string" ? safeReturnPath(voltar, "") || undefined : undefined,
+    };
+  },
   head: () => ({
     meta: [
       { title: "Entrar ou criar conta — Stopia" },

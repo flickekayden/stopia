@@ -238,7 +238,8 @@ function PartyRoomPage() {
   const [accountVersion, setAccountVersion] = useState(0);
   useEffect(() => {
     void wireAuthEvents();
-    return onAccountChange(() => setAccountVersion((v) => v + 1));
+    const off = onAccountChange(() => setAccountVersion((v) => v + 1));
+    return () => { off(); };
   }, []);
   useEffect(() => {
     if (!isHost || !roomId || !identity || roomStatus === "playing") return;
