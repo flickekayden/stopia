@@ -108,7 +108,7 @@ function BuyPage() {
         <Button asChild variant="ghost" className="-ml-2 h-11 px-2"><Link to="/perfil"><ArrowLeft /> Voltar sem comprar</Link></Button>
         <h1 className="font-display text-4xl leading-none text-primary">Continue jogando Stopia</h1>
         <p className="text-sm text-muted-foreground">
-          {credits.summary && credits.summary.balance === 0 ? "Suas solicitações de IA acabaram." : "Mais IA nas salas que você cria."} Só o mestre da sala gasta solicitações; quem entra na sala joga de graça.
+          {credits.summary && credits.summary.balance === 0 ? "Seus créditos de IA acabaram." : "Mais IA nas salas que você cria."} Só o mestre da sala gasta créditos; quem entra na sala joga de graça.
         </p>
       </header>
 
@@ -135,6 +135,14 @@ function BuyPage() {
             {busy ? <Loader2 className="animate-spin" /> : null} Liberar {pack} créditos de IA
           </Button>
         ) : (
+          <div className="space-y-2 rounded-xl border border-border p-3 text-left text-sm">
+            <p className="flex items-center gap-2 font-semibold"><Smartphone className="size-4" aria-hidden="true" /> Compras só no app para Android</p>
+            <p className="text-muted-foreground">Pelo navegador não é possível comprar. Instale o Stopia pela Google Play e compre por lá; entrando com a mesma conta, o saldo aparece aqui também.</p>
+          </div>
+        )}
+        {!guest && inApp && billing && !billing.storeReady && <p className="text-xs text-muted-foreground">As compras ainda estão sendo ativadas. Tente mais tarde.</p>}
+      </section>
+
 
       {phase.kind !== "idle" && (
         <section className="party-panel space-y-3" role="status" aria-live="polite">
