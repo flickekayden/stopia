@@ -262,6 +262,36 @@ export type Database = {
         }
         Relationships: []
       }
+      credit_abuse_events: {
+        Row: {
+          attempts: number
+          day: string
+          detail: string
+          first_at: string
+          kind: string
+          last_at: string
+          user_id: string
+        }
+        Insert: {
+          attempts?: number
+          day?: string
+          detail?: string
+          first_at?: string
+          kind: string
+          last_at?: string
+          user_id: string
+        }
+        Update: {
+          attempts?: number
+          day?: string
+          detail?: string
+          first_at?: string
+          kind?: string
+          last_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       credit_ledger: {
         Row: {
           actor_user_id: string | null
@@ -995,6 +1025,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      credit_abuse_note: {
+        Args: { p_detail: string; p_kind: string; p_user: string }
+        Returns: number
+      }
       credit_apply: {
         Args: {
           p_actor: string

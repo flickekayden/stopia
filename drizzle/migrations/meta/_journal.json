@@ -85,6 +85,13 @@
       "when": 1793726704275,
       "tag": "0011_signup_bonus_accounts_only",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1793731111057,
+      "tag": "0012_credit_abuse_monitoring",
+      "breakpoints": true
     }
   ]
 }
