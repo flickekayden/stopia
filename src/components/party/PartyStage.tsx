@@ -46,6 +46,7 @@ import { cn } from "@/lib/utils";
 import { localShareImageFor } from "@/lib/share-images";
 import { aiRequestEstimate } from "@/lib/billing";
 import { HostCreditLine } from "@/components/credits/CreditBadge";
+import { AiAccountDialog } from "@/components/credits/AiAccountDialog";
 
 export type PartyCtx = {
   room: PartyRoom;
@@ -512,6 +513,7 @@ export function PartyLobby({ ctx, actions }: { ctx: LobbyCtx; actions: PartyActi
   const connected = activePlayers(ctx.players).length;
   const missing = selected ? missingPlayers(selected, connected) : 0;
   const [rulesFor, setRulesFor] = useState<LobbyGameId | null>(null);
+  const [unlockOpen, setUnlockOpen] = useState(false);
   // Host: the game picker, or the chosen game's setup screen (settings first, room info below).
   const [picking, setPicking] = useState(false);
   const showSetup = Boolean(selected) && !(ctx.isHost && picking);
@@ -567,15 +569,21 @@ export function PartyLobby({ ctx, actions }: { ctx: LobbyCtx; actions: PartyActi
 
       <GameRulesDialog game={rulesFor} onClose={() => setRulesFor(null)} />
 
+      <AiAccountDialog open={unlockOpen} onOpenChange={setUnlockOpen} returnTo={`/festa/${ctx.room.code}`} />
+
       <div data-game={selected ?? undefined} className="mobile-bottom-bar fixed inset-x-0 bottom-0 mx-auto w-full max-w-md border-t border-border bg-background/95 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
         {ctx.isHost ? (
           <div className="space-y-2">
             {selected && ctx.credits && (
-              <HostCreditLine balance={ctx.credits.balance} billed={ctx.credits.billed} stop={selected === "stop"} estimate={aiRequestEstimate(selected, ctx.settings, connected)} />
+              <HostCreditLine balance={ctx.credits.balance} billed={ctx.credits.billed} stop={selected === "stop"} estimate={aiRequestEstimate(selected, ctx.settings, connected)} onUnlock={() => setUnlockOpen(true)} />
             )}
             {selected && missing === 0 && <p role="status" className="flex items-center justify-center gap-1.5 text-center text-sm font-semibold text-success"><Check className="size-4" aria-hidden="true" /> Tudo pronto: {connected} jogadores conectados</p>}
             {selected && missing > 0 && <p role="status" className="text-center text-sm text-muted-foreground">Necessário mínimo de {meta!.minPlayers} jogadores conectados{connected < ctx.players.length ? ` (${ctx.players.length - connected} ausente${ctx.players.length - connected > 1 ? "s" : ""})` : ""}. Compartilhe o código!</p>}
-            <Button className="party-accent-button h-14 w-full text-lg font-bold shadow-none" disabled={!selected || missing > 0 || ctx.busy !== null} aria-busy={ctx.busy === "start"} onClick={() => void actions.start()}>
+            <Button className="party-accent-button h-14 w-full text-lg font-bold shadow-none" disabled={!selected || missing > 0 || ctx.busy !== null} aria-busy={ctx.busy === "start"} onClick={() => {
+              // Stop is judged by the AI: a host without an account is invited to sign in first.
+              if (selected === "stop" && ctx.credits && !ctx.credits.billed) { setUnlockOpen(true); return; }
+              void actions.start();
+            }}>
               {ctx.busy === "start" ? <><Loader2 className="animate-spin" /> Preparando…</> : !selected ? "Escolha um jogo" : `Iniciar ${meta!.name}`}
             </Button>
           </div>
