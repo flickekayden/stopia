@@ -1910,6 +1910,15 @@ export async function getRoomCredits(input: { roomId: string; playerId: string; 
   return roomBalance(input.roomId);
 }
 
+/** A host who created the room as a guest and then signed in: the account's credits now pay this room. */
+export async function linkRoomCredits(input: { roomId: string; playerId: string; sessionId: string; accessToken: string }) {
+  await requireHost(input.roomId, input.playerId, input.sessionId);
+  const credits = await import("./credits.server");
+  const userId = await credits.userIdFromToken(input.accessToken);
+  if (!userId) throw new Error("Entre na sua conta de novo para usar a IA.");
+  return credits.linkRoomToAccount(input.roomId, userId);
+}
+
 const REPORT_REASONS = ["ofensa", "assedio", "spam", "conteudo_improprio", "outro"] as const;
 
 /** A player reports a chat message or another player; the report goes to the admin queue. */
