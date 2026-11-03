@@ -340,8 +340,8 @@ describe.skipIf(!enabled)("signup bonus antifraud on real PostgreSQL", () => {
     const u = await createUser(email("g2"));
     for (const t of tables) {
       for (const role of ["anon", "authenticated"] as const) {
-        expect(await denied(role, `SELECT 1 FROM public.${t} LIMIT 1`, u)).toBe("denied");
-        expect(await denied(role, `DELETE FROM public.${t}`, u)).toBe("denied");
+        expect(`${t}/${role}/select:${await denied(role, `SELECT 1 FROM public.${t} LIMIT 1`, u)}`).toBe(`${t}/${role}/select:denied`);
+        expect(`${t}/${role}/delete:${await denied(role, `DELETE FROM public.${t}`, u)}`).toBe(`${t}/${role}/delete:denied`);
       }
     }
     expect(await denied("authenticated", `INSERT INTO public.credit_wallets (user_id, balance) VALUES ('${u}', 999)`, u)).toBe("denied");

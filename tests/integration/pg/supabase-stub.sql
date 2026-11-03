@@ -32,3 +32,18 @@ CREATE TABLE public.party_rooms (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), 
 CREATE TABLE public.app_settings (key text PRIMARY KEY, value jsonb);
 ALTER TABLE public.party_rooms ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.app_settings ENABLE ROW LEVEL SECURITY;
+
+-- Other pre-existing tables touched by the security-hardening migration (0010), reduced to the columns it uses.
+ALTER TABLE public.party_rooms ADD COLUMN created_at timestamptz NOT NULL DEFAULT now();
+CREATE TABLE public.rooms (id uuid PRIMARY KEY DEFAULT gen_random_uuid());
+CREATE TABLE public.players (id uuid PRIMARY KEY DEFAULT gen_random_uuid());
+CREATE TABLE public.rounds (id uuid PRIMARY KEY DEFAULT gen_random_uuid());
+CREATE TABLE public.answers (id uuid PRIMARY KEY DEFAULT gen_random_uuid());
+CREATE TABLE public.chat_messages (id uuid PRIMARY KEY DEFAULT gen_random_uuid());
+CREATE TABLE public.room_voice_notes (id uuid PRIMARY KEY DEFAULT gen_random_uuid());
+CREATE TABLE public.category_presets (id uuid PRIMARY KEY DEFAULT gen_random_uuid());
+CREATE TABLE public.party_players (id uuid PRIMARY KEY DEFAULT gen_random_uuid());
+CREATE TABLE public.party_chat (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), player_id uuid);
+CREATE TABLE public.party_private (id uuid PRIMARY KEY DEFAULT gen_random_uuid());
+CREATE TABLE public.party_sessions (id uuid PRIMARY KEY DEFAULT gen_random_uuid());
+CREATE TABLE public.party_submissions (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), player_id uuid);

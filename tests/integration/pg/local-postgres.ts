@@ -17,6 +17,7 @@ const BASE_MIGRATIONS = [
   "0007_commercial_accounts_credits.sql",
   "0008_credit_merge_and_store_consume.sql",
   "0009_revoke_client_access_commercial.sql",
+  "0010_security_hardening_legacy_lock.sql",
   "0011_signup_bonus_accounts_only.sql",
 ];
 
