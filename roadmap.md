@@ -150,3 +150,6 @@
 - [x] Android: assetlinks, twa-manifest, guia de publicação
 - [x] Testes, regressão do juiz e relatório
 - [ ] Ativar compras reais: depende da Play Console, do produto stopia_ia_20 e dos segredos GOOGLE_PLAY_SERVICE_ACCOUNT_JSON / ANDROID_SHA256_FINGERPRINTS (dono)
+
+- [x] Real PostgreSQL antifraud tests (A–I, concurrency) and admin abuse monitoring
+- [ ] HMAC identity hash migration (waiting for owner approval)
