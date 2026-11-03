@@ -146,7 +146,7 @@ export async function findWallet(cred: CreditCredentials): Promise<ResolvedWalle
   return null;
 }
 
-export async function summarize(wallet: WalletRow, userId: string | null): Promise<WalletSummary> {
+export async function summarize(wallet: WalletRow, userId: string | null, bonus?: BonusStatus): Promise<WalletSummary> {
   const { count } = await db().from("payment_transactions").select("id", { count: "exact", head: true }).eq("wallet_id", wallet.id).eq("status", "confirmed");
   return {
     balance: wallet.balance,
@@ -155,6 +155,7 @@ export async function summarize(wallet: WalletRow, userId: string | null): Promi
     consumedTotal: wallet.consumed_total,
     packsBought: count ?? 0,
     kind: userId ? "account" : "guest",
+    bonus: userId ? bonus ?? null : null,
   };
 }
 
@@ -172,10 +173,12 @@ export async function bindRoomWallet(roomId: string, walletId: string) {
   await db().from("party_room_billing").upsert({ room_id: roomId, wallet_id: walletId }, { onConflict: "room_id", ignoreDuplicates: true });
 }
 
+/** The account wallet paying this room's AI, or null (no binding, or a legacy guest wallet). */
 async function roomWallet(roomId: string): Promise<WalletRow | null> {
   const { data } = await db().from("party_room_billing").select("wallet_id").eq("room_id", roomId).maybeSingle();
   if (!data) return null;
-  return resolveMerged(await walletById(data.wallet_id));
+  const wallet = await resolveMerged(await walletById(data.wallet_id));
+  return walletMayPayAi(wallet) ? wallet : null;
 }
 
 export async function roomBalance(roomId: string) {
@@ -183,9 +186,26 @@ export async function roomBalance(roomId: string) {
   return wallet ? { billed: true as const, balance: wallet.balance } : { billed: false as const, balance: 0 };
 }
 
+/**
+ * The host signed in after creating the room as a guest: their account starts paying this room's AI.
+ * Never takes over a room already paid by another account.
+ */
+export async function linkRoomToAccount(roomId: string, userId: string) {
+  const { wallet } = await accountWallet(userId);
+  const { data: current } = await db().from("party_room_billing").select("wallet_id").eq("room_id", roomId).maybeSingle();
+  if (!current) {
+    await bindRoomWallet(roomId, wallet.id);
+  } else if (current.wallet_id !== wallet.id) {
+    const bound = await resolveMerged(await walletById(current.wallet_id));
+    // Only a legacy guest wallet (which can no longer pay) is replaced.
+    if (!walletMayPayAi(bound)) await db().from("party_room_billing").update({ wallet_id: wallet.id }).eq("room_id", roomId).eq("wallet_id", current.wallet_id);
+  }
+  return roomBalance(roomId);
+}
+
 export type AiCharge = { status: "charged" | "duplicate" | "insufficient" | "unbilled"; walletId: string | null };
 
-/** Consumes one AI request from the room creator's wallet; the same usage key is never charged twice. */
+/** Consumes one AI request from the room creator's account wallet; the same usage key is never charged twice. */
 export async function chargeRoomAi(roomId: string, usageKey: string, label: string): Promise<AiCharge> {
   const wallet = await roomWallet(roomId);
   if (!wallet) return { status: "unbilled", walletId: null };
