@@ -5,11 +5,15 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { adminAdjustCredits, adminListReports, adminOverview, adminReconcile, adminSetReportStatus } from "@/lib/admin.functions";
+import { adminAdjustCredits, adminCreditAbuse, adminListReports, adminOverview, adminReconcile, adminSetReportStatus } from "@/lib/admin.functions";
+import { REPEATED_ATTEMPTS } from "@/lib/credit-monitor";
 import { getDevToken } from "@/lib/dev-settings";
 
 type Overview = Awaited<ReturnType<typeof adminOverview>>;
 type Report = Awaited<ReturnType<typeof adminListReports>>[number];
+type Abuse = Awaited<ReturnType<typeof adminCreditAbuse>>;
+
+const ABUSE_LABELS: Record<string, string> = { identity_used: "E-mail já usado", rate_limited: "Limite de rede", grant_error: "Falha na concessão" };
 
 const REASONS: Record<string, string> = { ofensa: "Ofensa", assedio: "Assédio", spam: "Spam", conteudo_improprio: "Impróprio", outro: "Outro" };
 
@@ -20,8 +24,10 @@ export function BusinessAdmin() {
   const adjustFn = useServerFn(adminAdjustCredits);
   const reportsFn = useServerFn(adminListReports);
   const statusFn = useServerFn(adminSetReportStatus);
+  const abuseFn = useServerFn(adminCreditAbuse);
   const [overview, setOverview] = useState<Overview | null>(null);
   const [reports, setReports] = useState<Report[]>([]);
+  const [abuse, setAbuse] = useState<Abuse | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [email, setEmail] = useState("");
   const [delta, setDelta] = useState("");
@@ -31,15 +37,16 @@ export function BusinessAdmin() {
     setBusy("load");
     try {
       const token = getDevToken();
-      const [o, r] = await Promise.all([overviewFn({ data: { token } }), reportsFn({ data: { token } })]);
+      const [o, r, a] = await Promise.all([overviewFn({ data: { token } }), reportsFn({ data: { token } }), abuseFn({ data: { token } }).catch(() => null)]);
       setOverview(o);
       setReports(r);
+      setAbuse(a);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Não foi possível carregar.");
     } finally {
       setBusy(null);
     }
-  }, [overviewFn, reportsFn]);
+  }, [overviewFn, reportsFn, abuseFn]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -125,6 +132,31 @@ export function BusinessAdmin() {
         </div>
         <Button type="submit" className="h-11 w-full" disabled={busy !== null}>{busy === "adjust" && <Loader2 className="animate-spin" />} Aplicar ajuste</Button>
       </form>
+
+      {abuse && (
+        <div className="space-y-2">
+          <p className="section-label">Antifraude dos créditos grátis · 14 dias</p>
+          <dl className="grid grid-cols-3 gap-2 text-center">
+            {Object.entries(abuse.totals).map(([kind, t]) => (
+              <div key={kind} className="rounded-xl bg-secondary p-2">
+                <dt className="text-[0.625rem] font-semibold uppercase text-muted-foreground">{ABUSE_LABELS[kind] ?? kind}</dt>
+                <dd className="font-display text-lg tabular-nums">{t.accounts}</dd>
+                <dd className="text-[0.625rem] text-muted-foreground tabular-nums">{t.attempts} tentativas</dd>
+              </div>
+            ))}
+          </dl>
+          {abuse.latest.length === 0 ? <p className="text-sm text-muted-foreground">Nenhum sinal de abuso.</p> : (
+            <ul className="space-y-1 text-xs">
+              {abuse.latest.map((e) => (
+                <li key={`${e.kind}-${e.account}-${e.day}`} className="flex items-center justify-between gap-2 rounded-lg border border-border px-2 py-1">
+                  <span className="min-w-0 truncate">{ABUSE_LABELS[e.kind] ?? e.kind} · conta {e.account}…{e.detail ? ` · ${e.detail}` : ""}</span>
+                  <span className={`shrink-0 tabular-nums ${e.attempts >= REPEATED_ATTEMPTS ? "font-bold text-destructive" : "text-muted-foreground"}`}>{e.day.slice(5)} · {e.attempts}×</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
 
       <div className="space-y-2">
         <p className="section-label">Denúncias</p>

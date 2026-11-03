@@ -83,3 +83,31 @@ export const adminSetReportStatus = createServerFn({ method: "POST" })
     await db.from("admin_audit").insert({ actor_user_id: uid, action: "report_status", target: data.id, detail: { status: data.status } });
     return { ok: true as const };
   });
+
+/**
+ * Signup-bonus abuse signals of the last 14 days (admin only): totals per kind and the latest rows.
+ * Accounts appear only as a short id prefix; no e-mail or identity hash ever leaves the server.
+ */
+export const adminCreditAbuse = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => z.object(token).parse(input))
+  .handler(async ({ data }) => {
+    const { db } = await requireAdmin(data.token);
+    const since = new Date(Date.now() - 13 * 24 * 60 * 60_000).toISOString().slice(0, 10);
+    const { data: rows, error } = await db
+      .from("credit_abuse_events")
+      .select("kind, user_id, day, attempts, detail, last_at")
+      .gte("day", since)
+      .order("last_at", { ascending: false })
+      .limit(200);
+    if (error) throw new Error("Não foi possível carregar o antifraude.");
+    const list = rows ?? [];
+    const totals = { identity_used: { accounts: 0, attempts: 0 }, rate_limited: { accounts: 0, attempts: 0 }, grant_error: { accounts: 0, attempts: 0 } };
+    for (const r of list) {
+      const t = totals[r.kind as keyof typeof totals];
+      if (!t) continue;
+      t.accounts += 1;
+      t.attempts += r.attempts;
+    }
+    const latest = list.slice(0, 20).map((r) => ({ kind: r.kind, account: r.user_id.slice(0, 8), day: r.day, attempts: r.attempts, detail: r.detail, lastAt: r.last_at }));
+    return { since, totals, latest };
+  });
