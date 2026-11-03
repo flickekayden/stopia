@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useCallback, useEffect, useState } from "react";
-import { ArrowLeft, Loader2, LogIn, LogOut, Save, ShieldCheck, ShoppingBag, Trash2 } from "lucide-react";
+import { ArrowLeft, Gift, Loader2, LogIn, LogOut, Save, ShieldCheck, ShoppingBag, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { CreditBadge } from "@/components/credits/CreditBadge";
@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { creditCredentials, emitAccountChange, getAccessToken, onAccountChange, onGuestClaimed, supabaseClient, wireAuthEvents } from "@/lib/account-client";
 import { deleteMyAccount, getBillingInfo, getMyAccount, updateMyProfile } from "@/lib/account.functions";
 import { LEDGER_LABELS, PAYMENT_LABELS, requestsLabel, type LedgerKind, type PaymentStatus } from "@/lib/billing";
+import { bonusMessage } from "@/lib/signup-bonus";
 
 export const Route = createFileRoute("/perfil")({
   head: () => ({
@@ -130,14 +131,20 @@ function ProfilePage() {
       {summary && (
         <section className="party-panel grid grid-cols-2 gap-3" aria-label="Resumo do saldo">
           <Stat label="Saldo de IA" value={`${summary.balance} disponíveis`} />
-          <Stat label="Grátis recebidas" value={`${summary.freeGranted}`} />
-          <Stat label="Usadas" value={`${summary.consumedTotal}`} />
+          <Stat label="Grátis (promoção)" value={`${summary.freeGranted}`} />
+          <Stat label="Comprados" value={`${summary.purchasedTotal}`} />
+          <Stat label="Usados" value={`${summary.consumedTotal}`} />
           <Stat label="Pacotes comprados" value={`${summary.packsBought}`} />
-          <Stat label="Total comprado" value={requestsLabel(summary.purchasedTotal)} />
+          <p className="col-span-2 text-xs text-muted-foreground">1 crédito = 1 solicitação de IA numa sala que você criou. Créditos não são partidas.</p>
+          {summary.kind === "account" && bonusMessage(summary.bonus, billing?.freeCredits) && (
+            <p className="col-span-2 text-sm font-semibold text-primary" role="status">{bonusMessage(summary.bonus, billing?.freeCredits)}</p>
+          )}
         </section>
       )}
 
-      <Button asChild className="h-12 w-full font-bold"><Link to="/comprar"><ShoppingBag /> Comprar mais solicitações</Link></Button>
+      {signedIn ? (
+        <Button asChild className="h-12 w-full font-bold"><Link to="/comprar"><ShoppingBag /> Comprar mais créditos de IA</Link></Button>
+      ) : null}
 
       {signedIn ? (
         <section className="party-panel space-y-3" aria-labelledby="perfil-dados">
@@ -154,8 +161,10 @@ function ProfilePage() {
         </section>
       ) : (
         <section className="party-panel space-y-3">
-          <p className="text-sm">Você está jogando como convidado. O saldo fica só neste aparelho e não pode ser recuperado se você limpar os dados do app ou trocar de celular.</p>
-          <Button asChild variant="secondary" className="h-12 w-full"><Link to="/entrar"><LogIn /> Entrar ou criar conta</Link></Button>
+          <p className="text-sm">Você está sem conta. Os modos sem IA funcionam normalmente; para usar a IA, crie sua conta grátis e receba {billing?.freeCredits ?? 20} créditos de IA, uma única vez por conta.</p>
+          {summary?.kind === "guest" && <p className="text-sm text-muted-foreground">O saldo de convidado deste aparelho continua guardado e vai para a sua conta quando você entrar neste aparelho.</p>}
+          <Button asChild className="h-12 w-full font-bold"><Link to="/entrar" search={{ modo: "criar" }}><Gift /> Criar conta grátis</Link></Button>
+          <Button asChild variant="secondary" className="h-12 w-full"><Link to="/entrar" search={{ modo: "entrar" }}><LogIn /> Já tenho conta</Link></Button>
         </section>
       )}
 
@@ -214,7 +223,7 @@ function ProfilePage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Excluir sua conta?</AlertDialogTitle>
-            <AlertDialogDescription>Seu perfil e o acesso à conta são apagados e o saldo restante é perdido. O registro das compras fica guardado sem seus dados pessoais, como exige a lei.</AlertDialogDescription>
+            <AlertDialogDescription>Seu perfil e o acesso à conta são apagados e o saldo restante é perdido. O registro das compras fica guardado sem seus dados pessoais, como exige a lei. Uma nova conta com o mesmo e-mail não recebe os créditos grátis de novo.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>

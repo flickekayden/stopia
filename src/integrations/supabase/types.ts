@@ -781,6 +781,35 @@ export type Database = {
         }
         Relationships: []
       }
+      promo_grants: {
+        Row: {
+          created_at: string
+          first_user_id: string
+          identity_hash: string
+          wallet_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          first_user_id: string
+          identity_hash: string
+          wallet_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          first_user_id?: string
+          identity_hash?: string
+          wallet_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "promo_grants_wallet_id_fkey"
+            columns: ["wallet_id"]
+            isOneToOne: false
+            referencedRelation: "credit_wallets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       room_voice_notes: {
         Row: {
           created_at: string
@@ -986,6 +1015,10 @@ export type Database = {
         }
         Returns: string
       }
+      credit_grant_signup: {
+        Args: { p_amount: number; p_user: string }
+        Returns: string
+      }
       credit_merge: { Args: { p_guest: string; p_user: string }; Returns: Json }
       credit_refund: {
         Args: { p_key: string; p_wallet: string }
@@ -998,6 +1031,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      promo_identity_hash: { Args: { p_email: string }; Returns: string }
     }
     Enums: {
       app_role: "admin" | "moderator" | "user"

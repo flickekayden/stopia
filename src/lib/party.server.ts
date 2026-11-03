@@ -359,20 +359,20 @@ export async function createPartyRoom(input: { game?: PartyGameId | undefined; n
     throw new Error("Não foi possível criar a sala. Nada foi salvo, tente de novo.");
   }
   await recordRate(key, "create");
-  // The creator's wallet pays this room's AI requests. If it cannot be opened, the room still works
-  // with the built-in (non-AI) content.
-  let newGuestToken: string | null = null;
-  let freeDenied = false;
+  // The creator's account wallet pays this room's AI requests. Guests (or a wallet that cannot be
+  // opened) still get a working room with the built-in (non-AI) content.
+  let aiLinked = false;
   try {
     const credits = await import("./credits.server");
-    const wallet = await credits.ensureHostWallet({ accessToken: input.accessToken, guestToken: input.guestToken });
-    await credits.bindRoomWallet(room.id, wallet.wallet.id);
-    newGuestToken = wallet.newGuestToken ?? null;
-    freeDenied = "freeDenied" in wallet ? Boolean(wallet.freeDenied) : false;
+    const wallet = await credits.ensureHostWallet({ accessToken: input.accessToken });
+    if (wallet) {
+      await credits.bindRoomWallet(room.id, wallet.wallet.id);
+      aiLinked = true;
+    }
   } catch (err) {
     console.error("createPartyRoom: wallet binding failed", err instanceof Error ? err.message : err);
   }
-  return { code: room.code, roomId: room.id, playerId: player.id, newGuestToken, freeDenied };
+  return { code: room.code, roomId: room.id, playerId: player.id, aiLinked };
 }
 
 export async function joinPartyRoom(input: { code: string; nickname: string; sessionId: string }) {
@@ -533,8 +533,9 @@ export async function startPartyGame(input: { roomId: string; playerId: string; 
   if (players.length < min) throw new Error(`Este jogo precisa de pelo menos ${min} jogadores conectados.`);
   if (game === "stop") {
     const { roomBalance } = await import("./credits.server");
-    const { balance } = await roomBalance(room.id);
-    if (balance < 1) throw new Error("O Stop é julgado pela IA e o mestre da sala está sem solicitações de IA. Compre um pacote no app ou escolha outro jogo.");
+    const { billed, balance } = await roomBalance(room.id);
+    if (!billed) throw new Error("O Stop é julgado pela IA. Entre na sua conta para usar a IA: ao criar sua conta você ganha 20 créditos de IA grátis.");
+    if (balance < 1) throw new Error("O Stop é julgado pela IA e o mestre da sala está sem créditos de IA. Compre um pacote no app ou escolha outro jogo.");
   }
   // Claim the start (version bump) before touching round data: a repeated or concurrent
   // start loses here and leaves the winner's fresh round alone.
@@ -1907,6 +1908,15 @@ export async function getRoomCredits(input: { roomId: string; playerId: string; 
   await requireHost(input.roomId, input.playerId, input.sessionId);
   const { roomBalance } = await import("./credits.server");
   return roomBalance(input.roomId);
+}
+
+/** A host who created the room as a guest and then signed in: the account's credits now pay this room. */
+export async function linkRoomCredits(input: { roomId: string; playerId: string; sessionId: string; accessToken: string }) {
+  await requireHost(input.roomId, input.playerId, input.sessionId);
+  const credits = await import("./credits.server");
+  const userId = await credits.userIdFromToken(input.accessToken);
+  if (!userId) throw new Error("Entre na sua conta de novo para usar a IA.");
+  return credits.linkRoomToAccount(input.roomId, userId);
 }
 
 const REPORT_REASONS = ["ofensa", "assedio", "spam", "conteudo_improprio", "outro"] as const;

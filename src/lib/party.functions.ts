@@ -177,6 +177,11 @@ export const getRoomCredits = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => z.object(session).parse(input))
   .handler(async ({ data }) => (await server()).getRoomCredits(data));
 
+/** Host only, signed in: a room created as a guest starts using the host's account credits. */
+export const linkRoomCredits = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => z.object({ ...session, accessToken: z.string().min(10).max(4096) }).parse(input))
+  .handler(async ({ data }) => (await server()).linkRoomCredits(data));
+
 export const reportPartyContent = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) =>
     z

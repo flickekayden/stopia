@@ -7,7 +7,7 @@ import { createHash } from "node:crypto";
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { classifyPlayPurchase, formatBRL, reversalAmount, type CreditCredentials } from "./billing";
-import { ensureWallet, findWallet, loadBillingConfig } from "./credits.server";
+import { findWallet, loadBillingConfig } from "./credits.server";
 
 const db = () => supabaseAdmin;
 
@@ -21,15 +21,16 @@ async function play() {
 
 export async function startPurchase(cred: CreditCredentials) {
   const config = await loadBillingConfig();
-  // Buying never grants free credits: a wallet created here starts at zero.
-  const resolved = await ensureWallet(cred, false);
+  // Credits are only usable by accounts, so buying needs a signed-in account (never a guest wallet).
+  const resolved = await findWallet(cred);
+  if (!resolved?.userId) throw new Error("Entre na sua conta para comprar créditos de IA.");
   const { data, error } = await db()
     .from("payment_transactions")
     .insert({ wallet_id: resolved.wallet.id, platform: "google_play", product_id: config.playProductId, credits: config.packCredits, price_label: formatBRL(config.priceCents) })
     .select("id")
     .single();
   if (error || !data) throw new Error("Não foi possível iniciar a compra. Nada foi cobrado.");
-  return { transactionId: data.id, productId: config.playProductId, credits: config.packCredits, newGuestToken: resolved.newGuestToken ?? null };
+  return { transactionId: data.id, productId: config.playProductId, credits: config.packCredits, newGuestToken: null };
 }
 
 async function ownTransaction(cred: CreditCredentials, transactionId: string) {

@@ -78,6 +78,13 @@
       "when": 1793462091891,
       "tag": "0010_security_hardening_legacy_lock",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1793726704275,
+      "tag": "0011_signup_bonus_accounts_only",
+      "breakpoints": true
     }
   ]
 }

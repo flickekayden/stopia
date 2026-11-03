@@ -1,19 +1,33 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { ArrowLeft, Loader2, LogIn, Mail, UserPlus, UserRound } from "lucide-react";
+import { ArrowLeft, Gift, Loader2, LogIn, Mail, UserPlus, UserRound } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { currentUser, markTermsAccepted, supabaseClient } from "@/lib/account-client";
+import { safeReturnPath } from "@/lib/signup-bonus";
+
+type Mode = "entrar" | "criar" | "esqueci";
+type AuthSearch = { modo?: "entrar" | "criar" | undefined; voltar?: string | undefined };
+
+const RETURN_KEY = "stopia-auth-return";
 
 export const Route = createFileRoute("/entrar")({
+  validateSearch: (search: Record<string, unknown>): AuthSearch => {
+    const modo = search["modo"];
+    const voltar = search["voltar"];
+    return {
+      modo: modo === "criar" ? "criar" : modo === "entrar" ? "entrar" : undefined,
+      voltar: typeof voltar === "string" ? safeReturnPath(voltar, "") || undefined : undefined,
+    };
+  },
   head: () => ({
     meta: [
       { title: "Entrar ou criar conta — Stopia" },
-      { name: "description", content: "Entre ou crie uma conta no Stopia para guardar seu saldo de IA e suas compras. Também dá para jogar como convidado." },
-      { property: "og:title", content: "Entrar no Stopia" },
-      { property: "og:description", content: "Conta opcional: guarde seu saldo de IA e suas compras, ou continue como convidado." },
+      { name: "description", content: "Crie sua conta grátis no Stopia e ganhe 20 créditos de IA, uma única vez por conta. Também dá para jogar sem conta nos modos sem IA." },
+      { property: "og:title", content: "Entrar no Stopia — 20 créditos de IA grátis" },
+      { property: "og:description", content: "Crie sua conta grátis e receba 20 créditos de IA para usar nas salas que você cria." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
@@ -21,11 +35,10 @@ export const Route = createFileRoute("/entrar")({
   component: AuthPage,
 });
 
-type Mode = "entrar" | "criar" | "esqueci";
-
 function AuthPage() {
   const navigate = useNavigate();
-  const [mode, setMode] = useState<Mode>("entrar");
+  const search = Route.useSearch();
+  const [mode, setMode] = useState<Mode>(search.modo ?? "entrar");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
@@ -33,9 +46,21 @@ function AuthPage() {
   const [busy, setBusy] = useState<string | null>(null);
   const [sent, setSent] = useState<string | null>(null);
 
+  // Where to go after signing in: the page that asked (e.g. the room), kept across the Google redirect.
   useEffect(() => {
-    void currentUser().then((user) => { if (user) navigate({ to: "/perfil", replace: true }); }).catch(() => undefined);
-  }, [navigate]);
+    if (search.voltar) window.sessionStorage.setItem(RETURN_KEY, search.voltar);
+  }, [search.voltar]);
+  const returnPath = () => safeReturnPath(search.voltar ?? (typeof window === "undefined" ? null : window.sessionStorage.getItem(RETURN_KEY)));
+  const goBack = () => {
+    const to = returnPath();
+    window.sessionStorage.removeItem(RETURN_KEY);
+    navigate({ to, replace: true });
+  };
+
+  useEffect(() => {
+    void currentUser().then((user) => { if (user) goBack(); }).catch(() => undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -47,7 +72,7 @@ function AuthPage() {
         const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
         if (error) throw new Error(error.message.includes("confirm") ? "Confirme seu e-mail antes de entrar (veja sua caixa de entrada)." : "E-mail ou senha incorretos.");
         toast.success("Bem-vindo de volta!");
-        navigate({ to: "/perfil" });
+        goBack();
       } else if (mode === "criar") {
         if (!terms) throw new Error("Para criar a conta, aceite os Termos de uso e a Política de privacidade.");
         if (password.length < 8) throw new Error("Use uma senha com pelo menos 8 caracteres.");
@@ -55,11 +80,11 @@ function AuthPage() {
         const { data, error } = await supabase.auth.signUp({
           email: email.trim(),
           password,
-          options: { emailRedirectTo: window.location.origin + "/perfil", data: { display_name: name.trim().slice(0, 20) } },
+          options: { emailRedirectTo: window.location.origin + returnPath(), data: { display_name: name.trim().slice(0, 20) } },
         });
         if (error) throw new Error(error.message.toLowerCase().includes("registered") ? "Já existe uma conta com esse e-mail. Tente entrar." : "Não foi possível criar a conta. Confira o e-mail e tente de novo.");
-        if (data.session) navigate({ to: "/perfil" });
-        else setSent("Enviamos um link de confirmação para o seu e-mail. Abra o link para ativar a conta.");
+        if (data.session) goBack();
+        else setSent("Enviamos um link de confirmação para o seu e-mail. Abra o link para ativar a conta e receber seus 20 créditos de IA grátis.");
       } else {
         const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo: `${window.location.origin}/reset-password` });
         if (error) throw new Error("Não foi possível enviar o e-mail agora. Tente de novo em instantes.");
@@ -83,7 +108,7 @@ function AuthPage() {
       const { lovable } = await import("@/integrations/lovable");
       const result = await lovable.auth.signInWithOAuth("google", { redirect_uri: window.location.origin + "/entrar" });
       if (result.error) throw result.error;
-      if (!result.redirected) navigate({ to: "/perfil" });
+      if (!result.redirected) goBack();
     } catch {
       toast.error("Não foi possível entrar com o Google. Tente de novo.");
     } finally {
@@ -98,8 +123,19 @@ function AuthPage() {
       <header className="top-actions-clear space-y-2 pt-2">
         <Button asChild variant="ghost" className="-ml-2 h-11 px-2"><Link to="/"><ArrowLeft /> Início</Link></Button>
         <h1 className="font-display text-4xl text-primary">{title}</h1>
-        <p className="text-sm text-muted-foreground">A conta é opcional. Ela guarda seu saldo de IA e suas compras, e você pode usá-la em outro aparelho.</p>
+        <p className="text-sm text-muted-foreground">A conta guarda seus créditos de IA e suas compras, e você pode usá-la em outro aparelho. Os modos sem IA funcionam sem conta.</p>
       </header>
+
+      {mode !== "esqueci" && (
+        <section className="party-panel flex items-start gap-3" aria-labelledby="auth-bonus">
+          <span className="party-icon size-11 shrink-0" aria-hidden="true"><Gift className="size-5" /></span>
+          <div className="min-w-0">
+            <h2 id="auth-bonus" className="font-display text-xl text-primary"><span aria-hidden="true">🎁 </span>20 créditos de IA grátis</h2>
+            <p className="text-sm text-muted-foreground">Uma única concessão por conta. Sem pagamento para criar sua conta.</p>
+            <p className="mt-1 text-xs text-muted-foreground">Cada crédito é uma solicitação de IA numa sala sua, não uma partida.</p>
+          </div>
+        </section>
+      )}
 
       {mode !== "esqueci" && (
         <div className="grid grid-cols-2 gap-2" role="tablist" aria-label="Entrar ou criar conta">
@@ -155,7 +191,7 @@ function AuthPage() {
 
       <section className="space-y-2 text-center">
         <Button asChild variant="ghost" className="h-12 w-full"><Link to="/"><UserRound /> Continuar como convidado</Link></Button>
-        <p className="text-xs text-muted-foreground">Como convidado, seu saldo fica só neste aparelho. Se você limpar os dados do app ou trocar de celular, ele não pode ser recuperado. Ao criar uma conta depois, o saldo comprado vem junto.</p>
+        <p className="text-xs text-muted-foreground">Sem conta você joga normalmente os modos sem IA. Os recursos de IA e os créditos grátis são só para contas.</p>
       </section>
     </main>
   );

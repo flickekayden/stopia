@@ -8,14 +8,14 @@ import { CreditBadge } from "@/components/credits/CreditBadge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { useMyCredits } from "@/hooks/use-credits";
-import { creditCredentials, setGuestToken } from "@/lib/account-client";
+import { creditCredentials } from "@/lib/account-client";
 import { cancelPackPurchase, getBillingInfo, startPackPurchase, verifyPackPurchase } from "@/lib/account.functions";
 import { playBillingAvailable, playPrice, purchaseWithPlay } from "@/lib/play-billing";
 
 export const Route = createFileRoute("/comprar")({
   head: () => ({
     meta: [
-      { title: "Comprar solicitações de IA — Stopia" },
+      { title: "Comprar créditos de IA — Stopia" },
       { name: "description", content: "Libere mais solicitações de IA para as salas que você cria no Stopia. Pagamento único, sem assinatura e sem cobrança automática." },
       { property: "og:title", content: "Continue jogando Stopia com IA" },
       { property: "og:description", content: "Pacotes de solicitações de IA com pagamento único, sem assinatura." },
@@ -83,7 +83,6 @@ function BuyPage() {
     try {
       const started = await start({ data: await creditCredentials() });
       transactionId = started.transactionId;
-      if (started.newGuestToken) setGuestToken(started.newGuestToken);
       const outcome = await purchaseWithPlay(started.productId);
       if (outcome.kind === "canceled") {
         await cancel({ data: { ...(await creditCredentials()), transactionId } }).catch(() => undefined);
@@ -108,7 +107,7 @@ function BuyPage() {
         <Button asChild variant="ghost" className="-ml-2 h-11 px-2"><Link to="/perfil"><ArrowLeft /> Voltar sem comprar</Link></Button>
         <h1 className="font-display text-4xl leading-none text-primary">Continue jogando Stopia</h1>
         <p className="text-sm text-muted-foreground">
-          {credits.summary && credits.summary.balance === 0 ? "Suas solicitações de IA acabaram." : "Mais IA nas salas que você cria."} Só o mestre da sala gasta solicitações; quem entra na sala joga de graça.
+          {credits.summary && credits.summary.balance === 0 ? "Seus créditos de IA acabaram." : "Mais IA nas salas que você cria."} Só o mestre da sala gasta créditos; quem entra na sala joga de graça.
         </p>
       </header>
 
@@ -116,33 +115,33 @@ function BuyPage() {
 
       <section className="party-panel space-y-4 text-center" aria-labelledby="pacote">
         <p className="section-label">Pacote</p>
-        <h2 id="pacote" className="font-display text-3xl">{pack} solicitações de IA</h2>
-        <p className="font-display text-5xl text-primary tabular-nums">{price}</p>
+        <h2 id="pacote" className="font-display text-3xl">{pack} créditos de IA — {price}</h2>
         <ul className="space-y-1 text-sm text-muted-foreground">
           <li>Pagamento único. Sem assinatura. Sem cobrança automática.</li>
-          <li>Cada solicitação é um pedido feito à IA numa sala sua: julgar uma rodada do Stop, criar um tema, comentar ou dar os prêmios finais.</li>
+          <li>1 crédito = 1 solicitação de IA numa sala sua: julgar uma rodada do Stop, criar um tema, comentar ou dar os prêmios finais. Créditos não são partidas.</li>
           <li>Pagamento pela Google Play, no app Stopia para Android.</li>
         </ul>
-        {inApp === null ? (
+        {guest ? (
+          <div className="space-y-2">
+            <p className="text-sm">Para comprar e usar créditos de IA, entre na sua conta. Criando a conta você também ganha {billing?.freeCredits ?? 20} créditos grátis, uma única vez.</p>
+            <Button asChild className="h-14 w-full text-lg font-bold"><Link to="/entrar" search={{ modo: "criar", voltar: "/comprar" }}>Criar conta grátis</Link></Button>
+            <Button asChild variant="secondary" className="h-12 w-full"><Link to="/entrar" search={{ modo: "entrar", voltar: "/comprar" }}>Já tenho conta</Link></Button>
+          </div>
+        ) : inApp === null ? (
           <Button className="h-14 w-full text-lg font-bold" disabled><Loader2 className="animate-spin" /> Verificando a loja…</Button>
         ) : inApp ? (
           <Button className="h-14 w-full text-lg font-bold" disabled={busy || !billing?.storeReady} onClick={() => setConfirmOpen(true)}>
-            {busy ? <Loader2 className="animate-spin" /> : null} Liberar {pack} solicitações
+            {busy ? <Loader2 className="animate-spin" /> : null} Liberar {pack} créditos de IA
           </Button>
         ) : (
           <div className="space-y-2 rounded-xl border border-border p-3 text-left text-sm">
             <p className="flex items-center gap-2 font-semibold"><Smartphone className="size-4" aria-hidden="true" /> Compras só no app para Android</p>
-            <p className="text-muted-foreground">Pelo navegador não é possível comprar. Instale o Stopia pela Google Play e compre por lá; se você entrar com a mesma conta, o saldo aparece aqui também.</p>
+            <p className="text-muted-foreground">Pelo navegador não é possível comprar. Instale o Stopia pela Google Play e compre por lá; entrando com a mesma conta, o saldo aparece aqui também.</p>
           </div>
         )}
-        {inApp && billing && !billing.storeReady && <p className="text-xs text-muted-foreground">As compras ainda estão sendo ativadas. Tente mais tarde.</p>}
+        {!guest && inApp && billing && !billing.storeReady && <p className="text-xs text-muted-foreground">As compras ainda estão sendo ativadas. Tente mais tarde.</p>}
       </section>
 
-      {guest && (
-        <p className="rounded-xl border border-border p-3 text-sm text-muted-foreground">
-          Você está como convidado: uma compra fica guardada só neste aparelho. Para não perder o saldo se trocar de celular ou limpar o app, <Link to="/entrar" className="font-semibold text-primary underline">crie uma conta</Link> antes.
-        </p>
-      )}
 
       {phase.kind !== "idle" && (
         <section className="party-panel space-y-3" role="status" aria-live="polite">
@@ -166,7 +165,7 @@ function BuyPage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Confirmar compra</AlertDialogTitle>
-            <AlertDialogDescription>{pack} solicitações de IA por {price}, pagamento único pela Google Play. Sem assinatura e sem cobrança automática.</AlertDialogDescription>
+            <AlertDialogDescription>{pack} créditos de IA por {price}, pagamento único pela Google Play. Sem assinatura e sem cobrança automática.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Agora não</AlertDialogCancel>

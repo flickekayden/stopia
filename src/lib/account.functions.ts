@@ -24,7 +24,7 @@ export const getMyCredits = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const c = await credits();
     const found = await c.findWallet(data);
-    return { signedIn: Boolean(found?.userId) || Boolean(await c.userIdFromToken(data.accessToken)), summary: found ? await c.summarize(found.wallet, found.userId) : null };
+    return { signedIn: Boolean(found?.userId) || Boolean(await c.userIdFromToken(data.accessToken)), summary: found ? await c.summarize(found.wallet, found.userId, found.bonus) : null };
   });
 
 export const getMyAccount = createServerFn({ method: "POST" })
@@ -35,7 +35,7 @@ export const getMyAccount = createServerFn({ method: "POST" })
     const userId = found?.userId ?? (await c.userIdFromToken(data.accessToken));
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const [summary, history, profile, admin] = await Promise.all([
-      found ? c.summarize(found.wallet, found.userId) : Promise.resolve(null),
+      found ? c.summarize(found.wallet, found.userId, found.bonus) : Promise.resolve(null),
       found ? c.walletHistory(found.wallet.id) : Promise.resolve({ ledger: [], payments: [] }),
       userId ? supabaseAdmin.from("profiles").select("display_name, avatar, terms_accepted_at").eq("id", userId).maybeSingle().then((r) => r.data) : Promise.resolve(null),
       c.isAdmin(userId),
