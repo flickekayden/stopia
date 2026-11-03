@@ -20,7 +20,7 @@ import { LOBBY_GAMES, type LobbyGameId } from "@/lib/party-games";
 import { getLastNickname, getOrCreateSessionId, savePlayer } from "@/lib/session";
 import { friendlyError } from "@/lib/friendly-error";
 import { useMyCredits } from "@/hooks/use-credits";
-import { creditCredentials, setGuestToken } from "@/lib/account-client";
+import { creditCredentials } from "@/lib/account-client";
 import { HOME_SHARE_IMAGE } from "@/lib/share-images";
 
 const HOME_OG_IMAGE = HOME_SHARE_IMAGE;
@@ -72,9 +72,8 @@ function GamesHub() {
     setBusy("create");
     try {
       const sessionId = getOrCreateSessionId();
-      const res = await create({ data: { nickname: nickname.trim(), sessionId, ...(await creditCredentials()) } });
-      if (res.newGuestToken) setGuestToken(res.newGuestToken);
-      if (res.freeDenied) toast.info("As solicitações grátis deste aparelho/rede já foram usadas hoje. Crie uma conta ou compre um pacote para jogar com IA.");
+      const { accessToken } = await creditCredentials();
+      const res = await create({ data: { nickname: nickname.trim(), sessionId, accessToken } });
       play("create");
       savePlayer(res.code, res.playerId, nickname.trim(), sessionId);
       navigate({ to: "/festa/$code", params: { code: res.code } });
@@ -166,7 +165,7 @@ function GamesHub() {
               {busy === "join" ? <Loader2 className="animate-spin" /> : <ArrowRight />} Entrar
             </Button>
           </div>
-          <p className="text-xs text-muted-foreground">Todos os jogos, incluindo o Stop, acontecem nesta sala. Só quem cria a sala gasta solicitações de IA.</p>
+          <p className="text-xs text-muted-foreground">Todos os jogos, incluindo o Stop, acontecem nesta sala. Só quem cria a sala gasta créditos de IA, e a IA exige conta.</p>
         </form>
         <p className="text-xs text-muted-foreground">Ao criar ou entrar numa sala você aceita os <Link to="/termos" className="underline">Termos e regras de convivência</Link> e a <Link to="/privacidade" className="underline">Política de privacidade</Link>.</p>
       </section>

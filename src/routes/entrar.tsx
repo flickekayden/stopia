@@ -187,7 +187,7 @@ function AuthPage() {
 
       <section className="space-y-2 text-center">
         <Button asChild variant="ghost" className="h-12 w-full"><Link to="/"><UserRound /> Continuar como convidado</Link></Button>
-        <p className="text-xs text-muted-foreground">Como convidado, seu saldo fica só neste aparelho. Se você limpar os dados do app ou trocar de celular, ele não pode ser recuperado. Ao criar uma conta depois, o saldo comprado vem junto.</p>
+        <p className="text-xs text-muted-foreground">Sem conta você joga normalmente os modos sem IA. Os recursos de IA e os créditos grátis são só para contas.</p>
       </section>
     </main>
   );
