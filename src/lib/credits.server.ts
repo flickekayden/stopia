@@ -3,10 +3,11 @@
  * server-issued guest token (stored only as a hash). Balances change exclusively through the
  * credit_* database functions, which lock the wallet row and keep an append-only ledger.
  */
-import { createHash, randomBytes } from "node:crypto";
+import { createHash } from "node:crypto";
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { readBillingConfig, type BillingConfig, type CreditCredentials, type WalletSummary } from "./billing";
+import { bonusAllowedNow, walletMayPayAi, type BonusStatus } from "./signup-bonus";
 
 const db = () => supabaseAdmin;
 
@@ -58,28 +59,6 @@ async function resolveMerged(wallet: WalletRow | null): Promise<WalletRow | null
   return current;
 }
 
-async function grantFree(walletId: string, reference: string) {
-  const config = await loadBillingConfig();
-  await db().rpc("credit_apply", { p_wallet: walletId, p_delta: config.freeCredits, p_kind: "free_grant", p_reference: reference, p_note: "Boas-vindas", p_actor: null as unknown as string });
-}
-
-async function accountWallet(userId: string): Promise<WalletRow> {
-  const { data: existing } = await db().from("credit_wallets").select(WALLET_COLUMNS).eq("user_id", userId).maybeSingle();
-  if (existing) return existing as WalletRow;
-  const { data: created, error } = await db().from("credit_wallets").insert({ user_id: userId }).select(WALLET_COLUMNS).single();
-  if (error || !created) {
-    // A concurrent request created it first (UNIQUE user_id).
-    const { data: again } = await db().from("credit_wallets").select(WALLET_COLUMNS).eq("user_id", userId).single();
-    if (!again) throw new Error("Não foi possível abrir seu saldo. Tente de novo.");
-    return again as WalletRow;
-  }
-  // One free grant per account, ever (credit_merge marks it when a guest wallet is adopted).
-  await grantFree(created.id, `free:user:${userId}`);
-  return (await walletById(created.id))!;
-}
-
-export type ResolvedWallet = { wallet: WalletRow; userId: string | null; newGuestToken?: string };
-
 async function networkKey() {
   let ip = "";
   try {
@@ -89,53 +68,82 @@ async function networkKey() {
   return ip ? createHash("sha256").update(`rate:${ip}`).digest("hex") : null;
 }
 
-/** At most this many new guest wallets per network address per day receive the free credits. */
-const GUEST_FREE_PER_DAY = 5;
-
-/** Wallet of a room creator: a brand-new guest gets the free credits unless this network used them up today. */
-export async function ensureHostWallet(cred: CreditCredentials) {
-  const existing = await findWallet(cred);
-  if (existing) return existing;
+/**
+ * The one-time signup bonus. The amount comes from server configuration and the identity from the
+ * verified account; the database function locks the wallet and records the grant permanently (per
+ * account and per normalized e-mail hash), so repeated or concurrent calls never grant twice.
+ * Many new accounts from one network on the same day get the bonus later instead of being refused.
+ */
+async function applySignupBonus(userId: string, wallet: WalletRow): Promise<BonusStatus> {
+  if (wallet.free_granted > 0) return "already";
   const key = await networkKey();
-  let allowFree = true;
   if (key) {
     const { count } = await db()
       .from("party_rate_events")
       .select("id", { count: "exact", head: true })
       .eq("key_hash", key)
-      .eq("kind", "guest_wallet")
+      .eq("kind", "signup_bonus")
       .gte("created_at", new Date(Date.now() - 24 * 60 * 60_000).toISOString());
-    allowFree = (count ?? 0) < GUEST_FREE_PER_DAY;
+    if (!bonusAllowedNow(count ?? 0)) {
+      // Only postpone accounts that could still receive it.
+      const { data: marker } = await db().from("credit_ledger").select("id").eq("kind", "free_grant").eq("reference", `free:user:${userId}`).maybeSingle();
+      return marker ? "identity_used" : "deferred";
+    }
   }
-  const created = await ensureWallet(cred, allowFree);
-  if (key && created.newGuestToken) await db().from("party_rate_events").insert({ key_hash: key, kind: "guest_wallet" });
-  return { ...created, freeDenied: !allowFree };
+  const config = await loadBillingConfig();
+  const { data, error } = await db().rpc("credit_grant_signup", { p_user: userId, p_amount: config.freeCredits });
+  if (error) {
+    console.error("credit_grant_signup failed", error.code);
+    return "deferred";
+  }
+  const status = String(data) as BonusStatus | "no_user";
+  if (status === "granted" && key) await db().from("party_rate_events").insert({ key_hash: key, kind: "signup_bonus" });
+  return status === "no_user" ? "no_identity" : status;
 }
 
-/** The caller's wallet, without creating a guest wallet. */
+async function accountWallet(userId: string): Promise<{ wallet: WalletRow; bonus: BonusStatus }> {
+  const { data: existing } = await db().from("credit_wallets").select(WALLET_COLUMNS).eq("user_id", userId).maybeSingle();
+  let wallet = existing as WalletRow | null;
+  if (!wallet) {
+    const { data: created } = await db().from("credit_wallets").insert({ user_id: userId }).select(WALLET_COLUMNS).maybeSingle();
+    // A concurrent request may have created it first (UNIQUE user_id).
+    wallet = (created as WalletRow | null) ?? ((await db().from("credit_wallets").select(WALLET_COLUMNS).eq("user_id", userId).maybeSingle()).data as WalletRow | null);
+    if (!wallet) throw new Error("Não foi possível abrir seu saldo. Tente de novo.");
+  }
+  const bonus = await applySignupBonus(userId, wallet);
+  if (bonus === "granted") wallet = (await walletById(wallet.id)) ?? wallet;
+  return { wallet, bonus };
+}
+
+export type ResolvedWallet = { wallet: WalletRow; userId: string | null; bonus?: BonusStatus };
+
+/**
+ * Wallet that pays a new room's AI: only a signed-in account. Guests can create rooms and play every
+ * mode, but their rooms run without AI until the creator signs in (see `linkRoomToAccount`).
+ */
+export async function ensureHostWallet(cred: CreditCredentials): Promise<ResolvedWallet | null> {
+  const userId = await userIdFromToken(cred.accessToken);
+  if (!userId) return null;
+  const { wallet, bonus } = await accountWallet(userId);
+  return { wallet, userId, bonus };
+}
+
+/**
+ * The caller's wallet, never creating a guest wallet. Signed-in callers get their account wallet
+ * (with the one-time bonus check); a legacy guest token only reads its preserved balance.
+ */
 export async function findWallet(cred: CreditCredentials): Promise<ResolvedWallet | null> {
   const userId = await userIdFromToken(cred.accessToken);
-  if (userId) return { wallet: await accountWallet(userId), userId };
+  if (userId) {
+    const { wallet, bonus } = await accountWallet(userId);
+    return { wallet, userId, bonus };
+  }
   if (cred.guestToken && GUEST_TOKEN.test(cred.guestToken)) {
     const { data } = await db().from("credit_wallets").select(WALLET_COLUMNS).eq("guest_token_hash", hashGuestToken(cred.guestToken)).maybeSingle();
     const wallet = await resolveMerged((data as WalletRow | null) ?? null);
     if (wallet && !wallet.user_id) return { wallet, userId: null };
   }
   return null;
-}
-
-/**
- * The caller's wallet, creating a guest wallet when needed. `allowFree` is false once this network
- * address already created several guest wallets today, so clearing the app does not mint free credits.
- */
-export async function ensureWallet(cred: CreditCredentials, allowFree: boolean): Promise<ResolvedWallet> {
-  const found = await findWallet(cred);
-  if (found) return found;
-  const token = randomBytes(32).toString("base64url");
-  const { data: created, error } = await db().from("credit_wallets").insert({ guest_token_hash: hashGuestToken(token) }).select(WALLET_COLUMNS).single();
-  if (error || !created) throw new Error("Não foi possível abrir seu saldo. Tente de novo.");
-  if (allowFree) await grantFree(created.id, `free:wallet:${created.id}`);
-  return { wallet: (await walletById(created.id))!, userId: null, newGuestToken: token };
 }
 
 export async function summarize(wallet: WalletRow, userId: string | null): Promise<WalletSummary> {
