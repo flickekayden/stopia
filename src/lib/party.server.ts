@@ -323,11 +323,33 @@ async function recordRate(key: string, kind: keyof typeof RATE_LIMITS) {
 
 /* ---------------------------------- Rooms --------------------------------- */
 
+/** Deletes abandoned rooms (players, chat, rounds and sessions cascade). Best-effort, never throws. */
+export async function cleanupInactiveRooms() {
+  try {
+    const { ROOM_IDLE_MS, ROOM_CLEANUP_BATCH, abandonedRoomIds } = await import("./room-cleanup");
+    const cutoff = new Date(Date.now() - ROOM_IDLE_MS).toISOString();
+    const { data: idle } = await db().from("party_rooms").select("id").lt("updated_at", cutoff).limit(ROOM_CLEANUP_BATCH);
+    const ids = (idle ?? []).map((r) => r.id);
+    if (!ids.length) return 0;
+    const { data: seen, error } = await db().from("party_players").select("room_id").in("room_id", ids).eq("is_bot", false).gte("last_seen", cutoff);
+    if (error) return 0;
+    const dead = abandonedRoomIds(ids, (seen ?? []).map((p) => p.room_id));
+    if (!dead.length) return 0;
+    await db().from("party_rooms").delete().in("id", dead);
+    return dead.length;
+  } catch (e) {
+    console.error("cleanupInactiveRooms failed", e);
+    return 0;
+  }
+}
+
 export async function createPartyRoom(input: { game?: PartyGameId | undefined; nickname: string; sessionId: string; accessToken?: string | undefined; guestToken?: string | undefined }) {
   const nickname = input.nickname.trim();
   if (!nickname) throw new Error("Coloca um apelido primeiro");
   const key = await rateKey(input.sessionId);
   if (await rateLimited(key, "create")) throw new Error("Muitas salas criadas em pouco tempo. Espere alguns minutos e tente de novo.");
+  // Occasional tidy-up of abandoned rooms; runs alongside creation without delaying it.
+  if (Math.random() < 0.1) void cleanupInactiveRooms();
   let room: RoomRow | null = null;
   for (let attempt = 0; attempt < 5 && !room; attempt += 1) {
     const code = await candidateCode();
