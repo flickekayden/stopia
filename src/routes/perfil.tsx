@@ -126,6 +126,10 @@ function ProfilePage() {
         </div>
       </header>
 
+      {account?.isAdmin && (
+        <Button asChild variant="secondary" className="h-12"><Link to="/admin"><ShieldCheck /> Painel administrativo</Link></Button>
+      )}
+
       <CreditBadge status={status} summary={summary} freeCredits={billing?.freeCredits} packCredits={billing?.packCredits} priceLabel={billing?.priceLabel} onRetry={() => void load()} />
 
       {summary && (
