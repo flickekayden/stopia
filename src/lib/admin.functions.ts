@@ -111,3 +111,55 @@ export const adminCreditAbuse = createServerFn({ method: "POST" })
     const latest = list.slice(0, 20).map((r) => ({ kind: r.kind, account: r.user_id.slice(0, 8), day: r.day, attempts: r.attempts, detail: r.detail, lastAt: r.last_at }));
     return { since, totals, latest };
   });
+
+/* Gemini key pool (admin only). Keys never leave the server unmasked. */
+const keyTier = z.enum(["free", "paid"]);
+
+export const adminListAiKeys = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => z.object(token).parse(input))
+  .handler(async ({ data }) => {
+    const { db } = await requireAdmin(data.token);
+    const { maskKey } = await import("./gemini-keys");
+    const { data: rows } = await db.from("ai_api_keys").select("*").order("created_at");
+    return (rows ?? []).map(({ api_key, ...r }) => ({ ...r, masked: maskKey(api_key) }));
+  });
+
+export const adminAddAiKey = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => z.object({ ...token, label: z.string().trim().min(1).max(60), apiKey: z.string().trim().min(20).max(200).regex(/^[A-Za-z0-9._-]+$/), tier: keyTier }).parse(input))
+  .handler(async ({ data }) => {
+    const { uid, db } = await requireAdmin(data.token);
+    const { error } = await db.from("ai_api_keys").insert({ label: data.label, api_key: data.apiKey, tier: data.tier });
+    if (error) throw new Error("Não foi possível salvar a chave.");
+    (await import("./gemini-pool.server")).invalidateKeyCache();
+    await db.from("admin_audit").insert({ actor_user_id: uid, action: "ai_key_add", detail: { label: data.label, tier: data.tier } });
+    return { ok: true as const };
+  });
+
+export const adminUpdateAiKey = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => z.object({ ...token, id: z.string().uuid(), action: z.enum(["enable", "disable", "reset", "delete", "free", "paid"]) }).parse(input))
+  .handler(async ({ data }) => {
+    const { uid, db } = await requireAdmin(data.token);
+    const q = db.from("ai_api_keys");
+    if (data.action === "delete") await q.delete().eq("id", data.id);
+    else if (data.action === "reset") await q.update({ status: "ok", cooldown_until: null }).eq("id", data.id);
+    else if (data.action === "free" || data.action === "paid") await q.update({ tier: data.action }).eq("id", data.id);
+    else await q.update({ enabled: data.action === "enable" }).eq("id", data.id);
+    (await import("./gemini-pool.server")).invalidateKeyCache();
+    await db.from("admin_audit").insert({ actor_user_id: uid, action: "ai_key_" + data.action, target: data.id });
+    return { ok: true as const };
+  });
+
+export const adminTestAiKey = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => z.object({ ...token, id: z.string().uuid(), model: z.string().regex(/^gemini-[a-z0-9.-]+$/).max(60) }).parse(input))
+  .handler(async ({ data }) => {
+    const { db } = await requireAdmin(data.token);
+    const { data: row } = await db.from("ai_api_keys").select("api_key").eq("id", data.id).maybeSingle();
+    if (!row) throw new Error("Chave não encontrada.");
+    const result = await (await import("./ai.server")).testGeminiKey(row.api_key, data.model);
+    const pool = await import("./gemini-pool.server");
+    await pool.loadKeys();
+    if (result.ok) await pool.markKeySuccess(data.id);
+    else if (result.status) await pool.markKeyFailure(data.id, result.status, result.detail);
+    pool.invalidateKeyCache();
+    return result;
+  });
