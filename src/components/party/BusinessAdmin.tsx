@@ -176,5 +176,6 @@ export function BusinessAdmin() {
         ))}
       </div>
     </section>
+    </>
   );
 }
