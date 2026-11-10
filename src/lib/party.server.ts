@@ -1231,7 +1231,7 @@ async function runPartyJudge(room: RoomRow, presentIds: string[], settings: Part
   } catch (err) {
     const noCredits = err instanceof NoAiCredits;
     if (game === "tribunal" && presentIds.length <= 2) {
-      const scored = scoreTribunalJudge({ defendantId, lawyerId: state.lawyerId, accuserIds: presentIds.filter((id) => id !== defendantId), verdict: null, bonus: 0 });
+      const scored = scoreTribunalJudge({ defendantId, lawyerId: state.lawyerId ?? null, accuserIds: presentIds.filter((id) => id !== defendantId), verdict: null, bonus: 0 });
       await guardedUpdate(room, {
         phase: "reveal",
         phase_started_at: new Date().toISOString(),
