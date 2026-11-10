@@ -21,6 +21,7 @@ import {
   AUTOR_SECONDS_OPTIONS,
   DEBATE_SECONDS_OPTIONS,
   INFILTRADO_THEMES,
+  INFILTRADO_SECONDS_OPTIONS,
   effectiveJudgeFor,
   isPartyGame,
   LOBBY_GAMES,
@@ -268,7 +269,7 @@ function PartySettingsPanel({ ctx, actions, game }: { ctx: LobbyCtx; actions: Pa
         {settings.rounds} rodadas · IA {settings.ai && game !== "infiltrado" ? "ligada" : "desligada"}
         {judgeSummary(game, settings, ctx.players.length)}
         {game === "autor" ? ` · ${secondsLabel(settings.autorSeconds)} para escrever` : ""}
-        {game === "infiltrado" ? ` · tema: ${settings.infiltradoTheme === "todas" ? "tudo misturado" : settings.infiltradoTheme}` : ""}
+        {game === "infiltrado" ? ` · ${secondsLabel(settings.infiltradoSeconds)} para pistas · tema: ${settings.infiltradoTheme === "todas" ? "tudo misturado" : settings.infiltradoTheme}` : ""}
         {game === "roleta" ? ` · intensidade ${settings.intensity === "media" ? "média" : settings.intensity === "caotica" ? "caótica" : "leve"} · ${settings.skips} pulo(s)` : ""}
       </p>
     );
@@ -300,6 +301,17 @@ function PartySettingsPanel({ ctx, actions, game }: { ctx: LobbyCtx; actions: Pa
               <Button key={n} variant={option(settings.autorSeconds === n)} aria-label={`${n} segundos`} aria-pressed={settings.autorSeconds === n} disabled={ctx.busy !== null} className="px-2" onClick={() => void actions.updateSettings({ autorSeconds: n })}>{secondsLabel(n)}</Button>
             ))}
           </div>
+        </div>
+      )}
+      {game === "infiltrado" && (
+        <div>
+          <p className="mb-2 text-sm font-semibold text-muted-foreground">Tempo para escrever a pista</p>
+          <div className="grid grid-cols-4 gap-2">
+            {INFILTRADO_SECONDS_OPTIONS.map((n) => (
+              <Button key={n} variant={option(settings.infiltradoSeconds === n)} aria-label={`${n} segundos`} aria-pressed={settings.infiltradoSeconds === n} disabled={ctx.busy !== null} className="px-2" onClick={() => void actions.updateSettings({ infiltradoSeconds: n })}>{secondsLabel(n)}</Button>
+            ))}
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground">Iniciantes ou família: 120s ou 180s.</p>
         </div>
       )}
       {game === "infiltrado" && (
@@ -730,14 +742,33 @@ function SecretCard({ ctx }: { ctx: PartyCtx }) {
       </div>
       {shown ? (
         role === "infiltrado" ? (
-          <p className="text-lg font-bold"><span className="font-display text-2xl party-accent">Você é o INFILTRADO.</span><br />Você não sabe a palavra. Blefe com uma pista que combine com a categoria.</p>
+          <div className="space-y-2">
+            <p className="font-display text-2xl party-accent">🕵️ SEU PAPEL: O INFILTRADO</p>
+            <p className="font-bold">Você NÃO sabe a palavra secreta. Só a categoria (veja acima).</p>
+            <ol className="list-decimal space-y-1 pl-5 text-sm">
+              <li>Dê uma pista genérica que combine com a categoria.</li>
+              <li>Finja naturalidade para ninguém desconfiar.</li>
+              <li>Leia as pistas dos outros: se for pego, você ainda pode adivinhar a palavra e roubar a vitória.</li>
+            </ol>
+          </div>
         ) : role === "cidadao" ? (
-          <p className="text-lg font-bold">A palavra secreta é <span className="font-display text-3xl party-accent">{ctx.view?.word}</span></p>
+          <div className="space-y-2">
+            <p className="font-display text-xl party-accent">🛡️ SEU PAPEL: CIDADÃO</p>
+            <p className="text-lg font-bold">A palavra secreta é <span className="font-display text-3xl party-accent">{ctx.view?.word}</span></p>
+            <ol className="list-decimal space-y-1 pl-5 text-sm">
+              <li>Dê uma pista <strong>sutil</strong>: óbvia demais ajuda o infiltrado a descobrir a palavra.</li>
+              <li>Nunca escreva a própria palavra.</li>
+              <li>Na votação, desconfie de quem deu uma pista vaga ou fora do assunto.</li>
+            </ol>
+          </div>
         ) : (
           <p className="text-sm text-muted-foreground">Você entrou no meio da rodada. Na próxima você recebe um papel.</p>
         )
       ) : (
-        <p className="text-sm text-muted-foreground">Toque em “Mostrar” sem ninguém olhando sua tela.</p>
+        <div className="space-y-1 text-sm text-muted-foreground">
+          <p className="font-semibold text-foreground">👆 Toque em “Mostrar” para ver se você é Cidadão ou Infiltrado.</p>
+          <p>Faça isso sem ninguém olhando sua tela. Depois de ler, toque em “Esconder”.</p>
+        </div>
       )}
     </section>
   );
@@ -881,6 +912,7 @@ function InfiltradoVote({ ctx, actions }: { ctx: PartyCtx; actions: PartyActions
         <EntryList ctx={ctx} entries={ctx.state.entries ?? []} showAuthor />
       </div>
       <div className="space-y-2">
+        <p className="party-panel text-sm"><strong>Dica:</strong> leia as pistas acima. Quem parece estar chutando no escuro ou foi genérico demais? Você não pode votar em si mesmo.</p>
         <p className="text-sm font-bold">Quem é o infiltrado?</p>
         <div className="grid grid-cols-2 gap-2">
           {candidates.map((id) => (
@@ -1007,7 +1039,7 @@ export function PartyPlay({ ctx, actions }: { ctx: PartyCtx; actions: PartyActio
       </div>
     );
   } else if (!eligible && phase !== "vote") {
-    body = <p className="party-panel text-center text-sm text-muted-foreground">{phase === "last_guess" ? `@${accusedName} foi o mais votado e é mesmo o infiltrado! Esperando o palpite da palavra…` : "Você entrou no meio desta etapa. Acompanhe e participe na próxima."}</p>;
+    body = <p className="party-panel text-center text-sm text-muted-foreground">{phase === "last_guess" ? `🎯 Vocês pegaram o infiltrado! Agora @${accusedName} tem uma última chance de chutar a palavra secreta. Torçam para ele errar!` : "Você entrou no meio desta etapa. Acompanhe e participe na próxima."}</p>;
   } else if (phase === "defense") {
     const duel = (ctx.state.eligible ?? []).length <= 2;
     body = (
@@ -1028,7 +1060,7 @@ export function PartyPlay({ ctx, actions }: { ctx: PartyCtx; actions: PartyActio
   } else if (phase === "last_guess") {
     body = (
       <div className="space-y-3">
-        <p className="party-prompt font-bold">Você foi pego! Última chance: adivinhe a palavra secreta para roubar a vitória.</p>
+        <p className="party-prompt font-bold">🚨 Você foi desmascarado! Mas se acertar a palavra secreta agora, você rouba a vitória da rodada. Pense nas pistas que os outros deram.</p>
         <TextSubmit ctx={ctx} actions={actions} label="Qual é a palavra?" placeholder="Digite a palavra" />
       </div>
     );

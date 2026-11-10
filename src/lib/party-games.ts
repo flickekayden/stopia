@@ -164,6 +164,7 @@ export const DEBATE_SECONDS_OPTIONS = [60, 90, 120, 180] as const;
 export const TRIBUNAL_SECONDS_OPTIONS = [60, 90, 120, 180, 240, 300] as const;
 export const ROLETA_SECONDS_OPTIONS = [45, 60, 90, 180, 300] as const;
 export const AUTOR_SECONDS_OPTIONS = [60, 75, 90, 120] as const;
+export const INFILTRADO_SECONDS_OPTIONS = [60, 90, 120, 180] as const;
 
 /** Infiltrado word themes the host can pick; "todas" mixes every theme. */
 export const INFILTRADO_THEMES = ["todas", "Comida", "Animal", "Lugar", "Objeto", "Profissão", "Esporte", "Transporte", "Festa", "Natureza", "Instrumento"] as const;
@@ -191,8 +192,9 @@ export type PartySettings = {
   roletaJudge: JudgeMode;
   /** Quem Escreveu: writing time. */
   autorSeconds: number;
-  /** Infiltrado: secret-word theme. */
+  /** Infiltrado: secret-word theme and clue-writing time. */
   infiltradoTheme: InfiltradoTheme;
+  infiltradoSeconds: number;
   /** Stop only. */
   stopSeconds: number;
   scoring: StopScoring;
@@ -213,6 +215,7 @@ export const DEFAULT_PARTY_SETTINGS: PartySettings = {
   roletaJudge: "auto",
   autorSeconds: 75,
   infiltradoTheme: "todas",
+  infiltradoSeconds: 90,
   stopSeconds: 90,
   scoring: "fixed",
   aiIntensity: "padrao",
@@ -272,6 +275,7 @@ export function readPartySettings(raw: unknown): PartySettings {
     roletaJudge: pick(JUDGE_MODES, value.roletaJudge, DEFAULT_PARTY_SETTINGS.roletaJudge),
     autorSeconds: pick<number>(AUTOR_SECONDS_OPTIONS, value.autorSeconds, DEFAULT_PARTY_SETTINGS.autorSeconds),
     infiltradoTheme: pick(INFILTRADO_THEMES, value.infiltradoTheme, DEFAULT_PARTY_SETTINGS.infiltradoTheme),
+    infiltradoSeconds: pick<number>(INFILTRADO_SECONDS_OPTIONS, value.infiltradoSeconds, DEFAULT_PARTY_SETTINGS.infiltradoSeconds),
     stopSeconds: Number.isFinite(seconds) && value.stopSeconds !== null && value.stopSeconds !== undefined
       ? Math.min(STOP_SECONDS_MAX, Math.max(STOP_SECONDS_MIN, Math.round(seconds)))
       : DEFAULT_PARTY_SETTINGS.stopSeconds,
@@ -310,6 +314,7 @@ export function hostPhaseSeconds(game: PartyGameId, phase: PartyPhaseId, setting
   if (game === "debate" && phase === "argue") return settings.debateSeconds;
   if (game === "roleta" && phase === "respond") return settings.roletaSeconds;
   if (game === "autor" && phase === "write") return settings.autorSeconds;
+  if (game === "infiltrado" && phase === "clues") return settings.infiltradoSeconds;
   return null;
 }
 
