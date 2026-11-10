@@ -34,13 +34,14 @@ export const getMyAccount = createServerFn({ method: "POST" })
     const found = await c.findWallet(data);
     const userId = found?.userId ?? (await c.userIdFromToken(data.accessToken));
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const [summary, history, profile, admin] = await Promise.all([
+    const [summary, history, profile, admin, email] = await Promise.all([
       found ? c.summarize(found.wallet, found.userId, found.bonus) : Promise.resolve(null),
       found ? c.walletHistory(found.wallet.id) : Promise.resolve({ ledger: [], payments: [] }),
       userId ? supabaseAdmin.from("profiles").select("display_name, avatar, terms_accepted_at").eq("id", userId).maybeSingle().then((r) => r.data) : Promise.resolve(null),
       c.isAdmin(userId),
+      userId ? supabaseAdmin.auth.admin.getUserById(userId).then((r) => r.data.user?.email ?? null, () => null) : Promise.resolve(null),
     ]);
-    return { signedIn: Boolean(userId), isAdmin: admin, summary, history, profile };
+    return { signedIn: Boolean(userId), isAdmin: admin, summary, history, profile, email };
   });
 
 export const claimGuestWallet = createServerFn({ method: "POST" })
