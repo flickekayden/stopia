@@ -33,32 +33,49 @@ export function tribunalDefendant<T extends { id: string; created_at: string }>(
   return ordered[(Math.max(1, round) - 1) % ordered.length]?.id ?? null;
 }
 
+/**
+ * Tribunal with 3+ players: a random defense lawyer drawn among everyone except the defendant.
+ * `roll` is a number in [0, 1); duels (2 players) have no lawyer.
+ */
+export function tribunalLawyer(playerIds: readonly string[], defendantId: string, roll: number) {
+  const others = [...new Set(playerIds)].filter((id) => id !== defendantId).sort();
+  if (others.length < 2) return null;
+  const index = Math.min(others.length - 1, Math.max(0, Math.floor((Number.isFinite(roll) ? roll : 0) * others.length)));
+  return others[index]!;
+}
+
 export type Verdict = "culpado" | "inocente";
 
-export function scoreTribunal(defendantId: string, votes: Record<string, Verdict>) {
+/** Jury verdict. Defendant and lawyer never vote; innocent pays 3 to both ("honorários"). */
+export function scoreTribunal(defendantId: string, votes: Record<string, Verdict>, lawyerId?: string | null) {
   let guilty = 0;
   let innocent = 0;
+  const defense = (id: string) => id === defendantId || (!!lawyerId && id === lawyerId);
   for (const [voter, verdict] of Object.entries(votes)) {
-    if (voter === defendantId) continue;
+    if (defense(voter)) continue;
     if (verdict === "culpado") guilty += 1;
     else innocent += 1;
   }
   const verdict: Verdict = guilty > innocent ? "culpado" : "inocente";
   const deltas: Deltas = {};
-  if (verdict === "inocente") add(deltas, defendantId, 3);
+  if (verdict === "inocente") {
+    add(deltas, defendantId, 3);
+    if (lawyerId && lawyerId !== defendantId) add(deltas, lawyerId, 3);
+  }
   for (const [voter, vote] of Object.entries(votes)) {
-    if (voter !== defendantId && vote === verdict) add(deltas, voter, 1);
+    if (!defense(voter) && vote === verdict) add(deltas, voter, 1);
   }
   return { verdict, guilty, innocent, deltas };
 }
 
 /**
- * Tribunal judged by the AI. Innocent: the defendant gets 3 (+0..2 bonus).
+ * Tribunal judged by the AI. Innocent: the defendant (and the lawyer, if any) gets 3 (+0..2 bonus).
  * Guilty: every accuser who wrote gets 2 and the best accusation 1 more (+0..2 bonus); in a duel the
  * prosecutor is the only accuser, so it gets 3 (+bonus). No verdict (AI undecided) = 2 each, no bonus.
  */
 export function scoreTribunalJudge(params: {
   defendantId: string;
+  lawyerId?: string | null;
   accuserIds: readonly string[];
   verdict: Verdict | null;
   bestAccuserId?: string | null;
@@ -66,14 +83,17 @@ export function scoreTribunalJudge(params: {
 }) {
   const deltas: Deltas = {};
   const extra = Math.max(0, Math.min(2, Math.round(Number.isFinite(params.bonus) ? params.bonus : 0)));
-  const accusers = params.accuserIds.filter((id) => id !== params.defendantId);
+  const lawyer = params.lawyerId && params.lawyerId !== params.defendantId ? params.lawyerId : null;
+  const accusers = params.accuserIds.filter((id) => id !== params.defendantId && id !== lawyer);
   if (params.verdict === null) {
     add(deltas, params.defendantId, 2);
+    if (lawyer) add(deltas, lawyer, 2);
     for (const id of accusers) add(deltas, id, 2);
     return { deltas, bestAccuserId: null };
   }
   if (params.verdict === "inocente") {
     add(deltas, params.defendantId, 3 + extra);
+    if (lawyer) add(deltas, lawyer, 3 + extra);
     return { deltas, bestAccuserId: null };
   }
   const best = params.bestAccuserId && accusers.includes(params.bestAccuserId) ? params.bestAccuserId : accusers.length === 1 ? accusers[0]! : null;
