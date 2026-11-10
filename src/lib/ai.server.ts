@@ -24,9 +24,54 @@ export async function generateJsonGemini<T>(params: {
   schema: JsonSchema;
   model?: string | undefined;
 }): Promise<T> {
+  // Key pool from the admin panel: free keys first, failover to the next on limit/credit/error.
+  const pool = await import("./gemini-pool.server");
+  const keys = await pool.usableKeys();
+  const reasons: string[] = [];
+  for (const k of keys) {
+    try {
+      const out = await generateJsonGoogle<T>(k.api_key, params, 3);
+      void pool.markKeySuccess(k.id);
+      return out;
+    } catch (err) {
+      if (err instanceof GeminiHttpError) {
+        reasons.push(await pool.markKeyFailure(k.id, err.status, err.detail));
+        continue;
+      }
+      throw err; // malformed response, not the key's fault
+    }
+  }
   const geminiKey = process.env["GEMINI_API_KEY"];
   if (geminiKey) return generateJsonGoogle<T>(geminiKey, params);
+  if (keys.length > 0) {
+    const { exhaustedMessage } = await import("./gemini-keys");
+    throw new Error(exhaustedMessage(reasons));
+  }
   return generateJsonGatewayGemini<T>(params);
+}
+
+/** Raw Gemini HTTP failure, used by the pool to classify and rotate keys. */
+export class GeminiHttpError extends Error {
+  constructor(public status: number, public detail: string) {
+    super(`Falha no Gemini (${status})`);
+  }
+}
+
+/** Single test call for one key from the admin panel. */
+export async function testGeminiKey(apiKey: string, model: string) {
+  const started = Date.now();
+  try {
+    await generateJsonGoogle<{ ok: boolean }>(apiKey, {
+      instructions: "Responda com {\"ok\": true}.",
+      input: "teste",
+      schema: { type: "object", properties: { ok: { type: "boolean" } }, required: ["ok"] },
+      model,
+    }, 3);
+    return { ok: true as const, ms: Date.now() - started };
+  } catch (err) {
+    if (err instanceof GeminiHttpError) return { ok: false as const, ms: Date.now() - started, status: err.status, detail: err.detail.slice(0, 300) };
+    return { ok: false as const, ms: Date.now() - started, status: 0, detail: err instanceof Error ? err.message : "erro" };
+  }
 }
 
 async function generateJsonGoogle<T>(
@@ -58,6 +103,10 @@ async function generateJsonGoogle<T>(
 
   if (!res.ok) {
     const detail = await res.text().catch(() => "");
+    // Pool calls (attempt 3) report raw failures so the next key can be tried.
+    if (attempt >= 3 && (res.status === 429 || res.status >= 500 || res.status === 400 || res.status === 401 || res.status === 402 || res.status === 403)) {
+      throw new GeminiHttpError(res.status, detail);
+    }
     if (res.status === 401 || res.status === 403) {
       throw new Error("A chave do Gemini foi recusada. Confira se ela está correta e ativa.");
     }
