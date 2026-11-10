@@ -1,6 +1,8 @@
 import { useSyncExternalStore, type KeyboardEvent } from "react";
 import { Check, Palette } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useSound } from "@/components/SoundProvider";
 import { DEFAULT_THEME, THEMES, readTheme, setTheme, subscribeTheme, type ThemeId } from "@/lib/themes";
 
@@ -59,5 +61,20 @@ export function ThemePicker() {
       </div>
       <p className="text-xs text-muted-foreground">Vale só para este aparelho. Cada jogador escolhe o seu.</p>
     </section>
+  );
+}
+
+/** Compact "Tema" button that opens the scheme picker in a bottom sheet. */
+export function ThemeButton() {
+  return (
+    <Dialog>
+      <DialogTrigger asChild>
+        <Button variant="ghost" className="h-11 px-3 text-sm"><Palette /> Tema</Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader><DialogTitle>Tema do jogo</DialogTitle></DialogHeader>
+        <ThemePicker />
+      </DialogContent>
+    </Dialog>
   );
 }

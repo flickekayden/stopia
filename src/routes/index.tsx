@@ -10,7 +10,7 @@ import { InstallApp } from "@/components/InstallApp";
 import { PartyIcon } from "@/components/party/PartyIcon";
 import { GameRulesDialog } from "@/components/party/RulesList";
 import { useSound } from "@/components/SoundProvider";
-import { ThemePicker } from "@/components/ThemePicker";
+import { ThemeButton } from "@/components/ThemePicker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { vibrate } from "@/lib/haptics";
@@ -118,6 +118,7 @@ function GamesHub() {
             <Link to={credits.signedIn ? "/perfil" : "/entrar"}><UserRound /> {credits.signedIn ? "Meu Stopia" : "Entrar"}</Link>
           </Button>
           {!credits.signedIn && <Button asChild variant="ghost" className="h-11 px-3 text-sm"><Link to="/perfil">Meu saldo</Link></Button>}
+          <ThemeButton />
         </div>
       </header>
 
@@ -169,8 +170,6 @@ function GamesHub() {
         </form>
         <p className="text-xs text-muted-foreground">Ao criar ou entrar numa sala você aceita os <Link to="/termos" className="underline">Termos e regras de convivência</Link> e a <Link to="/privacidade" className="underline">Política de privacidade</Link>.</p>
       </section>
-
-      <ThemePicker />
 
       <section className="space-y-3" aria-labelledby="hub-vitrine">
         <h2 id="hub-vitrine" className="section-label">Jogos da sala</h2>
