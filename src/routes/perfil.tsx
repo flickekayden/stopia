@@ -122,6 +122,7 @@ function ProfilePage() {
           <div className="min-w-0">
             <h1 className="font-display text-4xl leading-none text-primary">Meu Stopia</h1>
             <p className="text-sm text-muted-foreground">{status === "loading" ? "Carregando…" : signedIn ? `Conta${account?.isAdmin ? " · administrador" : ""}` : "Convidado neste aparelho"}</p>
+            {signedIn && account?.email && <p className="truncate text-sm font-semibold" title={account.email}>{account.email}</p>}
           </div>
         </div>
       </header>
