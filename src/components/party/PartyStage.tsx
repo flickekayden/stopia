@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { ArrowLeft, Award, BookOpen, Bot, Check, Clock, Copy, Crown, EyeOff, Eye, Gavel, LayoutGrid, Loader2, LogOut, RefreshCw, Share2, SkipForward, Sparkles, Swords, Trophy, Users } from "lucide-react";
+import { ArrowLeft, Award, BookOpen, Bot, Check, Clock, Copy, Crown, EyeOff, Eye, Gavel, LayoutGrid, Loader2, LogOut, Play, RefreshCw, Share2, SkipForward, Sparkles, Swords, Trophy, Users } from "lucide-react";
 import { toast } from "sonner";
 
 import { CrowdReactions } from "@/components/party/CrowdReactions";
@@ -9,6 +9,7 @@ import { GameRulesDialog, RulesList } from "@/components/party/RulesList";
 import { StopLobbySettings, StopRules } from "@/components/party/StopParty";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import type { PartyPlayer, PartyPrivateView, PartyRoom } from "@/hooks/use-party-room";
@@ -191,47 +192,6 @@ function GameMetaLine({ game }: { game: LobbyGameMeta }) {
   );
 }
 
-function GamePicker({ ctx, actions, onRules, onPicked }: { ctx: LobbyCtx; actions: PartyActions; onRules: (game: LobbyGameId) => void; onPicked: () => void }) {
-  return (
-    <section className="space-y-3" aria-labelledby="lobby-pick">
-      <h2 id="lobby-pick" className="text-lg font-bold">Escolha o jogo</h2>
-      <div className="grid grid-cols-2 gap-2">
-        {LOBBY_GAMES.map((game, index) => {
-          const active = ctx.selected === game.id;
-          return (
-            <div key={game.id} data-game={game.id} className="flex flex-col gap-1.5">
-            <button
-              type="button"
-              aria-pressed={active}
-              disabled={ctx.busy !== null}
-              onClick={() => {
-                // Picking opens that game's setup screen right away so its settings are never missed below the fold.
-                if (active) onPicked();
-                else void actions.select(game.id).then((ok) => { if (ok) onPicked(); });
-              }}
-              className={cn(
-                "party-card flex min-h-36 flex-1 flex-col items-start gap-2 p-3 text-left transition-transform active:scale-[0.98] disabled:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                active && "ring-2 ring-[var(--game-accent)]",
-              )}
-              style={{ "--enter-index": index } as CSSProperties}
-            >
-              <span className="party-icon size-10"><PartyIcon name={game.icon} className="size-5" /></span>
-              <span className="text-balance-safe font-bold leading-tight">{game.name}</span>
-              <span className="text-xs font-semibold leading-snug party-accent">{game.tagline}</span>
-              <span className="mt-auto"><GameMetaLine game={game} /></span>
-              {active && <span className="inline-flex items-center gap-1 text-xs font-bold party-accent"><Check className="size-3.5" aria-hidden="true" /> Escolhido</span>}
-            </button>
-            <Button type="button" variant="ghost" className="h-11 w-full text-sm font-semibold" onClick={() => onRules(game.id)} aria-label={`Regras de ${game.name}`}>
-              <BookOpen /> Regras
-            </Button>
-            </div>
-          );
-        })}
-      </div>
-    </section>
-  );
-}
-
 const JUDGE_LABELS = { ia: "Juiz de IA", voto: "Votação da galera" } as const;
 
 type JudgedGame = "tribunal" | "debate" | "roleta";
@@ -406,28 +366,6 @@ function SelectedGame({ ctx, actions, selected }: { ctx: LobbyCtx; actions: Part
   );
 }
 
-/** Every game with a rules button, so any player in the room can read how each one works. */
-function RulesShelf({ onRules }: { onRules: (game: LobbyGameId) => void }) {
-  return (
-    <ul className="grid grid-cols-2 gap-2 text-left">
-      {LOBBY_GAMES.map((game) => (
-        <li key={game.id} data-game={game.id}>
-          <button
-            type="button"
-            onClick={() => onRules(game.id)}
-            className="flex min-h-14 w-full items-center gap-2 rounded-lg bg-secondary/60 p-2 text-left text-sm font-semibold transition-transform active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            aria-label={`Regras de ${game.name}`}
-          >
-            <PartyIcon name={game.icon} className="size-4 shrink-0 party-accent" />
-            <span className="min-w-0 flex-1 text-balance-safe leading-tight">{game.name}</span>
-            <BookOpen className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-          </button>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
 /** Big room code with the full invite link: copy it or open the phone's share sheet. */
 function RoomShareCard({ code, game }: { code: string; game: string }) {
   const [url, setUrl] = useState(`/festa/${code}`);
@@ -507,6 +445,81 @@ function RoomShareCard({ code, game }: { code: string; game: string }) {
   );
 }
 
+const LOBBY_CAPACITY = 12;
+
+/** Top row: one round avatar per player (host crown, night king) plus dashed empty seats. */
+function LobbySlots({ players, me }: { players: PartyPlayer[]; me: PartyPlayer }) {
+  const king = nightKingId(players);
+  const empty = Math.max(0, Math.min(LOBBY_CAPACITY - players.length, Math.max(2, 4 - players.length)));
+  return (
+    <section aria-label="Jogadores na sala" className="space-y-3">
+      <ul className="-mx-4 flex gap-1 overflow-x-auto px-4 pb-1 pt-2 [scrollbar-width:none]">
+        {players.map((p) => (
+          <li key={p.id} className="lobby-slot">
+            <span className="lobby-avatar" aria-hidden="true">
+              {p.nickname.charAt(0).toUpperCase()}
+              {p.is_host && <span className="absolute -top-2 left-1/2 -translate-x-1/2 text-gold"><Crown className="size-4 fill-current" /></span>}
+              {p.is_bot && <span className="absolute -bottom-1 -right-1 grid size-5 place-items-center rounded-full bg-card text-muted-foreground"><Bot className="size-3" /></span>}
+            </span>
+            <span className="w-full truncate text-center text-[0.6875rem] font-extrabold uppercase tracking-wide">
+              {p.id === king ? "👑 " : ""}{p.nickname}{p.id === me.id ? " (você)" : ""}
+            </span>
+          </li>
+        ))}
+        {Array.from({ length: empty }, (_, i) => (
+          <li key={`empty-${i}`} className="lobby-slot" aria-hidden="true">
+            <span className="lobby-avatar" data-empty="true">+</span>
+            <span className="text-[0.6875rem] font-bold uppercase tracking-wide text-muted-foreground">Vazio</span>
+          </li>
+        ))}
+      </ul>
+      <p className="mx-auto w-fit rounded-full glass-surface border px-4 py-1.5 text-xs font-extrabold uppercase tracking-wider tabular-nums">
+        <Users className="mr-1.5 inline size-3.5 align-[-2px]" aria-hidden="true" />{players.length} / {LOBBY_CAPACITY} jogadores
+      </p>
+    </section>
+  );
+}
+
+/** "Modos" tab: the six games as a clean vertical list. The host picks; everyone can open the rules. */
+function ModeList({ ctx, actions, onRules, onPicked }: { ctx: LobbyCtx; actions: PartyActions; onRules: (game: LobbyGameId) => void; onPicked: () => void }) {
+  return (
+    <ul className="space-y-2.5" aria-label="Modos de jogo">
+      {LOBBY_GAMES.map((game, index) => {
+        const active = ctx.selected === game.id;
+        return (
+          <li key={game.id} data-game={game.id} className="flex items-stretch gap-2">
+            <button
+              type="button"
+              aria-pressed={active}
+              disabled={ctx.busy !== null}
+              onClick={() => {
+                if (!ctx.isHost) { onRules(game.id); return; }
+                if (active) onPicked();
+                else void actions.select(game.id).then((ok) => { if (ok) onPicked(); });
+              }}
+              className="party-card lobby-mode min-w-0 flex-1 disabled:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              style={{ "--enter-index": index } as CSSProperties}
+            >
+              <span className="party-icon size-12 rounded-2xl"><PartyIcon name={game.icon} className="size-6" /></span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-balance-safe font-display text-base uppercase leading-tight tracking-wide">{game.name}</span>
+                <span className="mt-0.5 block text-xs font-semibold leading-snug text-muted-foreground">{game.tagline}</span>
+                <span className="mt-1 block"><GameMetaLine game={game} /></span>
+              </span>
+              {active && <span className="grid size-7 shrink-0 place-items-center rounded-full party-accent-button"><Check className="size-4" aria-label="Escolhido" /></span>}
+            </button>
+            {ctx.isHost && (
+              <Button type="button" variant="ghost" size="icon" className="h-auto w-11 shrink-0" onClick={() => onRules(game.id)} aria-label={`Regras de ${game.name}`}>
+                <BookOpen />
+              </Button>
+            )}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
 export function PartyLobby({ ctx, actions }: { ctx: LobbyCtx; actions: PartyActions }) {
   const selected = ctx.selected;
   const meta = selected ? lobbyGameMeta(selected) : null;
@@ -514,82 +527,80 @@ export function PartyLobby({ ctx, actions }: { ctx: LobbyCtx; actions: PartyActi
   const missing = selected ? missingPlayers(selected, connected) : 0;
   const [rulesFor, setRulesFor] = useState<LobbyGameId | null>(null);
   const [unlockOpen, setUnlockOpen] = useState(false);
-  // Host: the game picker, or the chosen game's setup screen (settings first, room info below).
-  const [picking, setPicking] = useState(false);
-  const showSetup = Boolean(selected) && !(ctx.isHost && picking);
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [tab, setTab] = useState<"modos" | "config">("modos");
   const firstRender = useRef(true);
   useEffect(() => {
     if (firstRender.current) { firstRender.current = false; return; }
     window.scrollTo({ top: 0, behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
-  }, [showSetup, selected]);
-  const roomInfo = (
-    <>
-      <RoomShareCard code={ctx.room.code} game={ctx.room.game} />
-      <PlayersPanel players={ctx.players} me={ctx.me} actions={actions} busy={ctx.busy !== null} />
-    </>
-  );
+  }, [tab]);
 
   return (
-    <div className="dock-clearance space-y-4">
+    <div className="dock-clearance space-y-5">
       <NightCrownBanner players={ctx.players} me={ctx.me} />
-      {showSetup && selected ? (
-        <>
-          {ctx.isHost && (
-            <Button variant="ghost" className="-ml-2 h-11 px-2 font-semibold" disabled={ctx.busy !== null} onClick={() => setPicking(true)}>
-              <ArrowLeft /> Escolher outro jogo
-            </Button>
+      <LobbySlots players={ctx.players} me={ctx.me} />
+
+      <div className="lobby-tabs" role="tablist" aria-label="Seções do lobby">
+        <button type="button" role="tab" id="tab-modos" aria-controls="panel-modos" aria-selected={tab === "modos"} className="lobby-tab" onClick={() => setTab("modos")}>Modos</button>
+        <button type="button" role="tab" id="tab-config" aria-controls="panel-config" aria-selected={tab === "config"} className="lobby-tab" onClick={() => setTab("config")}>Customizado</button>
+      </div>
+
+      {tab === "modos" ? (
+        <div id="panel-modos" role="tabpanel" aria-labelledby="tab-modos" className="space-y-3">
+          {!ctx.isHost && (
+            <p role="status" className="text-center text-sm font-semibold text-muted-foreground">
+              {selected ? <>O Mestre escolheu <strong className="text-foreground">{meta!.name}</strong>. Toque num jogo para ler as regras.</> : "Aguardando o Mestre escolher… toque num jogo para ler as regras."}
+            </p>
           )}
-          <SelectedGame ctx={ctx} actions={actions} selected={selected} />
-          {roomInfo}
-        </>
+          <ModeList ctx={ctx} actions={actions} onRules={setRulesFor} onPicked={() => setTab("config")} />
+        </div>
       ) : (
-        roomInfo
-      )}
-
-      {ctx.isHost && !showSetup ? (
-        <GamePicker ctx={ctx} actions={actions} onRules={setRulesFor} onPicked={() => setPicking(false)} />
-      ) : !selected ? (
-        <section className="party-prompt space-y-4 text-center" role="status">
-          <span className="party-icon mx-auto size-14 motion-safe:animate-pulse"><Sparkles className="size-7" aria-hidden="true" /></span>
-          <div className="space-y-1">
-            <h2 className="text-xl font-bold">Aguardando o Mestre escolher o jogo...</h2>
-            <p className="text-sm text-muted-foreground">Enquanto isso, toque num jogo para ler as regras:</p>
-          </div>
-          <RulesShelf onRules={setRulesFor} />
-        </section>
-      ) : null}
-
-
-      {!ctx.isHost && selected && (
-        <section className="space-y-3" aria-labelledby="lobby-all-rules">
-          <h2 id="lobby-all-rules" className="section-label">Regras dos jogos</h2>
-          <RulesShelf onRules={setRulesFor} />
-        </section>
+        <div id="panel-config" role="tabpanel" aria-labelledby="tab-config" className="space-y-4">
+          {selected ? (
+            <SelectedGame ctx={ctx} actions={actions} selected={selected} />
+          ) : (
+            <section className="party-panel space-y-3 text-center">
+              <span className="party-icon mx-auto size-12"><Sparkles className="size-6" aria-hidden="true" /></span>
+              <p className="font-bold">{ctx.isHost ? "Escolha um jogo primeiro" : "O Mestre ainda está escolhendo o jogo"}</p>
+              {ctx.isHost && <Button variant="secondary" onClick={() => setTab("modos")}><LayoutGrid /> Ver modos</Button>}
+            </section>
+          )}
+          <PlayersPanel players={ctx.players} me={ctx.me} actions={actions} busy={ctx.busy !== null} />
+        </div>
       )}
 
       <GameRulesDialog game={rulesFor} onClose={() => setRulesFor(null)} />
-
       <AiAccountDialog open={unlockOpen} onOpenChange={setUnlockOpen} returnTo={`/festa/${ctx.room.code}`} />
+      <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Convidar a galera</DialogTitle>
+            <DialogDescription>Quem abrir o link entra direto nesta sala.</DialogDescription>
+          </DialogHeader>
+          <RoomShareCard code={ctx.room.code} game={ctx.room.game} />
+        </DialogContent>
+      </Dialog>
 
-      <div data-game={selected ?? undefined} className="mobile-bottom-bar fixed inset-x-0 bottom-0 mx-auto w-full max-w-md border-t border-border bg-background/95 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
-        {ctx.isHost ? (
-          <div className="space-y-2">
-            {selected && ctx.credits && (
-              <HostCreditLine balance={ctx.credits.balance} billed={ctx.credits.billed} stop={selected === "stop"} estimate={aiRequestEstimate(selected, ctx.settings, connected)} onUnlock={() => setUnlockOpen(true)} />
-            )}
-            {selected && missing === 0 && <p role="status" className="flex items-center justify-center gap-1.5 text-center text-sm font-semibold text-success"><Check className="size-4" aria-hidden="true" /> Tudo pronto: {connected} jogadores conectados</p>}
-            {selected && missing > 0 && <p role="status" className="text-center text-sm text-muted-foreground">Necessário mínimo de {meta!.minPlayers} jogadores conectados{connected < ctx.players.length ? ` (${ctx.players.length - connected} ausente${ctx.players.length - connected > 1 ? "s" : ""})` : ""}. Compartilhe o código!</p>}
-            <Button className="party-accent-button h-14 w-full text-lg font-bold shadow-none" disabled={!selected || missing > 0 || ctx.busy !== null} aria-busy={ctx.busy === "start"} onClick={() => {
+      <div data-game={selected ?? undefined} className="mobile-bottom-bar fixed inset-x-0 bottom-0 mx-auto w-full max-w-md space-y-2 border-t border-border bg-background/95 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+        {ctx.isHost && selected && ctx.credits && (
+          <HostCreditLine balance={ctx.credits.balance} billed={ctx.credits.billed} stop={selected === "stop"} estimate={aiRequestEstimate(selected, ctx.settings, connected)} onUnlock={() => setUnlockOpen(true)} />
+        )}
+        {ctx.isHost && selected && missing > 0 && <p role="status" className="text-center text-xs text-muted-foreground">Mínimo de {meta!.minPlayers} jogadores conectados{connected < ctx.players.length ? ` (${ctx.players.length - connected} ausente${ctx.players.length - connected > 1 ? "s" : ""})` : ""}. Convide a galera!</p>}
+        <div className={cn("grid gap-2", ctx.isHost ? "grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]" : "grid-cols-1")}>
+          <Button variant="outline" className="h-14 text-base font-extrabold uppercase tracking-wide" onClick={() => setInviteOpen(true)}>
+            <Share2 /> Convidar
+          </Button>
+          {ctx.isHost ? (
+            <Button className="party-accent-button h-14 text-base font-extrabold uppercase tracking-wide shadow-none" disabled={!selected || missing > 0 || ctx.busy !== null} aria-busy={ctx.busy === "start"} onClick={() => {
               // Stop is judged by the AI: a host without an account is invited to sign in first.
               if (selected === "stop" && ctx.credits && !ctx.credits.billed) { setUnlockOpen(true); return; }
               void actions.start();
             }}>
-              {ctx.busy === "start" ? <><Loader2 className="animate-spin" /> Preparando…</> : !selected ? "Escolha um jogo" : `Iniciar ${meta!.name}`}
+              {ctx.busy === "start" ? <><Loader2 className="animate-spin" /> Preparando…</> : !selected ? "Escolha um jogo" : <><Play className="fill-current" /> Iniciar</>}
             </Button>
-          </div>
-        ) : (
-          <p role="status" className="flex h-14 items-center justify-center gap-2 text-sm text-muted-foreground"><span className="size-2 rounded-full bg-primary motion-safe:animate-pulse" aria-hidden="true" /> {selected ? "Esperando o mestre começar…" : "Aguardando o Mestre escolher o jogo..."}</p>
-        )}
+          ) : null}
+        </div>
+        {!ctx.isHost && <p role="status" className="flex items-center justify-center gap-2 text-xs text-muted-foreground"><span className="size-2 rounded-full bg-primary motion-safe:animate-pulse" aria-hidden="true" /> {selected ? "Esperando o mestre começar…" : "Aguardando o Mestre escolher o jogo..."}</p>}
       </div>
     </div>
   );

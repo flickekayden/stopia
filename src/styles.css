@@ -545,3 +545,72 @@ input, select, textarea { font-size: max(16px, 1em); }
 .legal-prose h2 { margin-top: 1.5rem; font-size: 1.125rem; font-weight: 700; }
 .legal-prose p, .legal-prose li { margin-top: 0.5rem; font-size: 0.9375rem; line-height: 1.6; color: var(--muted-foreground); }
 .legal-prose ul { list-style: disc; padding-left: 1.25rem; }
+
+/* "Céu" scheme: light sky blue, Material elevation with frosted-glass surfaces (default for new devices). */
+:root[data-theme="ceu"] {
+  color-scheme: light;
+  --device-surround: oklch(0.86 0.04 235);
+  --overlay: oklch(0.25 0.05 245 / 0.45);
+  --background: oklch(0.955 0.025 230);
+  --foreground: oklch(0.24 0.06 250);
+  --card: oklch(1 0 0 / 0.72); --card-foreground: var(--foreground);
+  --popover: oklch(0.99 0.008 230); --popover-foreground: var(--foreground);
+  --primary: oklch(0.55 0.19 255); --primary-foreground: oklch(0.99 0.005 230);
+  --secondary: oklch(0.92 0.035 232); --secondary-foreground: var(--foreground);
+  --muted: oklch(0.93 0.03 232); --muted-foreground: oklch(0.44 0.05 250);
+  --accent: var(--secondary); --accent-foreground: var(--foreground);
+  --border: oklch(0.86 0.04 235); --input: oklch(0.82 0.05 238);
+  --surface-raised: oklch(1 0 0 / 0.85);
+  --destructive: oklch(0.55 0.21 25); --destructive-foreground: oklch(0.99 0.005 230);
+  --success: oklch(0.52 0.14 160);
+  --gold: oklch(0.8 0.155 85); --gold-foreground: oklch(0.24 0.06 250);
+  --silver: oklch(0.55 0.03 250);
+  --bronze: oklch(0.55 0.12 50);
+  --ring: var(--primary); --chart-1: var(--primary);
+  --glass: oklch(1 0 0 / 0.68);
+  --glass-strong: oklch(1 0 0 / 0.82);
+  --glass-edge: oklch(1 0 0 / 0.75);
+  --sky-glow-1: oklch(0.88 0.08 225 / 0.9);
+  --sky-glow-2: oklch(0.9 0.07 260 / 0.8);
+  --shadow-panel: 0 1px 2px oklch(0.4 0.08 250 / 0.06), 0 10px 28px -14px oklch(0.45 0.12 250 / 0.28);
+  --shadow-dock: 0 -10px 30px -12px oklch(0.45 0.12 250 / 0.28);
+  --game-tribunal: oklch(0.58 0.16 55);
+  --game-autor: oklch(0.56 0.2 350);
+  --game-infiltrado: oklch(0.56 0.2 25);
+  --game-debate: oklch(0.52 0.15 235);
+  --game-roleta: oklch(0.54 0.15 150);
+  --sidebar: var(--popover); --sidebar-foreground: var(--foreground); --sidebar-primary: var(--primary); --sidebar-primary-foreground: var(--primary-foreground); --sidebar-accent: var(--secondary); --sidebar-accent-foreground: var(--foreground); --sidebar-border: var(--border); --sidebar-ring: var(--primary);
+}
+:root[data-theme="ceu"] body,
+:root[data-theme="ceu"] .mobile-app-frame {
+  background-color: var(--background);
+  background-image: radial-gradient(60% 40% at 10% 0%, var(--sky-glow-1), transparent 70%), radial-gradient(55% 35% at 100% 30%, var(--sky-glow-2), transparent 70%);
+  background-attachment: fixed;
+}
+:root[data-theme="ceu"] :is(.party-card, .party-panel, .party-prompt, .room-ticket, .credit-badge, .party-choice, .glass-surface) {
+  background: var(--glass);
+  backdrop-filter: blur(18px) saturate(150%);
+  border-color: var(--glass-edge);
+  box-shadow: var(--shadow-panel);
+}
+:root[data-theme="ceu"] .party-prompt { background: color-mix(in oklch, var(--game-accent) 8%, var(--glass-strong)); }
+:root[data-theme="ceu"] .mobile-bottom-bar,
+:root[data-theme="ceu"] .round-hud {
+  background: var(--glass-strong);
+  backdrop-filter: blur(20px) saturate(160%);
+  border-color: var(--glass-edge);
+}
+
+/* Lobby: avatar slots, segmented tabs and the clean game list. */
+.lobby-slot { display: flex; flex-direction: column; align-items: center; gap: 0.25rem; width: 4.25rem; flex-shrink: 0; }
+.lobby-avatar { position: relative; display: grid; place-items: center; width: 3.5rem; height: 3.5rem; border-radius: 9999px; font-family: var(--font-display); font-size: 1.375rem; background: var(--primary); color: var(--primary-foreground); box-shadow: var(--shadow-panel); border: 3px solid var(--card); }
+.lobby-avatar[data-empty="true"] { background: transparent; color: var(--muted-foreground); border: 2px dashed var(--input); box-shadow: none; font-size: 1.25rem; }
+.lobby-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 0.25rem; padding: 0.25rem; border-radius: 9999px; background: var(--secondary); }
+.lobby-tab { min-height: 44px !important; border-radius: 9999px; font-weight: 800; font-size: 0.8125rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted-foreground); transition: background-color 160ms ease, color 160ms ease; }
+.lobby-tab[aria-selected="true"] { background: var(--card); color: var(--foreground); box-shadow: var(--shadow-panel); }
+:root[data-theme="ceu"] .lobby-tabs { background: oklch(1 0 0 / 0.5); backdrop-filter: blur(14px); border: 1px solid var(--glass-edge); }
+:root[data-theme="ceu"] .lobby-tab[aria-selected="true"] { background: var(--primary); color: var(--primary-foreground); }
+.lobby-mode { display: flex; width: 100%; align-items: center; gap: 0.875rem; padding: 0.75rem 0.875rem; text-align: left; border-radius: calc(var(--radius) + 6px); border: 2px solid transparent; transition: transform 150ms ease, border-color 150ms ease; }
+.lobby-mode:active { transform: scale(0.98); }
+.lobby-mode[aria-pressed="true"] { border-color: var(--game-accent); box-shadow: 0 0 0 4px color-mix(in oklch, var(--game-accent) 18%, transparent), var(--shadow-panel); }
+@media (prefers-reduced-motion: reduce) { .lobby-mode, .lobby-tab { transition: none; } .lobby-mode:active { transform: none; } }
