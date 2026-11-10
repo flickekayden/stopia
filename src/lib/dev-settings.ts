@@ -4,7 +4,7 @@ export const DEV_KEY_STORAGE = "stop-dev-key";
 export const DEV_KEY = "stop-dev-unlocked-v1";
 const SETTINGS_KEY = "stop-dev-settings";
 
-export const GEMINI_MODELS = ["gemini-3.6-flash", "gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.5-flash-lite"] as const;
+export const GEMINI_MODELS = ["gemini-3.6-flash", "gemini-2.5-flash", "gemini-3.8-flash", "gemini-2.5-pro", "gemini-2.5-flash-lite"] as const;
 export type GeminiModel = (typeof GEMINI_MODELS)[number];
 export const SOUND_PACKS = ["padrao", "suave", "agudo", "grave", "mudo"] as const;
 export type SoundPack = (typeof SOUND_PACKS)[number];
