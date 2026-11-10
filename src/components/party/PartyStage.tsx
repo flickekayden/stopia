@@ -192,47 +192,6 @@ function GameMetaLine({ game }: { game: LobbyGameMeta }) {
   );
 }
 
-function GamePicker({ ctx, actions, onRules, onPicked }: { ctx: LobbyCtx; actions: PartyActions; onRules: (game: LobbyGameId) => void; onPicked: () => void }) {
-  return (
-    <section className="space-y-3" aria-labelledby="lobby-pick">
-      <h2 id="lobby-pick" className="text-lg font-bold">Escolha o jogo</h2>
-      <div className="grid grid-cols-2 gap-2">
-        {LOBBY_GAMES.map((game, index) => {
-          const active = ctx.selected === game.id;
-          return (
-            <div key={game.id} data-game={game.id} className="flex flex-col gap-1.5">
-            <button
-              type="button"
-              aria-pressed={active}
-              disabled={ctx.busy !== null}
-              onClick={() => {
-                // Picking opens that game's setup screen right away so its settings are never missed below the fold.
-                if (active) onPicked();
-                else void actions.select(game.id).then((ok) => { if (ok) onPicked(); });
-              }}
-              className={cn(
-                "party-card flex min-h-36 flex-1 flex-col items-start gap-2 p-3 text-left transition-transform active:scale-[0.98] disabled:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                active && "ring-2 ring-[var(--game-accent)]",
-              )}
-              style={{ "--enter-index": index } as CSSProperties}
-            >
-              <span className="party-icon size-10"><PartyIcon name={game.icon} className="size-5" /></span>
-              <span className="text-balance-safe font-bold leading-tight">{game.name}</span>
-              <span className="text-xs font-semibold leading-snug party-accent">{game.tagline}</span>
-              <span className="mt-auto"><GameMetaLine game={game} /></span>
-              {active && <span className="inline-flex items-center gap-1 text-xs font-bold party-accent"><Check className="size-3.5" aria-hidden="true" /> Escolhido</span>}
-            </button>
-            <Button type="button" variant="ghost" className="h-11 w-full text-sm font-semibold" onClick={() => onRules(game.id)} aria-label={`Regras de ${game.name}`}>
-              <BookOpen /> Regras
-            </Button>
-            </div>
-          );
-        })}
-      </div>
-    </section>
-  );
-}
-
 const JUDGE_LABELS = { ia: "Juiz de IA", voto: "Votação da galera" } as const;
 
 type JudgedGame = "tribunal" | "debate" | "roleta";
@@ -404,28 +363,6 @@ function SelectedGame({ ctx, actions, selected }: { ctx: LobbyCtx; actions: Part
       </section>
       {selected === "stop" ? <StopLobbySettings ctx={ctx} actions={actions} /> : <PartySettingsPanel ctx={ctx} actions={actions} game={selected} />}
     </div>
-  );
-}
-
-/** Every game with a rules button, so any player in the room can read how each one works. */
-function RulesShelf({ onRules }: { onRules: (game: LobbyGameId) => void }) {
-  return (
-    <ul className="grid grid-cols-2 gap-2 text-left">
-      {LOBBY_GAMES.map((game) => (
-        <li key={game.id} data-game={game.id}>
-          <button
-            type="button"
-            onClick={() => onRules(game.id)}
-            className="flex min-h-14 w-full items-center gap-2 rounded-lg bg-secondary/60 p-2 text-left text-sm font-semibold transition-transform active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            aria-label={`Regras de ${game.name}`}
-          >
-            <PartyIcon name={game.icon} className="size-4 shrink-0 party-accent" />
-            <span className="min-w-0 flex-1 text-balance-safe leading-tight">{game.name}</span>
-            <BookOpen className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-          </button>
-        </li>
-      ))}
-    </ul>
   );
 }
 
