@@ -9,6 +9,8 @@ import { adminAdjustCredits, adminCreditAbuse, adminListReports, adminOverview, 
 import { REPEATED_ATTEMPTS } from "@/lib/credit-monitor";
 import { getDevToken } from "@/lib/dev-settings";
 
+import { GeminiKeysAdmin } from "./GeminiKeysAdmin";
+
 type Overview = Awaited<ReturnType<typeof adminOverview>>;
 type Report = Awaited<ReturnType<typeof adminListReports>>[number];
 type Abuse = Awaited<ReturnType<typeof adminCreditAbuse>>;
@@ -101,6 +103,8 @@ export function BusinessAdmin() {
     : [];
 
   return (
+    <>
+    <GeminiKeysAdmin />
     <section className="space-y-4 rounded-2xl border border-border p-3" aria-labelledby="biz-title">
       <div className="flex items-center justify-between gap-2">
         <h3 id="biz-title" className="font-bold">Negócio e moderação</h3>
@@ -174,5 +178,6 @@ export function BusinessAdmin() {
         ))}
       </div>
     </section>
+    </>
   );
 }
