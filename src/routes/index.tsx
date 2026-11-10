@@ -144,10 +144,6 @@ function GamesHub() {
             </Button>
           </div>
         </div>
-        <Button className="h-14 w-full text-lg font-bold" disabled={busy !== null} aria-busy={busy === "create"} onClick={() => void handleCreate()}>
-          {busy === "create" ? <Loader2 className="animate-spin" /> : <Users />}
-          {busy === "create" ? "Criando sala…" : "Criar Sala da Galera"}
-        </Button>
         <form onSubmit={handleJoin} className="space-y-2" aria-labelledby="hub-join-title">
           <p id="hub-join-title" className="section-label">Entrar com código</p>
           <div className="flex gap-2">
@@ -168,6 +164,11 @@ function GamesHub() {
           </div>
           <p className="text-xs text-muted-foreground">Todos os jogos, incluindo o Stop, acontecem nesta sala. Só quem cria a sala gasta créditos de IA, e a IA exige conta.</p>
         </form>
+        <div className="flex items-center gap-3 text-xs font-semibold text-muted-foreground" aria-hidden="true"><span className="h-px flex-1 bg-border" />ou<span className="h-px flex-1 bg-border" /></div>
+        <Button className="h-14 w-full text-lg font-bold" disabled={busy !== null} aria-busy={busy === "create"} onClick={() => void handleCreate()}>
+          {busy === "create" ? <Loader2 className="animate-spin" /> : <Users />}
+          {busy === "create" ? "Criando sala…" : "Criar Sala da Galera"}
+        </Button>
         <p className="text-xs text-muted-foreground">Ao criar ou entrar numa sala você aceita os <Link to="/termos" className="underline">Termos e regras de convivência</Link> e a <Link to="/privacidade" className="underline">Política de privacidade</Link>.</p>
       </section>
 
