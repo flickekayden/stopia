@@ -56,6 +56,51 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_api_keys: {
+        Row: {
+          api_key: string
+          cooldown_until: string | null
+          created_at: string
+          enabled: boolean
+          id: string
+          label: string
+          last_error: string | null
+          last_error_at: string | null
+          last_used_at: string | null
+          status: string
+          tier: string
+          uses: number
+        }
+        Insert: {
+          api_key: string
+          cooldown_until?: string | null
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          label: string
+          last_error?: string | null
+          last_error_at?: string | null
+          last_used_at?: string | null
+          status?: string
+          tier?: string
+          uses?: number
+        }
+        Update: {
+          api_key?: string
+          cooldown_until?: string | null
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          label?: string
+          last_error?: string | null
+          last_error_at?: string | null
+          last_used_at?: string | null
+          status?: string
+          tier?: string
+          uses?: number
+        }
+        Relationships: []
+      }
       ai_usage: {
         Row: {
           created_at: string
