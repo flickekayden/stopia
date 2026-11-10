@@ -1,7 +1,7 @@
 // Device-local colour schemes every player can pick on the home screen.
 // Token values live in src/styles.css under :root[data-theme="…"]; this module only names them.
 
-export type ThemeId = "premium" | "neon" | "brasa" | "floresta" | "festa" | "caderno";
+export type ThemeId = "ceu" | "premium" | "neon" | "brasa" | "floresta" | "festa" | "caderno";
 
 export interface AppTheme {
   id: ThemeId;
@@ -11,10 +11,11 @@ export interface AppTheme {
   swatches: [string, string, string];
 }
 
-export const DEFAULT_THEME: ThemeId = "premium";
+export const DEFAULT_THEME: ThemeId = "ceu";
 export const THEME_STORAGE_KEY = "stopia-theme";
 
 export const THEMES: readonly AppTheme[] = [
+  { id: "ceu", name: "Céu", description: "Azul claro com vidro jateado", swatches: ["#E3F0FB", "#FFFFFF", "#2563EB"] },
   { id: "premium", name: "Clássico", description: "Grafite e amarelo elétrico", swatches: ["#101114", "#1C1E23", "#FFD429"] },
   { id: "neon", name: "Neon", description: "Azul-noite e ciano", swatches: ["#0B1022", "#151C36", "#3FE0E8"] },
   { id: "brasa", name: "Brasa", description: "Carvão quente e laranja", swatches: ["#160F0C", "#241914", "#FF7A2F"] },
@@ -28,7 +29,8 @@ export function sanitizeTheme(value: unknown): ThemeId {
 }
 
 /** Inline script for <head>: applies the saved theme before first paint to avoid a colour flash. */
-export const THEME_BOOT_SCRIPT = `try{var t=localStorage.getItem(${JSON.stringify(THEME_STORAGE_KEY)});if(${JSON.stringify(THEMES.map((theme) => theme.id))}.indexOf(t)>0)document.documentElement.setAttribute("data-theme",t)}catch(e){}`;
+// "premium" uses the plain :root tokens; every other scheme (including the default) is set on <html data-theme>.
+export const THEME_BOOT_SCRIPT = `(function(){var t=${JSON.stringify(DEFAULT_THEME)};try{var s=localStorage.getItem(${JSON.stringify(THEME_STORAGE_KEY)});if(${JSON.stringify(THEMES.map((theme) => theme.id))}.indexOf(s)>=0)t=s}catch(e){}document.documentElement.setAttribute("data-theme",t)})()`;
 
 type Listener = () => void;
 const listeners = new Set<Listener>();
@@ -44,8 +46,7 @@ export function readTheme(): ThemeId {
 
 export function applyTheme(id: ThemeId) {
   const root = document.documentElement;
-  if (id === DEFAULT_THEME) root.removeAttribute("data-theme");
-  else root.setAttribute("data-theme", id);
+  root.setAttribute("data-theme", id);
 }
 
 export function setTheme(id: ThemeId) {
