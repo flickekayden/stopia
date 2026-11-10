@@ -42,3 +42,12 @@ describe("room chat and nicknames", () => {
     for (let i = 0; i < 50; i += 1) expect(randomNickname().length).toBeLessThanOrEqual(NICKNAME_MAX);
   });
 });
+
+import { describe as d2, expect as e2, it as i2 } from "bun:test";
+d2("infiltrado clue time", () => {
+  i2("defaults to 90s and honours host choice", () => {
+    e2(hostPhaseSeconds("infiltrado", "clues", readPartySettings({}))).toBe(90);
+    e2(hostPhaseSeconds("infiltrado", "clues", readPartySettings({ infiltradoSeconds: 180 }))).toBe(180);
+    e2(hostPhaseSeconds("infiltrado", "clues", readPartySettings({ infiltradoSeconds: 999 }))).toBe(90);
+  });
+});

@@ -41,6 +41,7 @@ export const updatePartySettings = createServerFn({ method: "POST" })
           roletaJudge: z.enum(["auto", "ia", "voto"]).optional(),
           autorSeconds: z.number().int().optional(),
           infiltradoTheme: z.string().max(40).optional(),
+          infiltradoSeconds: z.number().int().optional(),
           stopSeconds: z.number().int().optional(),
           scoring: z.enum(["fixed", "free"]).optional(),
           aiIntensity: z.enum(["leve", "padrao", "acida"]).optional(),
