@@ -25,6 +25,7 @@ import {
   scoreTribunalJudge,
   shuffle,
   tribunalDefendant,
+  tribunalLawyer,
   type Deltas,
   type Verdict,
 } from "./party-engine";
@@ -82,6 +83,7 @@ type BotCache = { stop?: Record<string, Record<string, string>>; texts?: Record<
 type RoundPrivate = {
   prompt?: PartyPrompt;
   defendantId?: string;
+  lawyerId?: string;
   sides?: Record<string, "A" | "B">;
   infiltradoId?: string;
   word?: string;
@@ -604,6 +606,8 @@ async function buildPrompt(room: RoomRow, players: PlayerRow[], round: number, s
     const defendantId = tribunalDefendant(players, round) ?? players[0]!.id;
     const defendant = players.find((p) => p.id === defendantId)?.nickname ?? "Réu";
     data.defendantId = defendantId;
+    const lawyerId = tribunalLawyer(players.map((p) => p.id), defendantId, Math.random());
+    if (lawyerId) data.lawyerId = lawyerId;
     let prompt: PartyPrompt | null = null;
     if (ai) {
       try {
@@ -713,6 +717,7 @@ async function startRound(room: RoomRow, players: PlayerRow[], round: number, sc
     submitted: [],
     scores,
     ...(stored.defendantId ? { defendantId: stored.defendantId } : {}),
+    ...(stored.lawyerId ? { lawyerId: stored.lawyerId } : {}),
     ...(stored.sides ? { sides: stored.sides } : {}),
     ...(game === "roleta" ? { skipsLeft: skipsLeft ?? settings.skips } : {}),
   };
@@ -1026,8 +1031,9 @@ async function advanceOnce(room: RoomRow): Promise<boolean> {
 
   if (game === "tribunal") {
     if (phase === "defense") {
-      const entries = textEntries(subs, present).sort((a, b) => (a.playerId === state.defendantId ? -1 : b.playerId === state.defendantId ? 1 : 0));
-      const voters = presentIds.filter((id) => id !== state.defendantId);
+      const rank = (id?: string) => (id === state.defendantId ? 0 : id === state.lawyerId ? 1 : 2);
+      const entries = textEntries(subs, present).sort((a, b) => rank(a.playerId) - rank(b.playerId));
+      const voters = presentIds.filter((id) => id !== state.defendantId && id !== state.lawyerId);
       if (judgedByAi) {
         if (entries.length === 0) return reveal({ notice: "Ninguém escreveu nada: o tribunal foi adiado sem pontos." }, {}, null);
         return claimJudge({ entries, eligible: [] });
@@ -1037,14 +1043,14 @@ async function advanceOnce(room: RoomRow): Promise<boolean> {
     const votes: Record<string, Verdict> = {};
     for (const s of subs) if (s.payload.verdict === "culpado" || s.payload.verdict === "inocente") votes[s.player_id] = s.payload.verdict;
     const defendantId = state.defendantId ?? "";
-    const result = scoreTribunal(defendantId, votes);
-    const defense = state.entries?.find((e) => e.playerId === defendantId)?.text ?? "(o réu ficou em silêncio)";
+    const result = scoreTribunal(defendantId, votes, state.lawyerId);
+    const defense = tribunalDefenseText(state.entries ?? [], defendantId, state.lawyerId);
     return reveal({ verdict: result.verdict, guilty: result.guilty, innocent: result.innocent, votes }, result.deltas, async () =>
       (await ai()).aiTribunalVerdict({
         caso: state.prompt?.text ?? "",
         reu: nickname(defendantId),
         defesa: defense,
-        acusacoes: (state.entries ?? []).filter((e) => e.playerId !== defendantId).map((e) => e.text),
+        acusacoes: (state.entries ?? []).filter((e) => e.playerId !== defendantId && e.playerId !== state.lawyerId).map((e) => e.text),
         veredito: result.verdict,
         votos_culpado: result.guilty,
         votos_inocente: result.innocent,
@@ -1147,6 +1153,14 @@ async function advanceOnce(room: RoomRow): Promise<boolean> {
  * stays in the deterministic engine. If the AI fails, the round falls back to a group vote instead of
  * stalling — except a Tribunal duel, where a one-person jury makes no sense, so it ends in a draw.
  */
+/** Defense read by the judge: the defendant's statement plus the lawyer's thesis when there is one. */
+function tribunalDefenseText(entries: readonly { playerId?: string | null; text: string }[], defendantId: string, lawyerId?: string | null) {
+  const own = entries.find((e) => e.playerId === defendantId)?.text;
+  const lawyer = lawyerId ? entries.find((e) => e.playerId === lawyerId)?.text : undefined;
+  if (!lawyer) return own ?? "(o réu ficou em silêncio)";
+  return `Depoimento do réu: ${own ?? "(o réu ficou em silêncio)"}\nTese do advogado de defesa: ${lawyer}`;
+}
+
 async function runPartyJudge(room: RoomRow, presentIds: string[], settings: PartySettings, admin: PartyAdminConfig) {
   const game = gameOf(room);
   const state = readPublicState(room.public_state);
@@ -1163,15 +1177,16 @@ async function runPartyJudge(room: RoomRow, presentIds: string[], settings: Part
     let deltas: Deltas;
     let text: string;
     if (game === "tribunal") {
-      const defense = labelled.find((l) => l.id === defendantId)?.text ?? "(o réu ficou em silêncio)";
-      const accusations = labelled.filter((l) => l.id !== defendantId).map((l, index) => ({ ...l, label: String(index + 1) }));
+      const lawyerId = state.lawyerId ?? null;
+      const defense = tribunalDefenseText(labelled.map((l) => ({ playerId: l.id, text: l.text })), defendantId, lawyerId);
+      const accusations = labelled.filter((l) => l.id !== defendantId && l.id !== lawyerId).map((l, index) => ({ ...l, label: String(index + 1) }));
       const made = await paid(() => ai.aiJudgeTribunal({
         caso: state.prompt?.text ?? "",
         defesa: defense,
         acusacoes: accusations.map((a) => ({ rotulo: a.label, texto: a.text })),
       }, tone));
       const bestAccuserId = made.bestLabel ? accusations.find((a) => a.label === made.bestLabel)?.id ?? null : null;
-      const scored = scoreTribunalJudge({ defendantId, accuserIds: accusations.map((a) => a.id), verdict: made.verdict, bestAccuserId, bonus: made.bonus });
+      const scored = scoreTribunalJudge({ defendantId, lawyerId, accuserIds: accusations.map((a) => a.id), verdict: made.verdict, bestAccuserId, bonus: made.bonus });
       results = {
         verdict: made.verdict,
         judge: { by: "ia", bestId: scored.bestAccuserId, bonus: Math.max(0, Math.min(2, Math.round(made.bonus))), sentence: made.sentence },
@@ -1216,7 +1231,7 @@ async function runPartyJudge(room: RoomRow, presentIds: string[], settings: Part
   } catch (err) {
     const noCredits = err instanceof NoAiCredits;
     if (game === "tribunal" && presentIds.length <= 2) {
-      const scored = scoreTribunalJudge({ defendantId, accuserIds: presentIds.filter((id) => id !== defendantId), verdict: null, bonus: 0 });
+      const scored = scoreTribunalJudge({ defendantId, lawyerId: state.lawyerId ?? null, accuserIds: presentIds.filter((id) => id !== defendantId), verdict: null, bonus: 0 });
       await guardedUpdate(room, {
         phase: "reveal",
         phase_started_at: new Date().toISOString(),
@@ -1232,7 +1247,7 @@ async function runPartyJudge(room: RoomRow, presentIds: string[], settings: Part
       });
       return;
     }
-    const voters = game === "tribunal" ? presentIds.filter((id) => id !== defendantId) : presentIds;
+    const voters = game === "tribunal" ? presentIds.filter((id) => id !== defendantId && id !== state.lawyerId) : presentIds;
     await guardedUpdate(room, {
       phase: "vote",
       phase_started_at: new Date().toISOString(),
@@ -1302,8 +1317,8 @@ async function buildTribunalCommentary(room: RoomRow) {
       return {
         caso: data.prompt?.text ?? "",
         reu: label.get(defendantId) ?? "?",
-        defesa: text(defendantId),
-        acusacoes: texts.filter((s) => s.player_id !== defendantId).map((s) => ({ rotulo: label.get(s.player_id)!, texto: text(s.player_id) })).filter((a) => a.texto),
+        defesa: [text(defendantId), data.lawyerId ? text(data.lawyerId) : ""].filter(Boolean).join(" | Advogado: "),
+        acusacoes: texts.filter((s) => s.player_id !== defendantId && s.player_id !== data.lawyerId).map((s) => ({ rotulo: label.get(s.player_id)!, texto: text(s.player_id) })).filter((a) => a.texto),
       };
     }).filter((c) => c.defesa || c.acusacoes.length > 0);
     if (casos.length === 0) throw new Error("sem casos");
@@ -1625,6 +1640,7 @@ function botRole(game: PartyGameId, bot: PlayerRow, state: PartyPublicState, rp:
   const prompt = state.prompt;
   if (game === "tribunal") {
     const defendant = bot.id === state.defendantId;
+    if (bot.id === state.lawyerId) return { papel: "advogado de defesa: escreve a tese que inocenta o réu", fallback: "defesa", contexto: prompt?.text ?? "" };
     return { papel: defendant ? "réu: escreve a própria defesa" : "acusador: escreve a acusação contra o réu", fallback: defendant ? "defesa" : "acusacao", contexto: prompt?.text ?? "" };
   }
   if (game === "infiltrado") {

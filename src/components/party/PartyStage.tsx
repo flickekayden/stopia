@@ -733,11 +733,14 @@ function SecretCard({ ctx }: { ctx: PartyCtx }) {
 }
 
 /** Tribunal: who you are in this case and who decides, so nobody has to guess their job. */
-function TribunalRole({ ctx, isDefendant, duel }: { ctx: PartyCtx; isDefendant: boolean; duel: boolean }) {
+function TribunalRole({ ctx, isDefendant, isLawyer, duel }: { ctx: PartyCtx; isDefendant: boolean; isLawyer: boolean; duel: boolean }) {
   const byAi = duel || effectiveJudgeFor("tribunal", ctx.settings, (ctx.state.eligible ?? []).length) === "ia";
-  const role = isDefendant ? "RÉU" : duel ? "PROMOTOR" : "ACUSADOR";
+  const lawyerName = ctx.state.lawyerId ? nick(ctx.players, ctx.state.lawyerId) : null;
+  const role = isDefendant ? "RÉU" : isLawyer ? "ADVOGADO" : duel ? "PROMOTOR" : "ACUSADOR";
   const mission = isDefendant
-    ? "Convença o juiz da sua inocência."
+    ? `Convença o juiz da sua inocência.${lawyerName ? ` Seu advogado sorteado: @${lawyerName}.` : ""}`
+    : isLawyer
+    ? `Você foi sorteado para defender @${nick(ctx.players, ctx.state.defendantId)}. Se o réu sair inocente, você ganha os honorários.`
     : `Convença o juiz de que @${nick(ctx.players, ctx.state.defendantId)} é culpado.`;
   return (
     <div className="rounded-xl border-2 border-[var(--game-accent)] bg-background p-4" role="note" aria-label={`Seu papel: ${role}`}>
@@ -818,7 +821,7 @@ function EntryList({ ctx, entries, onPick, selected, showAuthor }: { ctx: PartyC
         const side = entry.playerId ? ctx.state.sides?.[entry.playerId] : undefined;
         const content = (
           <>
-            {showAuthor && <p className="text-xs font-semibold text-muted-foreground">{nick(ctx.players, entry.playerId)}{own ? " (você)" : ""}{side ? ` · Lado ${side}` : ""}{entry.playerId === ctx.state.defendantId ? " · RÉU" : ""}</p>}
+            {showAuthor && <p className="text-xs font-semibold text-muted-foreground">{nick(ctx.players, entry.playerId)}{own ? " (você)" : ""}{side ? ` · Lado ${side}` : ""}{entry.playerId === ctx.state.defendantId ? " · RÉU" : entry.playerId && entry.playerId === ctx.state.lawyerId ? " · ADVOGADO" : ""}</p>}
             <p className="text-balance-safe mt-0.5 text-base font-semibold">“{entry.text}”</p>
           </>
         );
@@ -978,6 +981,7 @@ export function PartyPlay({ ctx, actions }: { ctx: PartyCtx; actions: PartyActio
 
   const defendant = ctx.state.defendantId;
   const isDefendant = defendant === ctx.me.id;
+  const isLawyer = !!ctx.state.lawyerId && ctx.state.lawyerId === ctx.me.id;
   const accusedName = nick(ctx.players, ctx.state.accusedId);
 
   let body: React.ReactNode = null;
@@ -997,8 +1001,8 @@ export function PartyPlay({ ctx, actions }: { ctx: PartyCtx; actions: PartyActio
     const duel = (ctx.state.eligible ?? []).length <= 2;
     body = (
       <div className="space-y-3">
-        <TribunalRole ctx={ctx} isDefendant={isDefendant} duel={duel} />
-        <TextSubmit ctx={ctx} actions={actions} label={isDefendant ? "Sua defesa" : duel ? `Sua acusação contra @${nick(ctx.players, defendant)}` : `Acuse ou testemunhe contra @${nick(ctx.players, defendant)}`} placeholder={isDefendant ? "Excelência, eu posso explicar…" : "Excelência, as provas são claras…"} />
+        <TribunalRole ctx={ctx} isDefendant={isDefendant} isLawyer={isLawyer} duel={duel} />
+        <TextSubmit ctx={ctx} actions={actions} label={isDefendant ? "Seu depoimento" : isLawyer ? `Sua tese de defesa de @${nick(ctx.players, defendant)}` : duel ? `Sua acusação contra @${nick(ctx.players, defendant)}` : `Acuse ou testemunhe contra @${nick(ctx.players, defendant)}`} placeholder={isDefendant ? "Excelência, eu posso explicar…" : isLawyer ? "Excelência, meu cliente é inocente porque…" : "Excelência, as provas são claras…"} />
       </div>
     );
   } else if (phase === "write") {
@@ -1142,7 +1146,7 @@ function RevealBody({ ctx }: { ctx: PartyCtx }) {
               <li key={entry.id} className={cn("party-panel answer-card", best && "ring-2 ring-[var(--game-accent)]")} style={{ "--enter-index": index } as CSSProperties}>
                 <p className="text-xs font-semibold text-muted-foreground">
                   {best && <Trophy className="mr-1 inline size-3.5 party-accent" aria-label="Melhor acusação" />}
-                  {nick(ctx.players, id)}{id === ctx.me.id ? " (você)" : ""} · {isDefendant ? "Defesa" : (ctx.state.eligible ?? []).length <= 2 ? "Promotor" : "Acusação"}
+                  {nick(ctx.players, id)}{id === ctx.me.id ? " (você)" : ""} · {isDefendant ? "Defesa" : id === ctx.state.lawyerId ? "Advogado de defesa" : (ctx.state.eligible ?? []).length <= 2 ? "Promotor" : "Acusação"}
                 </p>
                 <p className="text-balance-safe mt-0.5 font-semibold">“{entry.text}”</p>
               </li>

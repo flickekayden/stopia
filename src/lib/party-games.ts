@@ -161,7 +161,7 @@ export const STOP_ANSWER_MAX = 80;
 export type JudgeMode = "auto" | "ia" | "voto";
 export const JUDGE_MODES: readonly JudgeMode[] = ["auto", "ia", "voto"];
 export const DEBATE_SECONDS_OPTIONS = [60, 90, 120, 180] as const;
-export const TRIBUNAL_SECONDS_OPTIONS = [60, 90, 120, 180] as const;
+export const TRIBUNAL_SECONDS_OPTIONS = [60, 90, 120, 180, 240, 300] as const;
 export const ROLETA_SECONDS_OPTIONS = [45, 60, 90, 180, 300] as const;
 export const AUTOR_SECONDS_OPTIONS = [60, 75, 90, 120] as const;
 
@@ -395,6 +395,8 @@ export type PartyMine = { text?: string; target?: string; verdict?: string; gues
 export type PartyPublicState = {
   prompt?: PartyPrompt;
   defendantId?: string;
+  /** Tribunal with 3+ players: randomly drawn defense lawyer. */
+  lawyerId?: string;
   sides?: Record<string, "A" | "B">;
   eligible?: string[];
   submitted?: string[];
