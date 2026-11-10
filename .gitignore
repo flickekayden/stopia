@@ -30,3 +30,15 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Android / Play Store (never commit signing keys or builds)
+*.keystore
+*.jks
+*.aab
+*.apk
+android/app/build/
+android/.gradle/
+
+# Env files
+.env.local
+.env.*.local
